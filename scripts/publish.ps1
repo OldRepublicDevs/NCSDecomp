@@ -9,10 +9,16 @@
 
 $ErrorActionPreference = "Stop"
 
-# Detect platform (PowerShell Core 6+)
-$IsWindows = if ($PSVersionTable.PSVersion.Major -ge 6) { $IsWindows } else { $env:OS -eq "Windows_NT" }
-$IsLinux = if ($PSVersionTable.PSVersion.Major -ge 6) { $IsLinux } else { $false }
-$IsMacOS = if ($PSVersionTable.PSVersion.Major -ge 6) { $IsMacOS } else { $false }
+# Detect platform (PowerShell Core 6+ has automatic variables, fallback for older versions)
+if ($PSVersionTable.PSVersion.Major -ge 6) {
+    # Use automatic variables in PowerShell Core 6+
+    # $IsWindows, $IsLinux, $IsMacOS are automatically available
+} else {
+    # Fallback for Windows PowerShell 5.1
+    if (-not (Test-Path variable:IsWindows)) { $script:IsWindows = $env:OS -eq "Windows_NT" }
+    if (-not (Test-Path variable:IsLinux)) { $script:IsLinux = $false }
+    if (-not (Test-Path variable:IsMacOS)) { $script:IsMacOS = $false }
+}
 
 Write-Host "NCSDecomp CLI - Publishing Package" -ForegroundColor Green
 Write-Host "================================" -ForegroundColor Green
