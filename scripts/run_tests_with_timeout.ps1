@@ -4,17 +4,28 @@
 # See LICENSE.txt file in the project root for full license information.
 
 # PowerShell script to run tests with 2-minute timeout and profiling
+# Cross-platform compatible (Windows, macOS, Linux)
 param(
     [int]$TimeoutSeconds = 120
 )
 
-$junitStandalone = "lib\junit-platform-console-standalone-1.10.0.jar"
+# Detect platform (PowerShell Core 6+ has automatic variables, fallback for older versions)
+if ($PSVersionTable.PSVersion.Major -ge 6) {
+    # Use automatic variables in PowerShell Core 6+
+    # $IsWindows is automatically available
+} else {
+    # Fallback for Windows PowerShell 5.1
+    if (-not (Test-Path variable:IsWindows)) { $script:IsWindows = $env:OS -eq "Windows_NT" }
+}
+
+$junitStandalone = Join-Path "." (Join-Path "lib" "junit-platform-console-standalone-1.10.0.jar")
 if (-not (Test-Path $junitStandalone)) {
     Write-Host "Error: JUnit JAR not found at $junitStandalone" -ForegroundColor Red
     exit 1
 }
 
 # Ensure build directory exists and has compiled classes
+$buildDir = Join-Path "." "build"
 if (-not (Test-Path $buildDir)) {
     Write-Host "Error: Build directory not found. Run build.ps1 first." -ForegroundColor Red
     exit 1
