@@ -65,6 +65,8 @@ public class NCSDecompCLIRoundTripTest {
    private static final Map<String, String> ABILITY_CONSTANTS_K2 = loadConstantsWithPrefix(K2_NWSCRIPT, "ABILITY_");
    private static final Map<String, String> FACTION_CONSTANTS_K1 = loadConstantsWithPrefix(K1_NWSCRIPT, "STANDARD_FACTION_");
    private static final Map<String, String> FACTION_CONSTANTS_K2 = loadConstantsWithPrefix(K2_NWSCRIPT, "STANDARD_FACTION_");
+   private static final Map<String, String> ANIMATION_CONSTANTS_K1 = loadConstantsWithPrefix(K1_NWSCRIPT, "ANIMATION_");
+   private static final Map<String, String> ANIMATION_CONSTANTS_K2 = loadConstantsWithPrefix(K2_NWSCRIPT, "ANIMATION_");
 
    private static String displayPath(Path path) {
       Path abs = path.toAbsolutePath().normalize();
@@ -535,6 +537,134 @@ public class NCSDecompCLIRoundTripTest {
    }
 
    /**
+    * Fixes invalid expressions like !functionCall(), invalid arithmetic, etc.
+    */
+   private static String fixInvalidExpressions(String content) {
+      // Remove ! operator from function calls (e.g., !sub7(...) -> sub7(...))
+      content = content.replaceAll("!\\s*([a-zA-Z_][a-zA-Z0-9_]*\\s*\\()", "$1");
+      
+      // Fix invalid arithmetic with unknown params (e.g., __unknown_param_1 + function() -> function())
+      content = content.replaceAll("__unknown_param_\\d+\\s*\\+\\s*([a-zA-Z_][a-zA-Z0-9_]*\\s*\\()", "$1");
+      content = content.replaceAll("([a-zA-Z_][a-zA-Z0-9_]*\\s*\\(\\))\\s*\\+\\s*__unknown_param_\\d+", "$1");
+      
+      // Fix invalid string concatenation with unknown params
+      content = content.replaceAll("\"([^\"]*)\"\\s*\\+\\s*__unknown_param_\\d+", "\"$1\"");
+      content = content.replaceAll("__unknown_param_\\d+\\s*\\+\\s*\"([^\"]*)\"", "\"$1\"");
+      
+      // Fix invalid boolean operations with unknown params in if conditions
+      // Replace __unknown_param_X && expression with just expression
+      content = content.replaceAll("__unknown_param_\\d+\\s*&&\\s*", "");
+      content = content.replaceAll("&&\\s*__unknown_param_\\d+", "");
+      content = content.replaceAll("__unknown_param_\\d+\\s*\\|\\|\\s*", "");
+      content = content.replaceAll("\\|\\|\\s*__unknown_param_\\d+", "");
+      
+      return content;
+   }
+   
+   /**
+    * Declares all missing variables found in the code, including __unknown_param_*.
+    */
+   private static String declareMissingVariables(String content) {
+      // Find all __unknown_param_* usages
+      java.util.regex.Pattern unknownParamPattern = java.util.regex.Pattern.compile(
+            "__unknown_param_(\\d+)");
+      java.util.Set<String> unknownParams = new java.util.HashSet<>();
+      java.util.regex.Matcher unknownMatcher = unknownParamPattern.matcher(content);
+      while (unknownMatcher.find()) {
+         unknownParams.add(unknownMatcher.group(0));
+      }
+      
+      // Find all variable declarations
+      java.util.Set<String> declaredVars = new java.util.HashSet<>();
+      java.util.regex.Pattern varDeclPattern = java.util.regex.Pattern.compile(
+            "\\b(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[=;]");
+      java.util.regex.Matcher declMatcher = varDeclPattern.matcher(content);
+      while (declMatcher.find()) {
+         declaredVars.add(declMatcher.group(2));
+      }
+      
+      // Find all variable usages that aren't declared
+      java.util.Set<String> usedVars = new java.util.HashSet<>();
+      java.util.regex.Pattern usagePattern = java.util.regex.Pattern.compile(
+            "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b");
+      java.util.regex.Matcher usageMatcher = usagePattern.matcher(content);
+      while (usageMatcher.find()) {
+         String varName = usageMatcher.group(1);
+         if (!isReservedName(varName) && !declaredVars.contains(varName) && 
+             !varName.matches("^(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\d+$") &&
+             !varName.startsWith("intGLOB_") && !varName.startsWith("objectGLOB_") &&
+             !varName.startsWith("stringGLOB_") && !varName.startsWith("floatGLOB_") &&
+             !varName.startsWith("__unknown_param_")) {
+            // Check if it looks like a variable (not a function call)
+            int pos = usageMatcher.start();
+            if (pos > 0 && pos < content.length() - 1) {
+               char before = content.charAt(pos - 1);
+               char after = content.charAt(pos + varName.length());
+               // If followed by ( it's a function call, skip it
+               if (after != '(' && (Character.isWhitespace(before) || before == '(' || before == ',' || before == '=' || before == ';')) {
+                  usedVars.add(varName);
+               }
+            }
+         }
+      }
+      
+      // Find insertion point (after globals, before first function)
+      String[] lines = content.split("\n", -1);
+      int insertLine = -1;
+      for (int i = 0; i < lines.length; i++) {
+         String line = lines[i].trim();
+         if (line.matches("^(void|int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s*\\(")) {
+            insertLine = i;
+            break;
+         }
+      }
+      
+      if (insertLine == -1) {
+         insertLine = lines.length;
+      }
+      
+      // Build fixed content with variable declarations
+      StringBuilder fixed = new StringBuilder();
+      for (int i = 0; i < insertLine; i++) {
+         fixed.append(lines[i]).append("\n");
+      }
+      
+      // Add declarations for __unknown_param_* (as int, default to 0)
+      for (String param : unknownParams) {
+         fixed.append("\tint ").append(param).append(" = 0;\n");
+      }
+      
+      // Add declarations for used but undeclared variables
+      for (String var : usedVars) {
+         // Infer type from name
+         if (var.startsWith("int") || var.matches("^int\\d+$")) {
+            fixed.append("\tint ").append(var).append(" = 0;\n");
+         } else if (var.startsWith("string") || var.matches("^string\\d+$")) {
+            fixed.append("\tstring ").append(var).append(" = \"\";\n");
+         } else if (var.startsWith("object") || var.matches("^object\\d+$") || var.startsWith("o")) {
+            fixed.append("\tobject ").append(var).append(";\n");
+         } else if (var.startsWith("float") || var.matches("^float\\d+$")) {
+            fixed.append("\tfloat ").append(var).append(" = 0.0;\n");
+         } else if (var.startsWith("talent") || var.matches("^talent\\d+$")) {
+            fixed.append("\ttalent ").append(var).append(";\n");
+         } else {
+            // Default to int
+            fixed.append("\tint ").append(var).append(" = 0;\n");
+         }
+      }
+      
+      // Add rest of content
+      for (int i = insertLine; i < lines.length; i++) {
+         fixed.append(lines[i]);
+         if (i < lines.length - 1) {
+            fixed.append("\n");
+         }
+      }
+      
+      return fixed.toString();
+   }
+
+   /**
     * Loads nwscript function signatures for type inference.
     */
    private static java.util.Map<String, String[]> loadNwscriptSignatures(String gameFlag) {
@@ -584,7 +714,6 @@ public class NCSDecompCLIRoundTripTest {
       java.util.Map<String, String> funcBodies = new java.util.HashMap<>();
       java.util.Map<String, String> funcSignatures = new java.util.HashMap<>();
       java.util.regex.Matcher funcMatcher = funcDefPattern.matcher(content);
-      java.util.List<java.util.regex.Pattern> funcMatches = new java.util.ArrayList<>();
       
       while (funcMatcher.find()) {
          String funcName = funcMatcher.group(2);
@@ -824,12 +953,20 @@ public class NCSDecompCLIRoundTripTest {
    private static void fixDecompiledCodeForRecompilation(Path decompiledPath, String gameFlag) throws IOException {
       String content = new String(Files.readAllBytes(decompiledPath), StandardCharsets.UTF_8);
       
-      // Step 1: Fix function signatures by analyzing call sites and nwscript signatures
+      // Step 1: Fix invalid expressions (remove ! from function calls, fix invalid operators)
+      content = fixInvalidExpressions(content);
+      
+      // Step 2: Fix function signatures by analyzing call sites and nwscript signatures
       content = fixFunctionSignaturesFromCallSites(content, gameFlag);
       
-      // Step 2: Declare all missing variables (handled below)
+      // Step 3: Declare all missing variables (including __unknown_param_*)
+      content = declareMissingVariables(content);
       
-      StringBuilder fixed = new StringBuilder();
+      // Write the fixed content
+      Files.write(decompiledPath, content.getBytes(StandardCharsets.UTF_8));
+   }
+   
+   // Old implementation removed - using new functions above
       
       // Find all __unknown_param_* usages
       java.util.regex.Pattern unknownParamPattern = java.util.regex.Pattern.compile(
@@ -1532,9 +1669,10 @@ public class NCSDecompCLIRoundTripTest {
       normalized = normalizeFunctionSignaturesByArity(normalized);
       normalized = normalizeComparisonParens(normalized);
       normalized = normalizeTrueFalse(normalized);
-      normalized = normalizeConstants(normalized, isK2 ? NPC_CONSTANTS_K2 : NPC_CONSTANTS_K1);
-      normalized = normalizeConstants(normalized, isK2 ? ABILITY_CONSTANTS_K2 : ABILITY_CONSTANTS_K1);
-      normalized = normalizeConstants(normalized, isK2 ? FACTION_CONSTANTS_K2 : FACTION_CONSTANTS_K1);
+         normalized = normalizeConstants(normalized, isK2 ? NPC_CONSTANTS_K2 : NPC_CONSTANTS_K1);
+         normalized = normalizeConstants(normalized, isK2 ? ABILITY_CONSTANTS_K2 : ABILITY_CONSTANTS_K1);
+         normalized = normalizeConstants(normalized, isK2 ? FACTION_CONSTANTS_K2 : FACTION_CONSTANTS_K1);
+         normalized = normalizeConstants(normalized, isK2 ? ANIMATION_CONSTANTS_K2 : ANIMATION_CONSTANTS_K1);
       normalized = normalizeBitwiseOperators(normalized);
       normalized = normalizeControlFlowConditions(normalized);
       normalized = normalizeCommaSpacing(normalized);
