@@ -2325,16 +2325,16 @@ public class NCSDecompCLIRoundTripTest {
       // We need to match the opening brace after function signature and remove it,
       // then match the closing brace before return and remove it
 
-      // Use a more careful approach: find function signatures followed by double opening braces
-      // Pattern matches: function() { followed by newline, optional tabs/spaces, and another {
-      // Replace with just: function() { (preserving the newline and ALL content after, including declarations)
-      // The key is to preserve everything after the function opening brace, including the first line
-      // Be very specific: match function() {, then newline, then tabs/spaces, then extra {
-      // This ensures we don't accidentally match across function boundaries
+      // Remove unnecessary extra blocks around function bodies
+      // Pattern: function() { { body } return; } -> function() { body return; }
+      // This handles cases where decompiler adds an extra block
+      // We need to match: function() { followed by newline, then tabs/spaces, then extra {
+      // The key is to preserve the newline and tabs so the declaration on the next line is preserved
+      // Try a very explicit pattern that handles tabs specifically
       java.util.regex.Pattern funcWithExtraBlock = java.util.regex.Pattern.compile(
-            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\n\\s*)\\{\\s*",
+            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{)(\\s*[\\r\\n]+[\\t ]*)\\{\\s*",
             java.util.regex.Pattern.MULTILINE);
-      result = funcWithExtraBlock.matcher(result).replaceAll("$1");
+      result = funcWithExtraBlock.matcher(result).replaceAll("$1$2");
 
       // Remove closing brace of extra block before return: } return; } -> return; }
       // Match: closing brace, optional whitespace/newlines, return statement,
