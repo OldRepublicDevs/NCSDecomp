@@ -1246,8 +1246,22 @@ public class Decompiler
 
    private void open(File[] files) {
       for (int j = 0; j < files.length; j++) {
-         if ((this.temp = files[j].getName()).substring(this.temp.length() - 3).equalsIgnoreCase("ncs")) {
-            this.decompile(files[j]);
+         File fileToOpen = files[j];
+         if ((this.temp = fileToOpen.getName()).substring(this.temp.length() - 3).equalsIgnoreCase("ncs")) {
+            // Ensure we use the absolute path of the dropped/opened file
+            File absoluteFile = fileToOpen.getAbsoluteFile();
+            if (!absoluteFile.exists()) {
+               this.status.append("Warning: File does not exist: " + absoluteFile.getAbsolutePath() + "\n");
+               continue;
+            }
+            
+            // Update Open Directory setting to the file's parent directory
+            File parentDir = absoluteFile.getParentFile();
+            if (parentDir != null && parentDir.exists()) {
+               settings.setProperty("Open Directory", parentDir.getAbsolutePath());
+            }
+            
+            this.decompile(absoluteFile);
             JComponent tabComponent = this.getSelectedTabComponent();
             if (tabComponent != null) {
                File file = this.hash_TabComponent2File.get(tabComponent);
@@ -1370,12 +1384,59 @@ public class Decompiler
          fileName = fileName.substring(0, lastDot);
       }
       
-      File newFile = this.saveBuffer(
-         textArea,
-         settings.getProperty("Output Directory") + "/" + buildOutputFilename(fileName)
-      );
-      
       this.file = this.hash_TabComponent2File.get(tabComponent);
+      
+      // Determine output file path
+      File newFile;
+      if (this.file != null && this.file.exists()) {
+         // File exists - use its directory as the save location (preserve original path)
+         File parentDir = this.file.getParentFile();
+         if (parentDir != null && parentDir.exists()) {
+            newFile = new File(parentDir, buildOutputFilename(fileName));
+         } else {
+            // Fallback to default output directory
+            String outputDir = settings.getProperty("Output Directory");
+            if (outputDir == null || outputDir.isEmpty()) {
+               outputDir = System.getProperty("user.dir");
+            }
+            newFile = new File(outputDir, buildOutputFilename(fileName));
+         }
+      } else {
+         // File doesn't exist (created from scratch) - save to default output directory
+         String outputDir = settings.getProperty("Output Directory");
+         if (outputDir == null || outputDir.isEmpty()) {
+            outputDir = System.getProperty("user.dir");
+         }
+         newFile = new File(outputDir, buildOutputFilename(fileName));
+         // Ensure output directory exists
+         File outputDirFile = newFile.getParentFile();
+         if (outputDirFile != null && !outputDirFile.exists()) {
+            if (!outputDirFile.mkdirs()) {
+               this.status.append("Warning: Could not create output directory: " + outputDirFile.getAbsolutePath() + "\n");
+            }
+         }
+      }
+      
+      newFile = this.saveBuffer(textArea, newFile.getAbsolutePath());
+      if (newFile == null) {
+         // saveBuffer failed (e.g., directory doesn't exist)
+         return;
+      }
+      
+      // If file was null or didn't exist, update the mapping to point to the newly saved file
+      if (this.file == null || !this.file.exists()) {
+         this.file = newFile;
+         this.hash_TabComponent2File.put(tabComponent, this.file);
+         // File was created from scratch - just mark as saved (no round-trip validation needed)
+         unsavedFiles.remove(this.file);
+         if (tabComponent instanceof JPanel) {
+            this.updateTabLabel((JPanel)tabComponent, false);
+         }
+         this.status.append("Saved " + newFile.getName() + " to " + newFile.getParent() + "\n");
+         return;
+      }
+      
+      // Only do round-trip validation if the original file exists
       if (unsavedFiles.contains(this.file)) {
          this.status.append("Recompiling..." + this.file.getName() + ": ");
          int result = 2;
@@ -1527,7 +1588,12 @@ public class Decompiler
 
    private void saveAll() {
       for (int i = 0; i < this.jTB.getTabCount(); i++) {
-         String fileName = ((JLabel)((JPanel)this.jTB.getTabComponentAt(i)).getComponent(0)).getText();
+         JComponent tabComponent = (JComponent)this.jTB.getTabComponentAt(i);
+         if (tabComponent == null) {
+            continue;
+         }
+         
+         String fileName = ((JLabel)((JPanel)tabComponent).getComponent(0)).getText();
          // Remove unsaved marker if present
          if (fileName.endsWith(" *")) {
             fileName = fileName.substring(0, fileName.length() - 2);
@@ -1538,18 +1604,62 @@ public class Decompiler
             fileName = fileName.substring(0, lastDot);
          }
          
-         File newFile = this.saveBuffer(
-            (JTextArea)((JScrollPane)((JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(i)))[0].getComponent(0)).getViewport().getView(),
-            settings.getProperty("Output Directory") + "/" + buildOutputFilename(fileName)
-         );
-         File file = this.hash_TabComponent2File.get((JComponent)this.jTB.getTabComponentAt(i));
+         File file = this.hash_TabComponent2File.get(tabComponent);
+         
+         // Determine output file path (same logic as save())
+         File newFile;
+         if (file != null && file.exists()) {
+            // File exists - use its directory as the save location
+            File parentDir = file.getParentFile();
+            if (parentDir != null && parentDir.exists()) {
+               newFile = new File(parentDir, buildOutputFilename(fileName));
+            } else {
+               // Fallback to default output directory
+               String outputDir = settings.getProperty("Output Directory");
+               if (outputDir == null || outputDir.isEmpty()) {
+                  outputDir = System.getProperty("user.dir");
+               }
+               newFile = new File(outputDir, buildOutputFilename(fileName));
+            }
+         } else {
+            // File doesn't exist (created from scratch) - save to default output directory
+            String outputDir = settings.getProperty("Output Directory");
+            if (outputDir == null || outputDir.isEmpty()) {
+               outputDir = System.getProperty("user.dir");
+            }
+            newFile = new File(outputDir, buildOutputFilename(fileName));
+            // Ensure output directory exists
+            File outputDirFile = newFile.getParentFile();
+            if (outputDirFile != null && !outputDirFile.exists()) {
+               outputDirFile.mkdirs();
+            }
+         }
+         
+         JTextArea textArea = (JTextArea)((JScrollPane)((JComponent[])this.jTB.getClientProperty(tabComponent))[0].getComponent(0)).getViewport().getView();
+         newFile = this.saveBuffer(textArea, newFile.getAbsolutePath());
+         if (newFile == null) {
+            continue; // saveBuffer failed
+         }
+         
+         // If file was null or didn't exist, update the mapping
+         if (file == null || !file.exists()) {
+            file = newFile;
+            this.hash_TabComponent2File.put(tabComponent, file);
+         }
+         
          int result = 2;
 
-         try {
-            result = this.fileDecompiler.compileAndCompare(file, newFile);
-         } catch (DecompilerException var6) {
-            JOptionPane.showMessageDialog(null, var6.getMessage());
-            newFile.renameTo(new File(this.getShortName(newFile) + "_failed.nss"));
+         // Only do round-trip validation if the original file exists
+         if (file != null && file.exists()) {
+            try {
+               result = this.fileDecompiler.compileAndCompare(file, newFile);
+            } catch (DecompilerException var6) {
+               JOptionPane.showMessageDialog(null, var6.getMessage());
+               newFile.renameTo(new File(this.getShortName(newFile) + "_failed.nss"));
+            }
+         } else {
+            // File was created from scratch - just mark as saved
+            result = 1; // SUCCESS
          }
 
          switch (result) {
