@@ -66,9 +66,12 @@ function Remove-ClassFiles {
 }
 
 # Clean build directory, JAR file, and any stray .class files for idempotent builds
-$buildDir = Join-Path "." "build"
-$cliJarFile = Join-Path "." "NCSDecomp-CLI.jar"
-$guiJarFile = Join-Path "." "NCSDecomp.jar"
+# Java/Maven idiomatic paths: target/classes for compiled classes, target/jar for JARs
+$targetDir = Join-Path "." "target"
+$buildDir = Join-Path $targetDir "classes"
+$jarDir = Join-Path $targetDir "jar"
+$cliJarFile = Join-Path $jarDir "NCSDecomp-CLI.jar"
+$guiJarFile = Join-Path $jarDir "NCSDecomp.jar"
 $javaSourceDir = Join-Path "." (Join-Path "src" (Join-Path "main" "java"))
 
 Write-Host "Cleaning previous build artifacts..." -ForegroundColor Yellow
@@ -78,22 +81,14 @@ if (Test-Path $javaSourceDir) {
     Remove-ClassFiles -Path $javaSourceDir
 }
 
-# Clean build directory
-if (Test-Path $buildDir) {
-    Remove-Item -Recurse -Force $buildDir -ErrorAction SilentlyContinue
-}
-
-# Clean JAR files
-if (Test-Path $cliJarFile) {
-    Remove-Item -Force $cliJarFile -ErrorAction SilentlyContinue
-}
-if (Test-Path $guiJarFile) {
-    Remove-Item -Force $guiJarFile -ErrorAction SilentlyContinue
+# Clean target directory (Maven standard)
+if (Test-Path $targetDir) {
+    Remove-Item -Recurse -Force $targetDir -ErrorAction SilentlyContinue
 }
 
 # Clean executable output directory if building executable
 if ($BuildExecutable) {
-    $exeOutputDir = Join-Path "." "dist-exe"
+    $exeOutputDir = Join-Path $targetDir "dist"
     if (Test-Path $exeOutputDir) {
         Write-Host "Cleaning previous executable build..." -ForegroundColor Yellow
         try {
@@ -106,13 +101,15 @@ if ($BuildExecutable) {
         } catch {
             Write-Host "Warning: Could not delete $exeOutputDir (files may be locked)" -ForegroundColor Yellow
             Write-Host "Please close any running NCSDecomp processes and try again." -ForegroundColor Yellow
-            Write-Host "Or manually delete the dist-exe folder." -ForegroundColor Yellow
+            Write-Host "Or manually delete the target/dist folder." -ForegroundColor Yellow
             exit 1
         }
     }
 }
 
+# Create target directory structure
 New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
+New-Item -ItemType Directory -Path $jarDir -Force | Out-Null
 
 function New-NcsJar {
     param(
@@ -143,7 +140,8 @@ Main-Class: $MainClass
     try {
         $manifestPath = Join-Path "META-INF" "MANIFEST.MF"
         $jarFileName = Split-Path $JarFile -Leaf
-        $parentJar = if ($IsWindows) { "..\$jarFileName" } else { "../$jarFileName" }
+        # JAR is in target/jar, buildDir is target/classes, so go up one then into jar
+        $parentJar = if ($IsWindows) { "..\jar\$jarFileName" } else { "../jar/$jarFileName" }
 
         if (Test-Path $parentJar) {
             Remove-Item -Force $parentJar
@@ -312,11 +310,24 @@ try {
     exit 1
 }
 
-New-NcsJar -JarFile $cliJarFile -MainClass "com.kotor.resource.formats.ncs.NCSDecompCLI" -JarLabel "CLI"
-New-NcsJar -JarFile $guiJarFile -MainClass "com.kotor.resource.formats.ncs.Decompiler" -JarLabel "GUI"
+try {
+    New-NcsJar -JarFile $cliJarFile -MainClass "com.kotor.resource.formats.ncs.NCSDecompCLI" -JarLabel "CLI"
+} catch {
+    Write-Host "Failed to create CLI JAR: $_" -ForegroundColor Red
+    exit 1
+}
+
+try {
+    New-NcsJar -JarFile $guiJarFile -MainClass "com.kotor.resource.formats.ncs.Decompiler" -JarLabel "GUI"
+} catch {
+    Write-Host "Failed to create GUI JAR: $_" -ForegroundColor Red
+    exit 1
+}
 
 Write-Host ""
-Write-Host "JAR build complete! Created NCSDecomp-CLI.jar and NCSDecomp.jar" -ForegroundColor Green
+Write-Host "JAR build complete! Created:" -ForegroundColor Green
+Write-Host "  CLI: $cliJarFile" -ForegroundColor Cyan
+Write-Host "  GUI: $guiJarFile" -ForegroundColor Cyan
 
 # Build executable if requested
 if ($BuildExecutable) {
@@ -380,14 +391,15 @@ if ($BuildExecutable) {
     # For CLI tools, always use app-image (portable executable that runs directly)
     # This creates a folder with executable that can be run immediately without installation
     $packageType = "app-image"
-    $exeOutputDir = Join-Path "." "dist-exe"
+    $exeOutputDir = Join-Path $targetDir "dist"
 
     Write-Host "Creating portable executable (runs directly, no installation needed)..." -ForegroundColor Cyan
     Write-Host "This may take several minutes (first time can take 5-10 minutes)..." -ForegroundColor Cyan
     Write-Host ""
 
-    # Create temporary input directory for jpackage
-    $jpackageInput = "jpackage-input"
+    # Create temporary input directory for jpackage (Java idiomatic: target/tmp)
+    $tmpDir = Join-Path $targetDir "tmp"
+    $jpackageInput = Join-Path $tmpDir "jpackage-input"
     if (Test-Path $jpackageInput) {
         Remove-Item -Recurse -Force $jpackageInput
     }
@@ -398,14 +410,15 @@ if ($BuildExecutable) {
     Copy-Item $cliJarFile $jarDest
 
     # Copy nwscript files as resources (they'll be in the app directory)
-    # Try multiple locations: root, src/main/resources, and publish directory
+    # Try multiple locations: root, src/main/resources, and target/assembly (publish equivalent)
+    $assemblyDir = Join-Path $targetDir "assembly"
     $nwscriptLocations = @(
         (Join-Path "." "k1_nwscript.nss"),
         (Join-Path "." "tsl_nwscript.nss"),
         (Join-Path "." (Join-Path "src" (Join-Path "main" (Join-Path "resources" "k1_nwscript.nss")))),
         (Join-Path "." (Join-Path "src" (Join-Path "main" (Join-Path "resources" "tsl_nwscript.nss")))),
-        (Join-Path "." (Join-Path "publish" "k1_nwscript.nss")),
-        (Join-Path "." (Join-Path "publish" "tsl_nwscript.nss"))
+        (Join-Path $assemblyDir "k1_nwscript.nss"),
+        (Join-Path $assemblyDir "tsl_nwscript.nss")
     )
 
     foreach ($nssFile in $nwscriptLocations) {
@@ -462,7 +475,7 @@ if ($BuildExecutable) {
             Write-Host "Building GUI executable ($guiAppName)..." -ForegroundColor Yellow
 
             # Create GUI input directory
-            $guiInputDir = "jpackage-input-gui"
+            $guiInputDir = Join-Path $tmpDir "jpackage-input-gui"
             if (Test-Path $guiInputDir) {
                 Remove-Item -Recurse -Force $guiInputDir
             }
@@ -523,7 +536,7 @@ if ($BuildExecutable) {
                     (Join-Path "." $nssFile),
                     (Join-Path ".." $nssFile),
                     (Join-Path "." (Join-Path "src" (Join-Path "main" (Join-Path "resources" $nssFile)))),
-                    (Join-Path "." (Join-Path "publish" $nssFile))
+                    (Join-Path $assemblyDir $nssFile)
                 )
                 $copied = $false
                 foreach ($sourcePath in $sourcePaths) {
@@ -566,9 +579,9 @@ if ($BuildExecutable) {
         Write-Host ""
         Write-Host "CLI Usage examples:" -ForegroundColor Cyan
         $exePathExample = if ($IsWindows) {
-            ".\dist-exe\NCSDecompCLI\NCSDecompCLI.exe"
+            ".\target\dist\NCSDecompCLI\NCSDecompCLI.exe"
         } else {
-            "./dist-exe/NCSDecompCLI/NCSDecompCLI"
+            "./target/dist/NCSDecompCLI/NCSDecompCLI"
         }
         Write-Host "  $exePathExample --help" -ForegroundColor White
         Write-Host "  $exePathExample --version" -ForegroundColor White
@@ -586,19 +599,22 @@ if ($BuildExecutable) {
         if (Test-Path $jpackageInput) {
             Remove-Item -Recurse -Force $jpackageInput -ErrorAction SilentlyContinue
         }
-        if (Test-Path "jpackage-input-gui") {
-            Remove-Item -Recurse -Force "jpackage-input-gui" -ErrorAction SilentlyContinue
+        if (Test-Path $guiInputDir) {
+            Remove-Item -Recurse -Force $guiInputDir -ErrorAction SilentlyContinue
         }
         exit 1
     }
 } else {
     Write-Host ""
     Write-Host "Usage examples:" -ForegroundColor Cyan
-    Write-Host "  java -jar NCSDecomp-CLI.jar -i input.ncs" -ForegroundColor White
-    Write-Host "  java -jar NCSDecomp-CLI.jar -i input.ncs --stdout" -ForegroundColor White
-    Write-Host "  java -jar NCSDecomp-CLI.jar -i scripts_dir -r --k2 -O output_dir" -ForegroundColor White
-    Write-Host "  java -jar NCSDecomp-CLI.jar --help" -ForegroundColor White
-    Write-Host "  java -jar NCSDecomp.jar                  # Launch GUI" -ForegroundColor White
+    Write-Host "  java -jar $cliJarFile -i input.ncs" -ForegroundColor White
+    Write-Host "  java -jar $cliJarFile -i input.ncs --stdout" -ForegroundColor White
+    Write-Host "  java -jar $cliJarFile -i scripts_dir -r --k2 -O output_dir" -ForegroundColor White
+    Write-Host "  java -jar $cliJarFile --help" -ForegroundColor White
+    Write-Host "  java -jar $guiJarFile                  # Launch GUI" -ForegroundColor White
     Write-Host ""
     Write-Host "To build executable, run: .\scripts\build.ps1 -BuildExecutable" -ForegroundColor Cyan
 }
+
+# Explicitly exit with success code
+exit 0

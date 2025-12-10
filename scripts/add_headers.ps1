@@ -57,9 +57,7 @@ function Add-HeadersToFiles {
         Where-Object {
             $_.FullName -notlike '*\obj\*' -and
             $_.FullName -notlike '*\bin\*' -and
-            $_.FullName -notlike '*\build\*' -and
-            $_.FullName -notlike '*\dist-exe\*' -and
-            $_.FullName -notlike '*\publish\*' -and
+            $_.FullName -notlike '*\target\*' -and
             $_.FullName -notlike '*\runtime\*' -and
             $_.FullName -notlike '*\.history\*' -and
             $_.FullName -notlike '*\vendor\*' -and

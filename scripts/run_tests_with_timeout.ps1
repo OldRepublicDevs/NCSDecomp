@@ -24,8 +24,8 @@ if (-not (Test-Path $junitStandalone)) {
     exit 1
 }
 
-# Ensure build directory exists and has compiled classes
-$buildDir = Join-Path "." "build"
+# Ensure build directory exists and has compiled classes (Java/Maven idiomatic: target/classes)
+$buildDir = Join-Path "." (Join-Path "target" "classes")
 if (-not (Test-Path $buildDir)) {
     Write-Host "Error: Build directory not found. Run build.ps1 first." -ForegroundColor Red
     exit 1

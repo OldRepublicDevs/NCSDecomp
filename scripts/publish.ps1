@@ -43,12 +43,31 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Create publish directory
-$publishDir = Join-Path "." "publish"
+# Create assembly directory (Java/Maven idiomatic: target/assembly)
+$targetDir = Join-Path "." "target"
+$publishDir = Join-Path $targetDir "assembly"
 if (Test-Path $publishDir) {
     Write-Host ""
-    Write-Host "Cleaning previous publish directory..." -ForegroundColor Yellow
-    Remove-Item -Recurse -Force $publishDir
+    Write-Host "Cleaning previous assembly directory..." -ForegroundColor Yellow
+    try {
+        # Try to stop any processes that might be using files in assembly directory
+        if ($IsWindows) {
+            Get-Process | Where-Object { $_.Path -like "*$publishDir*" } | Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Milliseconds 500
+        }
+        Remove-Item -Recurse -Force $publishDir -ErrorAction Stop
+    } catch {
+        Write-Host "Warning: Could not delete $publishDir (files may be locked)" -ForegroundColor Yellow
+        Write-Host "Attempting to delete individual files..." -ForegroundColor Yellow
+        try {
+            Get-ChildItem -Path $publishDir -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
+            Remove-Item -Force $publishDir -ErrorAction SilentlyContinue
+        } catch {
+            Write-Host "Error: Could not clean assembly directory. Please close any applications using files in $publishDir" -ForegroundColor Red
+            Write-Host "Or manually delete the target/assembly folder and try again." -ForegroundColor Yellow
+            exit 1
+        }
+    }
 }
 New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
 
@@ -56,7 +75,7 @@ Write-Host ""
 Write-Host "Step 3: Packaging distribution files..." -ForegroundColor Yellow
 
 # Copy CLI executable folder (NCSDecompCLI)
-$cliAppImageDir = Join-Path "." (Join-Path "dist-exe" "NCSDecompCLI")
+$cliAppImageDir = Join-Path $targetDir (Join-Path "dist" "NCSDecompCLI")
 $cliAppDest = Join-Path $publishDir "NCSDecompCLI"
 
 if (Test-Path $cliAppImageDir) {
@@ -70,7 +89,7 @@ if (Test-Path $cliAppImageDir) {
 }
 
 # Copy GUI executable folder (NCSDecomp) if it exists
-$guiAppImageDir = Join-Path "." (Join-Path "dist-exe" "NCSDecomp")
+$guiAppImageDir = Join-Path $targetDir (Join-Path "dist" "NCSDecomp")
 $guiAppDest = Join-Path $publishDir "NCSDecomp"
 
 if (Test-Path $guiAppImageDir) {
@@ -83,16 +102,24 @@ if (Test-Path $guiAppImageDir) {
     Write-Host "  Note: NCSDecomp folder (GUI) not found, skipping..." -ForegroundColor Gray
 }
 
-# Copy JAR as alternative
-Copy-Item "NCSDecomp-CLI.jar" "$publishDir\NCSDecomp-CLI.jar"
-Write-Host "  - Copied NCSDecomp-CLI.jar" -ForegroundColor Cyan
+# Copy JAR as alternative (from target/jar)
+$jarDir = Join-Path $targetDir "jar"
+$cliJarSource = Join-Path $jarDir "NCSDecomp-CLI.jar"
+$guiJarSource = Join-Path $jarDir "NCSDecomp.jar"
+
+if (Test-Path $cliJarSource) {
+    Copy-Item $cliJarSource (Join-Path $publishDir "NCSDecomp-CLI.jar")
+    Write-Host "  - Copied NCSDecomp-CLI.jar" -ForegroundColor Cyan
+} else {
+    Write-Host "  Warning: NCSDecomp-CLI.jar not found at $cliJarSource" -ForegroundColor Yellow
+}
 
 # Copy GUI JAR if present
-if (Test-Path "NCSDecomp.jar") {
-    Copy-Item "NCSDecomp.jar" "$publishDir\NCSDecomp.jar"
+if (Test-Path $guiJarSource) {
+    Copy-Item $guiJarSource (Join-Path $publishDir "NCSDecomp.jar")
     Write-Host "  - Copied NCSDecomp.jar (GUI)" -ForegroundColor Cyan
 } else {
-    Write-Host "  Warning: NCSDecomp.jar not found" -ForegroundColor Yellow
+    Write-Host "  Warning: NCSDecomp.jar not found at $guiJarSource" -ForegroundColor Yellow
 }
 
 # Copy required nwscript files from src/main/resources
@@ -262,10 +289,10 @@ Write-Host "  - Created VERSION.txt" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Step 5: Creating ZIP archive..." -ForegroundColor Yellow
 
-# Create ZIP archive name with version and platform
+# Create ZIP archive name with version and platform (Java/Maven idiomatic: target/)
 $platformSuffix = if ($IsWindows) { "Windows" } elseif ($IsMacOS) { "macOS" } else { "Linux" }
 $zipFileName = "NCSDecomp-v1.0.0-$platformSuffix.zip"
-$zipPath = Join-Path "." $zipFileName
+$zipPath = Join-Path $targetDir $zipFileName
 
 # Remove existing ZIP if it exists
 if (Test-Path $zipPath) {
@@ -311,9 +338,9 @@ Write-Host ""
 Write-Host "================================" -ForegroundColor Green
 Write-Host "Publishing complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "Distribution package ready in: $publishDir" -ForegroundColor Cyan
+Write-Host "Distribution package ready in: target/assembly" -ForegroundColor Cyan
 if (Test-Path $zipPath) {
-    Write-Host "ZIP archive created: $zipFileName" -ForegroundColor Green
+    Write-Host "ZIP archive created: target/$zipFileName" -ForegroundColor Green
 }
 Write-Host ""
 Write-Host "Package contents:" -ForegroundColor Yellow
