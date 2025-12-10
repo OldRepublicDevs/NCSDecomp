@@ -54,8 +54,10 @@ public class NCSDecompCLIRoundTripTest {
    private static final Path K1_ASC_NWSCRIPT = REPO_ROOT.resolve("k1_asc_nwscript.nss");
    private static final Path K2_NWSCRIPT = REPO_ROOT.resolve("src").resolve("main").resolve("resources")
          .resolve("tsl_nwscript.nss");
-   private static final Map<String, String> NPC_CONSTANTS_K1 = loadNpcConstantsForGame(K1_NWSCRIPT);
-   private static final Map<String, String> NPC_CONSTANTS_K2 = loadNpcConstantsForGame(K2_NWSCRIPT);
+   private static final Map<String, String> NPC_CONSTANTS_K1 = loadConstantsWithPrefix(K1_NWSCRIPT, "NPC_");
+   private static final Map<String, String> NPC_CONSTANTS_K2 = loadConstantsWithPrefix(K2_NWSCRIPT, "NPC_");
+   private static final Map<String, String> ABILITY_CONSTANTS_K1 = loadConstantsWithPrefix(K1_NWSCRIPT, "ABILITY_");
+   private static final Map<String, String> ABILITY_CONSTANTS_K2 = loadConstantsWithPrefix(K2_NWSCRIPT, "ABILITY_");
 
    private static String displayPath(Path path) {
       Path abs = path.toAbsolutePath().normalize();
@@ -780,7 +782,8 @@ public class NCSDecompCLIRoundTripTest {
       normalized = normalizeEffectDeathDefaults(normalized);
       normalized = normalizeReturnStatements(normalized);
       normalized = normalizeTrueFalse(normalized);
-      normalized = normalizeNpcConstants(normalized, isK2 ? NPC_CONSTANTS_K2 : NPC_CONSTANTS_K1);
+      normalized = normalizeConstants(normalized, isK2 ? NPC_CONSTANTS_K2 : NPC_CONSTANTS_K1);
+      normalized = normalizeConstants(normalized, isK2 ? ABILITY_CONSTANTS_K2 : ABILITY_CONSTANTS_K1);
       normalized = normalizeBitwiseOperators(normalized);
       normalized = normalizePlaceholderNames(normalized);
       normalized = normalizeFunctionOrder(normalized);
@@ -789,11 +792,11 @@ public class NCSDecompCLIRoundTripTest {
       StringBuilder result = new StringBuilder();
 
       for (String line : lines) {
-         String trimmed = line.replaceFirst("\\s+$", "");
+         String trimmed = line.replaceFirst("^\\s+", "").replaceFirst("\\s+$", "");
          if (trimmed.isEmpty()) {
             continue; // drop blank lines to avoid formatting-only mismatches
          }
-         trimmed = trimmed.replace("\t", "    ").replaceAll(" +", " ");
+         trimmed = trimmed.replace("\t", "    ");
          result.append(trimmed).append("\n");
       }
 
@@ -969,16 +972,18 @@ public class NCSDecompCLIRoundTripTest {
     * Normalize NPC_* constants to their numeric values so symbolic vs numeric
     * usages compare equal across decompilation.
     */
-   private static String normalizeNpcConstants(String code, Map<String, String> npcConstants) {
-      if (npcConstants == null || npcConstants.isEmpty()) {
+   private static String normalizeConstants(String code, Map<String, String> constants) {
+      if (constants == null || constants.isEmpty()) {
          return code;
       }
-      java.util.regex.Pattern p = java.util.regex.Pattern.compile("\\bNPC_[A-Za-z0-9_]+\\b");
+      String prefixPattern = constants.keySet().stream().findFirst().map(name -> name.substring(0, name.indexOf('_') + 1))
+            .orElse("NPC_");
+      java.util.regex.Pattern p = java.util.regex.Pattern.compile("\\b" + prefixPattern + "[A-Za-z0-9_]+\\b");
       java.util.regex.Matcher m = p.matcher(code);
       StringBuffer sb = new StringBuffer();
       while (m.find()) {
          String name = m.group();
-         String replacement = npcConstants.get(name);
+         String replacement = constants.get(name);
          if (replacement != null) {
             m.appendReplacement(sb, replacement);
          }
@@ -987,13 +992,13 @@ public class NCSDecompCLIRoundTripTest {
       return sb.toString();
    }
 
-   private static Map<String, String> loadNpcConstantsForGame(Path path) {
+   private static Map<String, String> loadConstantsWithPrefix(Path path, String prefix) {
       Map<String, String> map = new HashMap<>();
-      loadNpcConstantsFromFile(path, map);
+      loadConstantsFromFile(path, prefix, map);
       return map;
    }
 
-   private static void loadNpcConstantsFromFile(Path path, Map<String, String> map) {
+   private static void loadConstantsFromFile(Path path, String prefix, Map<String, String> map) {
       if (path == null) {
          return;
       }
@@ -1002,7 +1007,7 @@ public class NCSDecompCLIRoundTripTest {
             return;
          }
          java.util.regex.Pattern p = java.util.regex.Pattern
-               .compile("^\\s*int\\s+(NPC_[A-Za-z0-9_]+)\\s*=\\s*([-]?[0-9]+)\\s*;.*$");
+               .compile("^\\s*int\\s+(" + prefix + "[A-Za-z0-9_]+)\\s*=\\s*([-]?[0-9]+)\\s*;.*$");
          for (String line : Files.readAllLines(path, StandardCharsets.UTF_8)) {
             java.util.regex.Matcher m = p.matcher(line);
             if (m.matches()) {
