@@ -3,7 +3,7 @@
 # Visit https://bolabaden.org for more information and other ventures
 # See LICENSE.txt file in the project root for full license information.
 
-# Publish script for NCSDecomp CLI
+# Publish script for NCSDecomp CLI and GUI
 # Packages everything needed for end-user distribution
 # Cross-platform compatible (Windows, macOS, Linux)
 
@@ -20,8 +20,8 @@ if ($PSVersionTable.PSVersion.Major -ge 6) {
     if (-not (Test-Path variable:IsMacOS)) { $script:IsMacOS = $false }
 }
 
-Write-Host "NCSDecomp CLI - Publishing Package" -ForegroundColor Green
-Write-Host "================================" -ForegroundColor Green
+Write-Host "NCSDecomp CLI + GUI - Publishing Package" -ForegroundColor Green
+Write-Host "=======================================" -ForegroundColor Green
 Write-Host ""
 
 # Build everything first
@@ -86,6 +86,14 @@ if (Test-Path $guiAppImageDir) {
 # Copy JAR as alternative
 Copy-Item "NCSDecomp-CLI.jar" "$publishDir\NCSDecomp-CLI.jar"
 Write-Host "  - Copied NCSDecomp-CLI.jar" -ForegroundColor Cyan
+
+# Copy GUI JAR if present
+if (Test-Path "NCSDecomp.jar") {
+    Copy-Item "NCSDecomp.jar" "$publishDir\NCSDecomp.jar"
+    Write-Host "  - Copied NCSDecomp.jar (GUI)" -ForegroundColor Cyan
+} else {
+    Write-Host "  Warning: NCSDecomp.jar not found" -ForegroundColor Yellow
+}
 
 # Copy required nwscript files from src/main/resources
 $nwscriptSource = Join-Path "." (Join-Path "src" (Join-Path "main" "resources"))
@@ -160,6 +168,9 @@ foreach ($licenseFile in $licenseFiles) {
         break
     }
 }
+if (-not $licenseCopied) {
+    Write-Host "  Warning: LICENSE file not found" -ForegroundColor Yellow
+}
 
 # Create examples directory
 $examplesDir = Join-Path $publishDir "examples"
@@ -233,7 +244,7 @@ pause
 Write-Host ""
 Write-Host "Step 4: Creating version info..." -ForegroundColor Yellow
 $versionInfo = @"
-NCSDecomp CLI Distribution Package
+NCSDecomp Distribution Package (CLI + GUI)
 Version: 1.0.0
 Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 Platform: $(if ($IsWindows) { "Windows" } elseif ($IsMacOS) { "macOS" } elseif ($IsLinux) { "Linux" } else { "Unknown" })
@@ -253,7 +264,7 @@ Write-Host "Step 5: Creating ZIP archive..." -ForegroundColor Yellow
 
 # Create ZIP archive name with version and platform
 $platformSuffix = if ($IsWindows) { "Windows" } elseif ($IsMacOS) { "macOS" } else { "Linux" }
-$zipFileName = "NCSDecomp-CLI-v1.0.0-$platformSuffix.zip"
+$zipFileName = "NCSDecomp-v1.0.0-$platformSuffix.zip"
 $zipPath = Join-Path "." $zipFileName
 
 # Remove existing ZIP if it exists

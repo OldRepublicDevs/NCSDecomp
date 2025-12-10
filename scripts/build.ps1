@@ -3,9 +3,9 @@
 # Visit https://bolabaden.org for more information and other ventures
 # See LICENSE.txt file in the project root for full license information.
 
-# Build script for NCSDecomp CLI
-# Compiles all Java files and creates a self-contained JAR
-# Optionally creates a self-contained executable using jpackage
+# Build script for NCSDecomp CLI and GUI
+# Compiles all Java files and creates self-contained JARs
+# Optionally creates self-contained executables using jpackage
 # Cross-platform compatible (Windows, macOS, Linux)
 
 param(
@@ -67,7 +67,8 @@ function Remove-ClassFiles {
 
 # Clean build directory, JAR file, and any stray .class files for idempotent builds
 $buildDir = Join-Path "." "build"
-$jarFile = Join-Path "." "NCSDecomp-CLI.jar"
+$cliJarFile = Join-Path "." "NCSDecomp-CLI.jar"
+$guiJarFile = Join-Path "." "NCSDecomp.jar"
 $javaSourceDir = Join-Path "." (Join-Path "src" (Join-Path "main" "java"))
 
 Write-Host "Cleaning previous build artifacts..." -ForegroundColor Yellow
@@ -82,9 +83,12 @@ if (Test-Path $buildDir) {
     Remove-Item -Recurse -Force $buildDir -ErrorAction SilentlyContinue
 }
 
-# Clean JAR file
-if (Test-Path $jarFile) {
-    Remove-Item -Force $jarFile -ErrorAction SilentlyContinue
+# Clean JAR files
+if (Test-Path $cliJarFile) {
+    Remove-Item -Force $cliJarFile -ErrorAction SilentlyContinue
+}
+if (Test-Path $guiJarFile) {
+    Remove-Item -Force $guiJarFile -ErrorAction SilentlyContinue
 }
 
 # Clean executable output directory if building executable
@@ -109,6 +113,80 @@ if ($BuildExecutable) {
 }
 
 New-Item -ItemType Directory -Path $buildDir -Force | Out-Null
+
+function New-NcsJar {
+    param(
+        [string]$JarFile,
+        [string]$MainClass,
+        [string]$JarLabel
+    )
+
+    Write-Host "Creating $JarLabel manifest..." -ForegroundColor Yellow
+    $manifestDir = Join-Path $buildDir "META-INF"
+    New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
+    $manifestFile = Join-Path $manifestDir "MANIFEST.MF"
+    $manifestContent = @"
+Manifest-Version: 1.0
+Created-By: NCSDecomp Build Script
+Main-Class: $MainClass
+
+"@
+    if ($IsWindows) {
+        $manifestContent | Out-File -FilePath $manifestFile -Encoding ASCII
+    } else {
+        $manifestContent | Out-File -FilePath $manifestFile -Encoding utf8NoBOM
+    }
+
+    Write-Host "Creating $JarLabel JAR file..." -ForegroundColor Yellow
+
+    Push-Location $buildDir
+    try {
+        $manifestPath = Join-Path "META-INF" "MANIFEST.MF"
+        $jarFileName = Split-Path $JarFile -Leaf
+        $parentJar = if ($IsWindows) { "..\$jarFileName" } else { "../$jarFileName" }
+
+        if (Test-Path $parentJar) {
+            Remove-Item -Force $parentJar
+        }
+
+        jar cfm $parentJar $manifestPath com META-INF
+        if ($LASTEXITCODE -ne 0) {
+            throw "$JarLabel JAR creation failed"
+        }
+
+        $resourceFiles = Get-ChildItem -Path "." -Filter "*.nss" -File -ErrorAction SilentlyContinue
+        if ($resourceFiles.Count -gt 0) {
+            jar uf $parentJar *.nss
+            Write-Host "Added $($resourceFiles.Count) resource file(s) to $jarFileName" -ForegroundColor Gray
+        }
+
+        Write-Host "Verifying $JarLabel JAR contents..." -ForegroundColor Gray
+        $jarList = jar tf $parentJar
+        $mainClassPath = ($MainClass -replace '\.', '/') + ".class"
+        $mainClassInJar = $jarList | Where-Object { $_ -like $mainClassPath }
+        if (-not $mainClassInJar) {
+            throw "Main class not found in $JarLabel JAR: $MainClass"
+        }
+
+        jar xf $parentJar META-INF/MANIFEST.MF
+        $manifestPathCheck = if ($IsWindows) { "META-INF\MANIFEST.MF" } else { "META-INF/MANIFEST.MF" }
+        if (Test-Path $manifestPathCheck) {
+            $manifestContentCheck = Get-Content $manifestPathCheck -Raw
+            if ($manifestContentCheck -notmatch [regex]::Escape($MainClass)) {
+                Write-Host "WARNING: $JarLabel manifest may have incorrect main class!" -ForegroundColor Yellow
+                Write-Host "Manifest content:" -ForegroundColor Yellow
+                Get-Content $manifestPathCheck | Write-Host
+            } else {
+                Write-Host "Verified $JarLabel manifest has correct main class" -ForegroundColor Gray
+            }
+            Remove-Item -Recurse -Force "META-INF" -ErrorAction SilentlyContinue
+        }
+
+        Write-Host "$JarLabel JAR created successfully" -ForegroundColor Gray
+    } finally {
+        Pop-Location
+    }
+}
 
 # Collect all Java files from Maven source directory
 Write-Host "Collecting Java source files..." -ForegroundColor Yellow
@@ -198,101 +276,47 @@ try {
     }
     Write-Host "Compilation successful!" -ForegroundColor Green
 
-    # Verify main class was compiled
-    $mainClassFile = Join-Path $buildDir (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "NCSDecompCLI.class")))))
-    if (-not (Test-Path $mainClassFile)) {
-        Write-Host "Error: Main class not found after compilation: $mainClassFile" -ForegroundColor Red
+    # Verify main classes were compiled
+    $cliMainClassFile = Join-Path $buildDir (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "NCSDecompCLI.class")))))
+    $guiMainClassFile = Join-Path $buildDir (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "Decompiler.class")))))
+
+    if (-not (Test-Path $cliMainClassFile)) {
+        Write-Host "Error: CLI main class not found after compilation: $cliMainClassFile" -ForegroundColor Red
         Write-Host "Checking for compiled classes..." -ForegroundColor Yellow
         $classFiles = Get-ChildItem -Path $buildDir -Recurse -Filter "*.class"
         if ($classFiles.Count -eq 0) {
             Write-Host "No .class files found in build directory!" -ForegroundColor Red
         } else {
-            Write-Host "Found $($classFiles.Count) class files, but main class is missing." -ForegroundColor Yellow
+            Write-Host "Found $($classFiles.Count) class files, but CLI main class is missing." -ForegroundColor Yellow
             $classFiles | Select-Object -First 5 | ForEach-Object { Write-Host "  $($_.FullName)" -ForegroundColor Gray }
         }
         exit 1
     }
-    Write-Host "Verified main class compiled: NCSDecompCLI.class" -ForegroundColor Gray
+    Write-Host "Verified CLI main class compiled: NCSDecompCLI.class" -ForegroundColor Gray
+
+    if (-not (Test-Path $guiMainClassFile)) {
+        Write-Host "Error: GUI main class not found after compilation: $guiMainClassFile" -ForegroundColor Red
+        Write-Host "Checking for compiled classes..." -ForegroundColor Yellow
+        $classFiles = Get-ChildItem -Path $buildDir -Recurse -Filter "*.class"
+        if ($classFiles.Count -eq 0) {
+            Write-Host "No .class files found in build directory!" -ForegroundColor Red
+        } else {
+            Write-Host "Found $($classFiles.Count) class files, but GUI main class is missing." -ForegroundColor Yellow
+            $classFiles | Select-Object -First 5 | ForEach-Object { Write-Host "  $($_.FullName)" -ForegroundColor Gray }
+        }
+        exit 1
+    }
+    Write-Host "Verified GUI main class compiled: Decompiler.class" -ForegroundColor Gray
 } catch {
     Write-Host "Compilation failed: $_" -ForegroundColor Red
     exit 1
 }
 
-# Create manifest for CLI
-Write-Host "Creating manifest..." -ForegroundColor Yellow
-$manifestDir = Join-Path $buildDir "META-INF"
-New-Item -ItemType Directory -Path $manifestDir -Force | Out-Null
-$manifestFile = Join-Path $manifestDir "MANIFEST.MF"
-$manifestContent = @"
-Manifest-Version: 1.0
-Created-By: NCSDecomp Build Script
-Main-Class: com.kotor.resource.formats.ncs.NCSDecompCLI
-
-"@
-if ($IsWindows) {
-    $manifestContent | Out-File -FilePath $manifestFile -Encoding ASCII
-} else {
-    $manifestContent | Out-File -FilePath $manifestFile -Encoding utf8NoBOM
-}
-
-# Create JAR file
-Write-Host "Creating JAR file..." -ForegroundColor Yellow
-
-Push-Location $buildDir
-try {
-    # Create JAR with all compiled classes, resources, and META-INF
-    # This includes everything in the build directory with proper structure
-    $manifestPath = Join-Path "META-INF" "MANIFEST.MF"
-    $parentJar = if ($IsWindows) { "..\NCSDecomp-CLI.jar" } else { "../NCSDecomp-CLI.jar" }
-
-    # Ensure we're creating a fresh JAR (remove if exists)
-    if (Test-Path $parentJar) {
-        Remove-Item -Force $parentJar
-    }
-
-    # Create JAR with explicit manifest
-    jar cfm $parentJar $manifestPath com META-INF
-    if ($LASTEXITCODE -ne 0) {
-        throw "JAR creation failed"
-    }
-
-    # Add resources (nwscript files, etc.) to JAR root if they exist
-    $resourceFiles = Get-ChildItem -Path "." -Filter "*.nss" -File -ErrorAction SilentlyContinue
-    if ($resourceFiles.Count -gt 0) {
-        jar uf $parentJar *.nss
-        Write-Host "Added $($resourceFiles.Count) resource file(s) to JAR" -ForegroundColor Gray
-    }
-
-    # Verify JAR contents
-    Write-Host "Verifying JAR contents..." -ForegroundColor Gray
-    $jarList = jar tf $parentJar
-    $mainClassInJar = $jarList | Where-Object { $_ -like "com/kotor/resource/formats/ncs/NCSDecompCLI.class" }
-    if (-not $mainClassInJar) {
-        throw "Main class not found in JAR: com.kotor.resource.formats.ncs.NCSDecompCLI"
-    }
-
-    # Verify manifest
-    jar xf $parentJar META-INF/MANIFEST.MF
-    $manifestPathCheck = if ($IsWindows) { "META-INF\MANIFEST.MF" } else { "META-INF/MANIFEST.MF" }
-    if (Test-Path $manifestPathCheck) {
-        $manifestContent = Get-Content $manifestPathCheck -Raw
-        if ($manifestContent -notmatch "Main-Class: com\.kotor\.resource\.formats\.ncs\.NCSDecompCLI") {
-            Write-Host "WARNING: Manifest may have incorrect main class!" -ForegroundColor Yellow
-            Write-Host "Manifest content:" -ForegroundColor Yellow
-            Get-Content $manifestPathCheck | Write-Host
-        } else {
-            Write-Host "Verified manifest has correct main class" -ForegroundColor Gray
-        }
-        Remove-Item -Recurse -Force "META-INF" -ErrorAction SilentlyContinue
-    }
-
-    Write-Host "JAR created successfully with all classes and resources" -ForegroundColor Gray
-} finally {
-    Pop-Location
-}
+New-NcsJar -JarFile $cliJarFile -MainClass "com.kotor.resource.formats.ncs.NCSDecompCLI" -JarLabel "CLI"
+New-NcsJar -JarFile $guiJarFile -MainClass "com.kotor.resource.formats.ncs.Decompiler" -JarLabel "GUI"
 
 Write-Host ""
-Write-Host "JAR build complete! Created NCSDecomp-CLI.jar" -ForegroundColor Green
+Write-Host "JAR build complete! Created NCSDecomp-CLI.jar and NCSDecomp.jar" -ForegroundColor Green
 
 # Build executable if requested
 if ($BuildExecutable) {
@@ -312,8 +336,8 @@ if ($BuildExecutable) {
     }
 
     # Verify JAR contains the correct main class
-    Write-Host "Verifying JAR file..." -ForegroundColor Gray
-    $jarList = jar tf $jarFile 2>&1
+    Write-Host "Verifying CLI JAR file..." -ForegroundColor Gray
+    $jarList = jar tf $cliJarFile 2>&1
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Error: JAR file appears to be corrupted or invalid" -ForegroundColor Red
         exit 1
@@ -330,7 +354,7 @@ if ($BuildExecutable) {
     $tempDir = Join-Path $tempBase "jpackage-verify-$(Get-Random)"
     New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
     $currentLocation = Get-Location
-    $jarFileAbsolute = (Resolve-Path $jarFile).Path
+    $jarFileAbsolute = (Resolve-Path $cliJarFile).Path
     try {
         Push-Location $tempDir
         jar xf $jarFileAbsolute META-INF/MANIFEST.MF 2>&1 | Out-Null
@@ -371,7 +395,7 @@ if ($BuildExecutable) {
 
     # Copy JAR to input directory
     $jarDest = Join-Path $jpackageInput "NCSDecomp-CLI.jar"
-    Copy-Item $jarFile $jarDest
+    Copy-Item $cliJarFile $jarDest
 
     # Copy nwscript files as resources (they'll be in the app directory)
     # Try multiple locations: root, src/main/resources, and publish directory
@@ -432,7 +456,7 @@ if ($BuildExecutable) {
         # Build GUI executable (if NCSDecomp.jar exists)
         $guiAppName = "NCSDecomp"
         $guiMainClass = "com.kotor.resource.formats.ncs.Decompiler"
-        $guiJarPath = "NCSDecomp.jar"
+        $guiJarPath = $guiJarFile
 
         if (Test-Path $guiJarPath) {
             Write-Host "Building GUI executable ($guiAppName)..." -ForegroundColor Yellow
@@ -574,6 +598,7 @@ if ($BuildExecutable) {
     Write-Host "  java -jar NCSDecomp-CLI.jar -i input.ncs --stdout" -ForegroundColor White
     Write-Host "  java -jar NCSDecomp-CLI.jar -i scripts_dir -r --k2 -O output_dir" -ForegroundColor White
     Write-Host "  java -jar NCSDecomp-CLI.jar --help" -ForegroundColor White
+    Write-Host "  java -jar NCSDecomp.jar                  # Launch GUI" -ForegroundColor White
     Write-Host ""
     Write-Host "To build executable, run: .\scripts\build.ps1 -BuildExecutable" -ForegroundColor Cyan
 }
