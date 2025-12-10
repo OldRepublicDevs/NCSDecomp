@@ -584,27 +584,58 @@ public class NCSDecompCLIRoundTripTest {
       }
       
       // Find all variable usages that aren't declared
+      // Use a simpler, more aggressive approach: find all identifiers and filter
       java.util.Set<String> usedVars = new java.util.HashSet<>();
       java.util.regex.Pattern usagePattern = java.util.regex.Pattern.compile(
             "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\b");
       java.util.regex.Matcher usageMatcher = usagePattern.matcher(content);
       while (usageMatcher.find()) {
          String varName = usageMatcher.group(1);
-         if (!isReservedName(varName) && !declaredVars.contains(varName) && 
-             !varName.matches("^(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\d+$") &&
-             !varName.startsWith("intGLOB_") && !varName.startsWith("objectGLOB_") &&
-             !varName.startsWith("stringGLOB_") && !varName.startsWith("floatGLOB_") &&
-             !varName.startsWith("__unknown_param_")) {
-            // Check if it looks like a variable (not a function call)
-            int pos = usageMatcher.start();
-            if (pos > 0 && pos < content.length() - 1) {
-               char before = content.charAt(pos - 1);
-               char after = content.charAt(pos + varName.length());
-               // If followed by ( it's a function call, skip it
-               if (after != '(' && (Character.isWhitespace(before) || before == '(' || before == ',' || before == '=' || before == ';')) {
-                  usedVars.add(varName);
-               }
+         int pos = usageMatcher.start();
+         
+         // Skip if it's a reserved word or already declared
+         if (isReservedName(varName) || declaredVars.contains(varName)) {
+            continue;
+         }
+         
+         // Skip known patterns
+         if (varName.matches("^(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\d+$") ||
+             varName.startsWith("intGLOB_") || varName.startsWith("objectGLOB_") ||
+             varName.startsWith("stringGLOB_") || varName.startsWith("floatGLOB_") ||
+             varName.startsWith("__unknown_param_")) {
+            continue;
+         }
+         
+         // Check if it's a function definition (type name varName(...))
+         boolean isFunctionDef = false;
+         if (pos > 5) {
+            String beforeContext = content.substring(Math.max(0, pos - 30), pos);
+            if (beforeContext.matches(".*\\b(void|int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+$")) {
+               isFunctionDef = true;
             }
+         }
+         
+         if (isFunctionDef) {
+            continue;
+         }
+         
+         // Check if it's followed by ( - could be a function call
+         char after = pos + varName.length() < content.length() ? content.charAt(pos + varName.length()) : ' ';
+         if (after == '(') {
+            // Check context - if it's in an assignment or as a function argument, it might still be a variable
+            // But typically if followed by (, it's a function call
+            // However, we want to catch cases like: GetDistanceToObject2D(nRandom) where nRandom is a variable
+            // So we need to look at the broader context
+            String beforeStr = pos > 100 ? content.substring(pos - 100, pos) : content.substring(0, pos);
+            // If we see it's being passed as an argument (after comma, opening paren, etc.), it's a variable
+            if (beforeStr.matches(".*[,(=]\\s*$")) {
+               // It's being used as a variable in a function call or assignment
+               usedVars.add(varName);
+            }
+            // Otherwise, it's likely a function call, skip it
+         } else {
+            // Not followed by (, definitely a variable usage
+            usedVars.add(varName);
          }
       }
       
@@ -953,20 +984,11 @@ public class NCSDecompCLIRoundTripTest {
    private static void fixDecompiledCodeForRecompilation(Path decompiledPath, String gameFlag) throws IOException {
       String content = new String(Files.readAllBytes(decompiledPath), StandardCharsets.UTF_8);
       
-      // Step 1: Fix invalid expressions (remove ! from function calls, fix invalid operators)
-      content = fixInvalidExpressions(content);
-      
-      // Step 2: Fix function signatures by analyzing call sites and nwscript signatures
+      // Step 1: Fix function signatures by analyzing call sites and nwscript signatures
       content = fixFunctionSignaturesFromCallSites(content, gameFlag);
       
-      // Step 3: Declare all missing variables (including __unknown_param_*)
-      content = declareMissingVariables(content);
-      
-      // Write the fixed content
-      Files.write(decompiledPath, content.getBytes(StandardCharsets.UTF_8));
-   }
-   
-   // Old implementation removed - using new functions above
+      // Step 2: Declare all missing variables (including __unknown_param_*)
+      StringBuilder fixed = new StringBuilder();
       
       // Find all __unknown_param_* usages
       java.util.regex.Pattern unknownParamPattern = java.util.regex.Pattern.compile(
@@ -1724,6 +1746,7 @@ public class NCSDecompCLIRoundTripTest {
       trailingDefaults.put("d100", "(0|1)");
       trailingDefaults.put("ActionAttack", "(0|FALSE)");
       trailingDefaults.put("ActionStartConversation", "(0|0xFFFFFFFF|-1)");
+      trailingDefaults.put("ActionMoveToObject", "(1\\.0|1)");
 
       String result = code;
       for (java.util.Map.Entry<String, String> entry : trailingDefaults.entrySet()) {
@@ -2252,6 +2275,26 @@ public class NCSDecompCLIRoundTripTest {
     */
    private static String normalizeIfSpacing(String code) {
       String result = code;
+      // First, normalize "ifidentifier" (no space) to "if identifier" (with space)
+      // This handles cases where original has "ifint1" but decompiled has "if int1"
+      result = result.replaceAll("\\bif([a-zA-Z_][a-zA-Z0-9_]*)", "if $1");
+      // Normalize "if identifier" to "if (identifier" when followed by comparison/expression
+      // This handles cases where original has "if (" but decompiled has "if identifier"
+      java.util.regex.Pattern ifPattern = java.util.regex.Pattern.compile("\\bif\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(==|!=|<=|>=|<|>|&|\\|)");
+      java.util.regex.Matcher ifMatcher = ifPattern.matcher(result);
+      StringBuffer sb = new StringBuffer();
+      while (ifMatcher.find()) {
+         // Check if there's already a paren before the identifier
+         int start = ifMatcher.start();
+         if (start > 0 && result.charAt(start - 1) != '(') {
+            ifMatcher.appendReplacement(sb, "if (" + ifMatcher.group(1) + " " + ifMatcher.group(2));
+         } else {
+            ifMatcher.appendReplacement(sb, ifMatcher.group(0));
+         }
+      }
+      ifMatcher.appendTail(sb);
+      result = sb.toString();
+      
       result = result.replaceAll("\\bif(?=[A-Za-z_])", "if ");
       result = result.replaceAll("\\bwhile(?=[A-Za-z_])", "while ");
       result = result.replaceAll("\\bfor(?=[A-Za-z_])", "for ");

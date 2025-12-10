@@ -866,7 +866,7 @@ public class SubScriptState {
 
          if (AIf.class.isInstance(this.current) || AElse.class.isInstance(this.current)) {
             Node next = NodeUtils.getNextCommand(node, this.nodedata);
-            if (this.nodedata.getPos(next) == this.current.getEnd()) {
+            if (next != null && this.nodedata.getPos(next) == this.current.getEnd()) {
                return true;
             }
          }
