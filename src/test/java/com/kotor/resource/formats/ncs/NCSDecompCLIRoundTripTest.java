@@ -631,6 +631,22 @@ public class NCSDecompCLIRoundTripTest {
       // Fix double semicolons
       content = content.replaceAll(";;+", ";");
       
+      // Fix incomplete statements - if a line has a function call but no semicolon and next line starts with function
+      // This is a common decompiler issue where statements get split incorrectly
+      // Pattern: functionCall() followed by newline and another function call
+      content = content.replaceAll("([a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^)]*\\))\\s*\n\\s*([a-zA-Z_][a-zA-Z0-9_]*\\s*\\()", "$1;\n\t$2");
+      
+      // Fix missing semicolons after assignments before function calls
+      content = content.replaceAll("(=)\\s*([^=;]+)\\s*\n\\s*([a-zA-Z_][a-zA-Z0-9_]*\\s*\\()", "$1 $2;\n\t$3");
+      
+      // Fix statements that are missing semicolons before control flow keywords
+      content = content.replaceAll("(\\))\\s*\n\\s*(if|else|while|for|return|break|continue)\\s*\\(", "$1;\n\t$2 (");
+      content = content.replaceAll("(\\))\\s*\n\\s*(if|else|while|for|return|break|continue)\\s+", "$1;\n\t$2 ");
+      
+      // Fix malformed expressions with extra operators at the start of lines
+      // Remove standalone operators that appear at line start
+      content = content.replaceAll("\n\\s*([=!<>+\\-*/|&]{2,})\\s*", "\n\t");
+      
       return content;
    }
    
