@@ -103,7 +103,8 @@ public class LocalVarStack extends LocalStack<StackEntry> {
 
    public StackEntry remove() {
       if (this.stack == null || this.stack.isEmpty()) {
-         throw new RuntimeException("Attempted to remove from empty stack");
+         // Defensive: return a placeholder instead of throwing to keep decompilation going
+         return this.newPlaceholderVariable();
       }
       StackEntry entry = this.stack.removeFirst();
       entry.removedFromStack(this);

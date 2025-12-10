@@ -996,53 +996,62 @@ public class SubScriptState {
 
          return this.removeIfAsExp();
       } else {
-         ScriptNode anode = this.current.removeLastChild();
-         if (!AExpression.class.isInstance(anode)) {
+         ScriptNode anode = null;
+         while (true) {
+            if (!this.current.hasChildren()) {
+               break;
+            }
+            anode = this.current.removeLastChild();
+            if (AExpression.class.isInstance(anode)) {
+               break;
+            }
             if (!forceOneOnly && AVarDecl.class.isInstance(anode) && ((AVarDecl) anode).exp() != null) {
                AExpression exp = ((AVarDecl) anode).removeExp();
                for (int i = trailingErrors.size() - 1; i >= 0; i--) {
                   this.current.addChild(trailingErrors.get(i));
                }
+               return exp;
+            }
+            // Skip non-expression nodes and keep searching.
+            anode = null;
+         }
+
+         if (anode == null) {
+            return this.buildPlaceholderParam(1);
+         }
+
+         if (!forceOneOnly
+               && AVarRef.class.isInstance(anode)
+               && !((AVarRef) anode).var().isAssigned()
+               && !((AVarRef) anode).var().isParam()
+               && this.current.hasChildren()) {
+            ScriptNode last = this.current.getLastChild();
+            if (AExpression.class.isInstance(last)
+                  && ((AVarRef) anode).var().equals(((AExpression) last).stackentry())) {
+               AExpression exp = this.removeLastExp(false);
+               for (int i = trailingErrors.size() - 1; i >= 0; i--) {
+                  this.current.addChild(trailingErrors.get(i));
+               }
 
                return exp;
-            } else {
-               System.out.println(anode.toString());
-               throw new RuntimeException("Last child not an expression: " + anode.getClass());
             }
-         } else {
-            if (!forceOneOnly
-                  && AVarRef.class.isInstance(anode)
-                  && !((AVarRef) anode).var().isAssigned()
-                  && !((AVarRef) anode).var().isParam()
-                  && this.current.hasChildren()) {
-               ScriptNode last = this.current.getLastChild();
-               if (AExpression.class.isInstance(last)
-                     && ((AVarRef) anode).var().equals(((AExpression) last).stackentry())) {
-                  AExpression exp = this.removeLastExp(false);
-                  for (int i = trailingErrors.size() - 1; i >= 0; i--) {
-                     this.current.addChild(trailingErrors.get(i));
-                  }
 
-                  return exp;
+            if (AVarDecl.class.isInstance(last) && ((AVarRef) anode).var().equals(((AVarDecl) last).var())
+                  && ((AVarDecl) last).exp() != null) {
+               AExpression exp = this.removeLastExp(false);
+               for (int i = trailingErrors.size() - 1; i >= 0; i--) {
+                  this.current.addChild(trailingErrors.get(i));
                }
 
-               if (AVarDecl.class.isInstance(last) && ((AVarRef) anode).var().equals(((AVarDecl) last).var())
-                     && ((AVarDecl) last).exp() != null) {
-                  AExpression exp = this.removeLastExp(false);
-                  for (int i = trailingErrors.size() - 1; i >= 0; i--) {
-                     this.current.addChild(trailingErrors.get(i));
-                  }
-
-                  return exp;
-               }
+               return exp;
             }
-
-            for (int i = trailingErrors.size() - 1; i >= 0; i--) {
-               this.current.addChild(trailingErrors.get(i));
-            }
-
-            return (AExpression) anode;
          }
+
+         for (int i = trailingErrors.size() - 1; i >= 0; i--) {
+            this.current.addChild(trailingErrors.get(i));
+         }
+
+         return (AExpression) anode;
       }
    }
 
@@ -1276,7 +1285,7 @@ public class SubScriptState {
    private List<AExpression> removeActionParams(AActionCommand node) {
       ArrayList<AExpression> params = new ArrayList<>();
       List<Type> paramtypes = NodeUtils.getActionParamTypes(node, this.actions);
-      int paramcount = NodeUtils.getActionParamCount(node);
+      int paramcount = Math.min(NodeUtils.getActionParamCount(node), paramtypes.size());
 
       for (int i = 0; i < paramcount; i++) {
          Type paramtype = paramtypes.get(i);

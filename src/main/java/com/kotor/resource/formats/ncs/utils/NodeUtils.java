@@ -385,7 +385,7 @@ public final class NodeUtils {
 
    public static int actionRemoveElementCount(AActionCommand node, ActionsData actions) {
       List<Type> types = getActionParamTypes(node, actions);
-      int count = getActionParamCount(node);
+      int count = Math.min(getActionParamCount(node), types.size());
       int remove = 0;
 
       for (int i = 0; i < count; i++) {
