@@ -793,11 +793,18 @@ public class NCSDecompCLIRoundTripTest {
       }
 
       functions.sort(String::compareTo);
-      StringBuilder rebuilt = new StringBuilder(preamble.toString().trim());
-      if (rebuilt.length() > 0 && !functions.isEmpty()) {
-         rebuilt.append("\n");
+      String preambleStr = preamble.toString().trim();
+      String functionsStr = String.join("\n", functions);
+      StringBuilder rebuilt = new StringBuilder();
+      if (!preambleStr.isEmpty()) {
+         rebuilt.append(preambleStr);
+         if (!functionsStr.isEmpty()) {
+            rebuilt.append("\n");
+         }
       }
-      rebuilt.append(String.join("\n", functions).trim());
+      if (!functionsStr.isEmpty()) {
+         rebuilt.append(functionsStr);
+      }
       return rebuilt.toString().trim();
    }
 
