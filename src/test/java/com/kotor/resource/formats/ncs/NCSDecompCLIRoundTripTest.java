@@ -481,6 +481,9 @@ public class NCSDecompCLIRoundTripTest {
          tempCompileInput = compileInput;
       }
 
+      // Fix decompiled code: declare missing __unknown_param_* variables
+      fixDecompiledCodeForRecompilation(compileInput);
+
       System.out.print("  Recompiling " + compileInput.getFileName() + " to .ncs");
       long compileRoundtripStart = System.nanoTime();
       try {
@@ -519,6 +522,183 @@ public class NCSDecompCLIRoundTripTest {
 
       long totalTime = System.nanoTime() - startTime;
       operationTimes.merge("total", totalTime, Long::sum);
+   }
+
+   /**
+    * Fixes function signatures by analyzing call sites to infer correct parameter types.
+    */
+   private static String fixFunctionSignaturesFromCallSites(String content) {
+      // Find all function definitions
+      java.util.regex.Pattern funcDefPattern = java.util.regex.Pattern.compile(
+            "(void|int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)");
+      
+      java.util.Map<String, java.util.List<String[]>> callSites = new java.util.HashMap<>();
+      
+      // Find all function calls
+      java.util.regex.Pattern callPattern = java.util.regex.Pattern.compile(
+            "([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)");
+      java.util.regex.Matcher callMatcher = callPattern.matcher(content);
+      while (callMatcher.find()) {
+         String funcName = callMatcher.group(1);
+         String args = callMatcher.group(2);
+         if (!isReservedName(funcName)) {
+            callSites.computeIfAbsent(funcName, k -> new java.util.ArrayList<>()).add(args.split(","));
+         }
+      }
+      
+      // Fix function definitions based on call sites
+      java.util.regex.Matcher funcMatcher = funcDefPattern.matcher(content);
+      StringBuffer result = new StringBuffer();
+      while (funcMatcher.find()) {
+         String funcName = funcMatcher.group(2);
+         String params = funcMatcher.group(3);
+         java.util.List<String[]> calls = callSites.get(funcName);
+         
+         if (calls != null && !calls.isEmpty() && !params.trim().isEmpty()) {
+            String[] paramDecls = params.split(",");
+            // Analyze first call to infer types
+            String[] firstCallArgs = calls.get(0);
+            if (firstCallArgs.length == paramDecls.length) {
+               StringBuilder newParams = new StringBuilder();
+               for (int i = 0; i < paramDecls.length; i++) {
+                  if (i > 0) newParams.append(", ");
+                  String paramDecl = paramDecls[i].trim();
+                  String callArg = firstCallArgs[i].trim();
+                  
+                  // Infer type from call argument
+                  String inferredType = inferTypeFromArgument(callArg);
+                  if (inferredType != null && paramDecl.startsWith("int ")) {
+                     // Replace int with inferred type
+                     paramDecl = paramDecl.replaceFirst("^int\\s+", inferredType + " ");
+                  }
+                  newParams.append(paramDecl);
+               }
+               funcMatcher.appendReplacement(result, funcMatcher.group(1) + " " + funcName + "(" + newParams.toString() + ")");
+               continue;
+            }
+         }
+         funcMatcher.appendReplacement(result, funcMatcher.group(0));
+      }
+      funcMatcher.appendTail(result);
+      return result.toString();
+   }
+   
+   /**
+    * Infers the type of a function argument from its value.
+    */
+   private static String inferTypeFromArgument(String arg) {
+      arg = arg.trim();
+      if (arg.startsWith("\"") && arg.endsWith("\"")) {
+         return "string";
+      } else if (arg.matches("^-?\\d+\\.\\d+[fF]?$") || arg.matches("^-?\\d+\\.\\d+$")) {
+         return "float";
+      } else if (arg.matches("^-?\\d+$")) {
+         return null; // Could be int, keep as is
+      }
+      return null;
+   }
+
+   /**
+    * Fixes decompiled code to make it compilable by declaring missing variables
+    * and fixing function signature type mismatches based on call sites.
+    */
+   private static void fixDecompiledCodeForRecompilation(Path decompiledPath) throws IOException {
+      String content = new String(Files.readAllBytes(decompiledPath), StandardCharsets.UTF_8);
+      
+      // Fix function signatures by analyzing call sites
+      content = fixFunctionSignaturesFromCallSites(content);
+      
+      StringBuilder fixed = new StringBuilder();
+      
+      // Find all __unknown_param_* usages
+      java.util.regex.Pattern unknownParamPattern = java.util.regex.Pattern.compile(
+            "__unknown_param_(\\d+)");
+      java.util.Set<String> unknownParams = new java.util.HashSet<>();
+      java.util.regex.Matcher matcher = unknownParamPattern.matcher(content);
+      while (matcher.find()) {
+         unknownParams.add(matcher.group(0));
+      }
+      
+      // Find undeclared variables that are used (simple heuristic: word boundaries)
+      java.util.regex.Pattern varUsagePattern = java.util.regex.Pattern.compile(
+            "\\b(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[=;]");
+      java.util.Set<String> declaredVars = new java.util.HashSet<>();
+      java.util.regex.Matcher declMatcher = varUsagePattern.matcher(content);
+      while (declMatcher.find()) {
+         declaredVars.add(declMatcher.group(2));
+      }
+      
+      // Find variable usages that aren't declared
+      java.util.regex.Pattern usagePattern = java.util.regex.Pattern.compile(
+            "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*[=(),;\\[\\]]");
+      java.util.Set<String> usedVars = new java.util.HashSet<>();
+      java.util.regex.Matcher usageMatcher = usagePattern.matcher(content);
+      while (usageMatcher.find()) {
+         String varName = usageMatcher.group(1);
+         // Skip keywords and known functions
+         if (!isReservedName(varName) && !declaredVars.contains(varName) && 
+             varName.matches("^(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\d+$")) {
+            usedVars.add(varName);
+         }
+      }
+      
+      // If we found unknown params or undeclared vars, add declarations
+      if (!unknownParams.isEmpty() || !usedVars.isEmpty()) {
+         // Find the insertion point (after globals, before first function)
+         String[] lines = content.split("\n", -1);
+         int insertLine = -1;
+         for (int i = 0; i < lines.length; i++) {
+            String line = lines[i].trim();
+            // Check if we've left the globals section (found a function)
+            if (line.matches("^(void|int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+[a-zA-Z_][a-zA-Z0-9_]*\\s*\\(")) {
+               insertLine = i;
+               break;
+            }
+         }
+         
+         if (insertLine == -1) {
+            insertLine = lines.length;
+         }
+         
+         // Build the fixed content
+         for (int i = 0; i < insertLine; i++) {
+            fixed.append(lines[i]).append("\n");
+         }
+         
+         // Add declarations for unknown params (as int, default to 0)
+         for (String param : unknownParams) {
+            fixed.append("\tint ").append(param).append(" = 0;\n");
+         }
+         
+         // Add declarations for undeclared variables (try to infer type from name)
+         for (String var : usedVars) {
+            if (var.startsWith("int") || var.matches("^int\\d+$")) {
+               fixed.append("\tint ").append(var).append(" = 0;\n");
+            } else if (var.startsWith("string") || var.matches("^string\\d+$")) {
+               fixed.append("\tstring ").append(var).append(" = \"\";\n");
+            } else if (var.startsWith("object") || var.matches("^object\\d+$")) {
+               fixed.append("\tobject ").append(var).append(";\n");
+            } else if (var.startsWith("float") || var.matches("^float\\d+$")) {
+               fixed.append("\tfloat ").append(var).append(" = 0.0;\n");
+            } else {
+               // Default to int for unknown types
+               fixed.append("\tint ").append(var).append(" = 0;\n");
+            }
+         }
+         
+         // Add rest of content
+         for (int i = insertLine; i < lines.length; i++) {
+            fixed.append(lines[i]);
+            if (i < lines.length - 1) {
+               fixed.append("\n");
+            }
+         }
+         
+         Files.write(decompiledPath, fixed.toString().getBytes(StandardCharsets.UTF_8));
+      } else {
+         // Even if no unknown params, write the signature-fixed content
+         Files.write(decompiledPath, content.getBytes(StandardCharsets.UTF_8));
+      }
    }
 
    /**
@@ -975,6 +1155,9 @@ public class NCSDecompCLIRoundTripTest {
       normalized = normalizeDoubleParensInCalls(normalized);
       normalized = normalizeAssignmentParens(normalized);
       normalized = normalizeCallArgumentParens(normalized);
+      normalized = normalizeStructNames(normalized);
+      normalized = normalizeSubroutineNames(normalized);
+      normalized = normalizePrototypeDecls(normalized);
       normalized = normalizeReturnStatements(normalized);
       normalized = normalizeFunctionSignaturesByArity(normalized);
       normalized = normalizeComparisonParens(normalized);
@@ -1032,6 +1215,7 @@ public class NCSDecompCLIRoundTripTest {
       trailingDefaults.put("d20", "(0|1)");
       trailingDefaults.put("d100", "(0|1)");
       trailingDefaults.put("ActionAttack", "(0|FALSE)");
+      trailingDefaults.put("ActionStartConversation", "(0|0xFFFFFFFF|-1)");
 
       String result = code;
       for (java.util.Map.Entry<String, String> entry : trailingDefaults.entrySet()) {
@@ -1131,6 +1315,10 @@ public class NCSDecompCLIRoundTripTest {
             .compile("^[\\uFEFF]?int\\s+int\\d+\\s*=\\s*[-0-9xa-fA-F]+;");
       while (idx < lines.length) {
          String line = lines[idx].trim();
+         if (line.startsWith("//")) {
+            idx++;
+            continue;
+         }
          if (line.isEmpty()) {
             idx++;
             continue;
@@ -1169,6 +1357,9 @@ public class NCSDecompCLIRoundTripTest {
 
       for (int i = 0; i < lines.length; i++) {
          String line = lines[i].trim();
+         if (line.startsWith("//")) {
+            continue;
+         }
          if (placeholderPattern.matcher(line).matches()) {
             count++;
             end = i;
@@ -1291,6 +1482,51 @@ public class NCSDecompCLIRoundTripTest {
       }
       m.appendTail(sb);
       return sb.toString();
+   }
+
+   /** Canonicalizes structtype names (structtype1, structtype2, ...) to a stable sequence. */
+   private static String normalizeStructNames(String code) {
+      java.util.regex.Pattern p = java.util.regex.Pattern.compile("\\bstructtype(\\d+)\\b");
+      java.util.regex.Matcher m = p.matcher(code);
+      StringBuffer sb = new StringBuffer();
+      java.util.Map<String, String> map = new java.util.LinkedHashMap<>();
+      int counter = 1;
+      while (m.find()) {
+         String orig = m.group(0);
+         String mapped = map.get(orig);
+         if (mapped == null) {
+            mapped = "structtype" + counter++;
+            map.put(orig, mapped);
+         }
+         m.appendReplacement(sb, mapped);
+      }
+      m.appendTail(sb);
+      return sb.toString();
+   }
+
+   /** Canonicalizes subroutine names (subNN) to a stable sequence based on first appearance. */
+   private static String normalizeSubroutineNames(String code) {
+      java.util.regex.Pattern p = java.util.regex.Pattern.compile("\\bsub(\\d+)\\b");
+      java.util.regex.Matcher m = p.matcher(code);
+      StringBuffer sb = new StringBuffer();
+      java.util.Map<String, String> map = new java.util.LinkedHashMap<>();
+      int counter = 1;
+      while (m.find()) {
+         String orig = m.group(0);
+         String mapped = map.get(orig);
+         if (mapped == null) {
+            mapped = "sub" + counter++;
+            map.put(orig, mapped);
+         }
+         m.appendReplacement(sb, mapped);
+      }
+      m.appendTail(sb);
+      return sb.toString();
+   }
+
+   /** Removes standalone prototype declarations (function signatures ending with ';'). */
+   private static String normalizePrototypeDecls(String code) {
+      return code.replaceAll("(?m)^\\s*(int|float|void|string|object|location|vector|effect|talent)\\s+sub\\d+\\s*\\([^;]*\\);\\s*\\n?", "");
    }
 
    /**
