@@ -1766,7 +1766,10 @@ public class NCSDecompCLIRoundTripTest {
             int start = (Integer) match[0];
             int end = (Integer) match[1];
             String group1 = (String) match[2];
-            result = result.substring(0, start) + group1 + ")" + result.substring(end);
+            // Safety check: ensure indices are within bounds
+            if (start >= 0 && end <= result.length() && start < end) {
+               result = result.substring(0, start) + group1 + ")" + result.substring(end);
+            }
          }
       }
 
@@ -2280,21 +2283,8 @@ public class NCSDecompCLIRoundTripTest {
       result = result.replaceAll("\\bif([a-zA-Z_][a-zA-Z0-9_]*)", "if $1");
       // Normalize "if identifier" to "if (identifier" when followed by comparison/expression
       // This handles cases where original has "if (" but decompiled has "if identifier"
-      java.util.regex.Pattern ifPattern = java.util.regex.Pattern.compile("\\bif\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(==|!=|<=|>=|<|>|&|\\|)");
-      java.util.regex.Matcher ifMatcher = ifPattern.matcher(result);
-      StringBuffer sb = new StringBuffer();
-      while (ifMatcher.find()) {
-         // Check if there's already a paren before the identifier
-         int start = ifMatcher.start();
-         if (start > 0 && result.charAt(start - 1) != '(') {
-            ifMatcher.appendReplacement(sb, "if (" + ifMatcher.group(1) + " " + ifMatcher.group(2));
-         } else {
-            ifMatcher.appendReplacement(sb, ifMatcher.group(0));
-         }
-      }
-      ifMatcher.appendTail(sb);
-      result = sb.toString();
-      
+      // Use simpler approach: just add paren if missing and followed by comparison
+      result = result.replaceAll("\\bif\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*(==|!=|<=|>=|<|>|&|\\|)", "if ($1 $2");
       result = result.replaceAll("\\bif(?=[A-Za-z_])", "if ");
       result = result.replaceAll("\\bwhile(?=[A-Za-z_])", "while ");
       result = result.replaceAll("\\bfor(?=[A-Za-z_])", "for ");
