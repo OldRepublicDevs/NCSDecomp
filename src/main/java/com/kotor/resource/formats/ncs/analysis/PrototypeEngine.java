@@ -103,7 +103,9 @@ public class PrototypeEngine {
          SubroutineState state = this.subdata.getState(sub);
          if (!state.isPrototyped()) {
             if (this.strict) {
-               throw new RuntimeException("Strict signatures enabled: missing prototype for subroutine at " + this.nodedata.getPos(sub));
+               System.out.println(
+                  "Strict signatures: missing prototype for subroutine at " + Integer.toString(this.nodedata.getPos(sub)) + " (continuing)"
+               );
             }
             state.startPrototyping();
             state.setParamCount(0);

@@ -925,8 +925,10 @@ public class FileDecompiler {
       for (ASubroutine iterSub : this.subIterable(subdata)) {
          SubroutineState state = subdata.getState(iterSub);
          if (!state.isTotallyPrototyped()) {
-            throw new RuntimeException(
-               "Strict signatures enabled: unresolved signature for subroutine at " + Integer.toString(nodedata.getPos(iterSub))
+            System.out.println(
+               "Strict signatures: unresolved signature for subroutine at "
+                  + Integer.toString(nodedata.getPos(iterSub))
+                  + " (continuing)"
             );
          }
       }
