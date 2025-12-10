@@ -61,21 +61,23 @@ if ($exitCode -ne 0) {
     exit 1
 }
 
+$profileFile = Join-Path "test-work" "test_profile.txt"
 Write-Host "Running tests with $TimeoutSeconds second timeout and profiling..."
-Write-Host "Profiling output will be in: test_profile.txt"
+Write-Host "Profiling output will be in: $profileFile"
+Write-Host ""
 
 # Start the Java process with profiling
 $job = Start-Job -ScriptBlock {
-    param($cp)
-    $env:JAVA_TOOL_OPTIONS = "-XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation -XX:LogFile=test_profile.txt -XX:+PrintCompilation"
-    java -cp $cp -XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation -XX:LogFile=test_profile.txt com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest 2>&1
-} -ArgumentList $cp
+    param($cp, $profilePath)
+    $env:JAVA_TOOL_OPTIONS = "-XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation -XX:LogFile=$profilePath -XX:+PrintCompilation"
+    java -cp $cp -XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation -XX:LogFile=$profilePath com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest 2>&1
+} -ArgumentList $cp, $profileFile
 
 # Wait for job with timeout
 $result = Wait-Job -Job $job -Timeout $TimeoutSeconds
 
 if ($null -eq $result) {
-    Write-Host "`nTIMEOUT: Tests exceeded $TimeoutSeconds seconds. Killing process..."
+    Write-Host "`nTIMEOUT: Tests exceeded $TimeoutSeconds seconds. Killing process..." -ForegroundColor Red
     Stop-Job -Job $job
     Remove-Job -Job $job -Force
     exit 124
@@ -88,8 +90,58 @@ Remove-Job -Job $job
 $output | Write-Host
 
 # Check exit code
-if ($LASTEXITCODE -ne 0) {
-    exit $LASTEXITCODE
+$exitCode = $LASTEXITCODE
+if ($exitCode -ne 0) {
+    exit $exitCode
+}
+
+# Analyze profile if it exists
+if (Test-Path $profileFile) {
+    Write-Host ""
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host "PROFILE ANALYSIS" -ForegroundColor Cyan
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+
+    # Parse compilation log to find hot methods
+    $profileContent = Get-Content $profileFile -ErrorAction SilentlyContinue
+    if ($profileContent) {
+        # Extract method compilation info
+        $hotMethods = $profileContent | Where-Object { $_ -match '^\s*\d+\s+\d+\s+[!%]' } |
+            ForEach-Object {
+                if ($_ -match '^\s*(\d+)\s+(\d+)\s+([!%]?)\s+(\d+)\s+([^\s]+)\s+(.+)') {
+                    [PSCustomObject]@{
+                        CompileID = [int]$matches[1]
+                        Level = [int]$matches[2]
+                        Special = $matches[3]
+                        Size = [int]$matches[4]
+                        Method = $matches[6]
+                        Line = $_
+                    }
+                }
+            } |
+            Sort-Object -Property Size -Descending |
+            Select-Object -First 20
+
+        if ($hotMethods) {
+            Write-Host "Top 20 methods by compiled size (potential bottlenecks):" -ForegroundColor Yellow
+            Write-Host ""
+            $hotMethods | ForEach-Object {
+                $indicator = if ($_.Special -eq '!') { '[OSR]' } elseif ($_.Special -eq '%') { '[ON-STACK]' } else { '' }
+                Write-Host ("  {0,6} bytes {1,-8} {2}" -f $_.Size, $indicator, $_.Method)
+            }
+        }
+
+        # Count total compilations
+        $totalCompilations = ($profileContent | Where-Object { $_ -match '^\s*\d+\s+\d+\s+\d+' }).Count
+        Write-Host ""
+        Write-Host "Total method compilations: $totalCompilations"
+    } else {
+        Write-Host "Profile file is empty or could not be read." -ForegroundColor Yellow
+    }
+
+    Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Full profile log: $profileFile" -ForegroundColor Gray
 }
 
 

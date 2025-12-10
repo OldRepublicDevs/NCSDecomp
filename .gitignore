@@ -56,6 +56,11 @@ test_output.txt
 test_results*.txt
 test_udiff*.txt
 test_fastfail.txt
+test_profile.txt
+
+# Test working directories (created by tests)
+test-work/
+roundtrip-work/
 
 # Build artifacts
 dist-exe/
