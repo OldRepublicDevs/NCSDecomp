@@ -1118,6 +1118,69 @@ public class Decompiler
          return; // Invalid panel index
       }
       
+      // If switching to bytecode view (index 1), populate bytecode data if available
+      if (index == 1 && panels[1] instanceof JSplitPane) {
+         try {
+            File file = this.hash_TabComponent2File.get(tabComponent);
+            if (file != null) {
+               JSplitPane byteCodePane = (JSplitPane)panels[1];
+               
+               // Get left component (original bytecode)
+               java.awt.Component leftComp = byteCodePane.getLeftComponent();
+               if (leftComp instanceof JScrollPane) {
+                  JTextArea origTextArea = (JTextArea)((JScrollPane)leftComp).getViewport().getView();
+                  if (origTextArea != null && origTextArea.getText().trim().isEmpty()) {
+                     String origByteCode = this.fileDecompiler.getOriginalByteCode(file);
+                     if (origByteCode != null && !origByteCode.trim().isEmpty()) {
+                        origTextArea.setText(origByteCode);
+                     } else {
+                        origTextArea.setText("// Original bytecode not available.\n// Bytecode is only captured during round-trip validation (save/recompile).");
+                     }
+                  }
+               }
+               
+               // Get right component (recompiled bytecode)
+               java.awt.Component rightComp = byteCodePane.getRightComponent();
+               if (rightComp instanceof JScrollPane) {
+                  JTextArea newTextArea = (JTextArea)((JScrollPane)rightComp).getViewport().getView();
+                  if (newTextArea != null && newTextArea.getText().trim().isEmpty()) {
+                     String newByteCode = this.fileDecompiler.getNewByteCode(file);
+                     if (newByteCode != null && !newByteCode.trim().isEmpty()) {
+                        newTextArea.setText(newByteCode);
+                        // Set focus based on which has more content
+                        if (leftComp instanceof JScrollPane) {
+                           JTextArea origTextArea = (JTextArea)((JScrollPane)leftComp).getViewport().getView();
+                           if (origTextArea != null && origTextArea.getLineCount() >= newTextArea.getLineCount()) {
+                              this.jTB.putClientProperty(panels[1], "left");
+                           } else {
+                              this.jTB.putClientProperty(panels[1], "right");
+                           }
+                        }
+                     } else {
+                        newTextArea.setText("// Recompiled bytecode not available.\n// Save the file to trigger round-trip validation and bytecode capture.");
+                     }
+                  }
+               }
+            }
+         } catch (Exception e) {
+            // If there's an error, show a message but still switch to the view
+            System.out.println("Error populating bytecode view: " + e.getMessage());
+            e.printStackTrace();
+            try {
+               JSplitPane byteCodePane = (JSplitPane)panels[1];
+               java.awt.Component leftComp = byteCodePane.getLeftComponent();
+               if (leftComp instanceof JScrollPane) {
+                  JTextArea origTextArea = (JTextArea)((JScrollPane)leftComp).getViewport().getView();
+                  if (origTextArea != null) {
+                     origTextArea.setText("// Error loading bytecode: " + e.getMessage());
+                  }
+               }
+            } catch (Exception ex) {
+               // Ignore errors in error handling
+            }
+         }
+      }
+      
       this.jTB.setComponentAt(selectedIndex, panels[index]);
       this.repaint();
    }
@@ -1310,14 +1373,39 @@ public class Decompiler
                break;
             case 1:
                this.panels = (JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(index));
-               this.origByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getLeftComponent()).getViewport().getComponent(0);
-               this.origByteCodeJTA.setText(this.fileDecompiler.getOriginalByteCode(this.file));
-               this.newByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getRightComponent()).getViewport().getComponent(0);
-               this.newByteCodeJTA.setText(this.fileDecompiler.getNewByteCode(this.file));
-               if (this.origByteCodeJTA.getLineCount() >= this.newByteCodeJTA.getLineCount()) {
-                  this.jTB.putClientProperty(this.panels[1], "left");
-               } else {
-                  this.jTB.putClientProperty(this.panels[1], "right");
+               if (this.panels != null && this.panels.length > 1 && this.panels[1] instanceof JSplitPane) {
+                  try {
+                     String origByteCode = this.fileDecompiler.getOriginalByteCode(this.file);
+                     String newByteCode = this.fileDecompiler.getNewByteCode(this.file);
+                     
+                     JSplitPane byteCodePane = (JSplitPane)this.panels[1];
+                     java.awt.Component leftComp = byteCodePane.getLeftComponent();
+                     if (leftComp instanceof JScrollPane) {
+                        this.origByteCodeJTA = (JTextArea)((JScrollPane)leftComp).getViewport().getView();
+                        if (this.origByteCodeJTA != null) {
+                           this.origByteCodeJTA.setText(origByteCode != null ? origByteCode : "// Original bytecode not available");
+                        }
+                     }
+                     
+                     java.awt.Component rightComp = byteCodePane.getRightComponent();
+                     if (rightComp instanceof JScrollPane) {
+                        this.newByteCodeJTA = (JTextArea)((JScrollPane)rightComp).getViewport().getView();
+                        if (this.newByteCodeJTA != null) {
+                           this.newByteCodeJTA.setText(newByteCode != null ? newByteCode : "// Recompiled bytecode not available");
+                        }
+                     }
+                     
+                     if (this.origByteCodeJTA != null && this.newByteCodeJTA != null) {
+                        if (this.origByteCodeJTA.getLineCount() >= this.newByteCodeJTA.getLineCount()) {
+                           this.jTB.putClientProperty(this.panels[1], "left");
+                        } else {
+                           this.jTB.putClientProperty(this.panels[1], "right");
+                        }
+                     }
+                  } catch (Exception e) {
+                     System.out.println("Error updating bytecode view: " + e.getMessage());
+                     e.printStackTrace();
+                  }
                }
 
                this.hash_Func2VarVec = this.fileDecompiler.getVariableData(this.file);
@@ -1333,9 +1421,22 @@ public class Decompiler
                break;
             case 2:
                this.panels = (JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(index));
-               this.origByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getLeftComponent()).getViewport().getComponent(0);
-               this.origByteCodeJTA.setText(this.fileDecompiler.getOriginalByteCode(this.file));
-               this.jTB.putClientProperty(this.panels[1], "left");
+               if (this.panels != null && this.panels.length > 1 && this.panels[1] instanceof JSplitPane) {
+                  try {
+                     String origByteCode = this.fileDecompiler.getOriginalByteCode(this.file);
+                     JSplitPane byteCodePane = (JSplitPane)this.panels[1];
+                     java.awt.Component leftComp = byteCodePane.getLeftComponent();
+                     if (leftComp instanceof JScrollPane) {
+                        this.origByteCodeJTA = (JTextArea)((JScrollPane)leftComp).getViewport().getView();
+                        if (this.origByteCodeJTA != null) {
+                           this.origByteCodeJTA.setText(origByteCode != null ? origByteCode : "// Original bytecode not available");
+                        }
+                     }
+                     this.jTB.putClientProperty(this.panels[1], "left");
+                  } catch (Exception e) {
+                     System.out.println("Error updating bytecode view: " + e.getMessage());
+                  }
+               }
                this.hash_Func2VarVec = this.fileDecompiler.getVariableData(this.file);
                this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
                this.fileDecompiler.getOriginalByteCode(this.file);
@@ -1350,14 +1451,38 @@ public class Decompiler
                break;
             case 3:
                this.panels = (JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(index));
-               this.origByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getLeftComponent()).getViewport().getComponent(0);
-               this.origByteCodeJTA.setText(this.fileDecompiler.getOriginalByteCode(this.file));
-               this.newByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getRightComponent()).getViewport().getComponent(0);
-               this.newByteCodeJTA.setText(this.fileDecompiler.getNewByteCode(this.file));
-               if (this.origByteCodeJTA.getLineCount() >= this.newByteCodeJTA.getLineCount()) {
-                  this.jTB.putClientProperty(this.panels[1], "left");
-               } else {
-                  this.jTB.putClientProperty(this.panels[1], "right");
+               if (this.panels != null && this.panels.length > 1 && this.panels[1] instanceof JSplitPane) {
+                  try {
+                     String origByteCode = this.fileDecompiler.getOriginalByteCode(this.file);
+                     String newByteCode = this.fileDecompiler.getNewByteCode(this.file);
+                     
+                     JSplitPane byteCodePane = (JSplitPane)this.panels[1];
+                     java.awt.Component leftComp = byteCodePane.getLeftComponent();
+                     if (leftComp instanceof JScrollPane) {
+                        this.origByteCodeJTA = (JTextArea)((JScrollPane)leftComp).getViewport().getView();
+                        if (this.origByteCodeJTA != null) {
+                           this.origByteCodeJTA.setText(origByteCode != null ? origByteCode : "// Original bytecode not available");
+                        }
+                     }
+                     
+                     java.awt.Component rightComp = byteCodePane.getRightComponent();
+                     if (rightComp instanceof JScrollPane) {
+                        this.newByteCodeJTA = (JTextArea)((JScrollPane)rightComp).getViewport().getView();
+                        if (this.newByteCodeJTA != null) {
+                           this.newByteCodeJTA.setText(newByteCode != null ? newByteCode : "// Recompiled bytecode not available");
+                        }
+                     }
+                     
+                     if (this.origByteCodeJTA != null && this.newByteCodeJTA != null) {
+                        if (this.origByteCodeJTA.getLineCount() >= this.newByteCodeJTA.getLineCount()) {
+                           this.jTB.putClientProperty(this.panels[1], "left");
+                        } else {
+                           this.jTB.putClientProperty(this.panels[1], "right");
+                        }
+                     }
+                  } catch (Exception e) {
+                     System.out.println("Error updating bytecode view: " + e.getMessage());
+                  }
                }
 
                this.hash_Func2VarVec = this.fileDecompiler.getVariableData(this.file);
