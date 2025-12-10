@@ -57,7 +57,7 @@ This project follows standard Maven directory layout conventions:
 # On Windows: creates .exe
 # On macOS: creates .app
 # On Linux: creates executable binary
-.\scripts\build.ps1 -BuildExe
+.\scripts\build.ps1 -BuildExecutable
 
 # Show build script help
 .\scripts\build.ps1 -Help
@@ -72,7 +72,7 @@ The PowerShell build script will:
 2. Compile all Java source files from `src/main/java`
 3. Copy resources from `src/main/resources` to the build directory
 4. Create a JAR file named `NCSDecomp-CLI.jar` in the project root
-5. Optionally create self-contained executables (when using `-BuildExe`)
+5. Optionally create self-contained executables (when using `-BuildExecutable`)
 6. Automatically detect the platform and use appropriate settings
 
 #### Option 2: Using Maven

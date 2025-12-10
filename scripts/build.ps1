@@ -9,7 +9,7 @@
 # Cross-platform compatible (Windows, macOS, Linux)
 
 param(
-    [switch]$BuildExe = $false,
+    [switch]$BuildExecutable = $false,
     [switch]$Help = $false
 )
 
@@ -20,12 +20,12 @@ if ($Help) {
     Write-Host "NCSDecomp Build Script" -ForegroundColor Green
     Write-Host ""
     Write-Host "Usage:" -ForegroundColor Cyan
-    Write-Host "  .\scripts\build.ps1              # Build JAR file only"
-    Write-Host "  .\scripts\build.ps1 -BuildExe    # Build JAR and executable"
-    Write-Host "  .\scripts\build.ps1 -Help         # Show this help"
+    Write-Host "  .\scripts\build.ps1                    # Build JAR file only"
+    Write-Host "  .\scripts\build.ps1 -BuildExecutable    # Build JAR and executable"
+    Write-Host "  .\scripts\build.ps1 -Help               # Show this help"
     Write-Host ""
     Write-Host "Options:" -ForegroundColor Cyan
-    Write-Host "  -BuildExe    Build self-contained executable (requires JDK 14+ with jpackage)"
+    Write-Host "  -BuildExecutable    Build self-contained executable (requires JDK 14+ with jpackage)"
     Write-Host "  -Help        Show this help message"
     exit 0
 }
@@ -44,7 +44,7 @@ if ($PSVersionTable.PSVersion.Major -ge 6) {
 $platformName = if ($IsWindows) { "Windows" } elseif ($IsMacOS) { "macOS" } elseif ($IsLinux) { "Linux" } else { "Unknown" }
 Write-Host "Building NCSDecomp CLI..." -ForegroundColor Green
 Write-Host "Platform: $platformName" -ForegroundColor Gray
-if ($BuildExe) {
+if ($BuildExecutable) {
     Write-Host "Mode: JAR + Executable" -ForegroundColor Cyan
 } else {
     Write-Host "Mode: JAR only" -ForegroundColor Cyan
@@ -88,7 +88,7 @@ if (Test-Path $jarFile) {
 }
 
 # Clean executable output directory if building executable
-if ($BuildExe) {
+if ($BuildExecutable) {
     $exeOutputDir = Join-Path "." "dist-exe"
     if (Test-Path $exeOutputDir) {
         Write-Host "Cleaning previous executable build..." -ForegroundColor Yellow
@@ -295,7 +295,7 @@ Write-Host ""
 Write-Host "JAR build complete! Created NCSDecomp-CLI.jar" -ForegroundColor Green
 
 # Build executable if requested
-if ($BuildExe) {
+if ($BuildExecutable) {
     Write-Host ""
     Write-Host "========================================" -ForegroundColor Cyan
     Write-Host "Building self-contained executable..." -ForegroundColor Cyan
@@ -575,5 +575,5 @@ if ($BuildExe) {
     Write-Host "  java -jar NCSDecomp-CLI.jar -i scripts_dir -r --k2 -O output_dir" -ForegroundColor White
     Write-Host "  java -jar NCSDecomp-CLI.jar --help" -ForegroundColor White
     Write-Host ""
-    Write-Host "To build executable, run: .\scripts\build.ps1 -BuildExe" -ForegroundColor Cyan
+    Write-Host "To build executable, run: .\scripts\build.ps1 -BuildExecutable" -ForegroundColor Cyan
 }
