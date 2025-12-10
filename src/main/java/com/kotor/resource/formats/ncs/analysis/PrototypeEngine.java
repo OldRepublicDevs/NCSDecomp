@@ -120,12 +120,15 @@ public class PrototypeEngine {
             if (inferredParams < 0) {
                inferredParams = 0;
             }
+            // Avoid collapsing call arguments; assume at least one param if nothing inferred.
+            if (inferredParams == 0) {
+               inferredParams = 1;
+            }
             state.startPrototyping();
             state.setParamCount(inferredParams);
-            // Default to void return when unknown; avoid inventing non-void types that can
-            // distort call sites (e.g., dropping AssignCommand bodies).
+            // Default to int return (bool-compatible) when unknown to preserve call usage.
             if (!state.type().isTyped() || state.type().byteValue() == Type.VT_NONE) {
-               state.setReturnType(new Type(Type.VT_NONE), 0);
+               state.setReturnType(new Type(Type.VT_INTEGER), 0);
             }
             state.ensureParamPlaceholders();
             state.stopPrototyping(true);
