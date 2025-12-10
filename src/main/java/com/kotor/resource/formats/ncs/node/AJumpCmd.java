@@ -17,7 +17,7 @@ public final class AJumpCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AJumpCmd((PJumpCommand)this.cloneNode(this._jumpCommand_));
    }
 

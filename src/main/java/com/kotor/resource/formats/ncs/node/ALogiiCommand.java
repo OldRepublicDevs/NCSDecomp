@@ -34,7 +34,7 @@ public final class ALogiiCommand extends PLogiiCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ALogiiCommand(
          (PLogiiOp)this.cloneNode(this._logiiOp_),
          (TIntegerConstant)this.cloneNode(this._pos_),

@@ -20,7 +20,7 @@ public final class ABpCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ABpCmd((PBpCommand)this.cloneNode(this._bpCommand_));
    }
 

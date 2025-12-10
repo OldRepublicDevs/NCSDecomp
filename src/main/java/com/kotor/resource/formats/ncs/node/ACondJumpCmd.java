@@ -17,7 +17,7 @@ public final class ACondJumpCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ACondJumpCmd((PConditionalJumpCommand)this.cloneNode(this._conditionalJumpCommand_));
    }
 

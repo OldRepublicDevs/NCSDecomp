@@ -20,7 +20,7 @@ public final class AGtBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AGtBinaryOp((TGt)this.cloneNode(this._gt_));
    }
 

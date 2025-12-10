@@ -25,7 +25,7 @@ public final class AJumpCommand extends PJumpCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AJumpCommand(
          (TJmp)this.cloneNode(this._jmp_),
          (TIntegerConstant)this.cloneNode(this._pos_),

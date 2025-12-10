@@ -19,8 +19,10 @@ public final class ASubroutine extends PSubroutine {
    }
 
    @Override
-   public Object clone() {
-      return new ASubroutine((PCommandBlock)this.cloneNode(this._commandBlock_), (PReturn)this.cloneNode(this._return_));
+   public ASubroutine clone() {
+      PCommandBlock clonedCommandBlock = this._commandBlock_ != null ? (PCommandBlock)this._commandBlock_.clone() : null;
+      PReturn clonedReturn = this._return_ != null ? (PReturn)this._return_.clone() : null;
+      return new ASubroutine(clonedCommandBlock, clonedReturn);
    }
 
    @Override

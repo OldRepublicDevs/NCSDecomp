@@ -35,7 +35,7 @@ public final class ACommandBlock extends PCommandBlock {
    }
 
    @Override
-   public Object clone() {
+   public ACommandBlock clone() {
       return new ACommandBlock(this.cloneList(this._cmd_));
    }
 
@@ -91,6 +91,9 @@ public final class ACommandBlock extends PCommandBlock {
 
       @Override
       public PCmd cast(Object o) {
+         if (!(o instanceof PCmd)) {
+            throw new ClassCastException("Expected PCmd but got: " + (o != null ? o.getClass().getName() : "null"));
+         }
          PCmd node = (PCmd)o;
          if (node.parent() != null && node.parent() != ACommandBlock.this) {
             node.parent().removeChild(node);

@@ -25,7 +25,7 @@ public final class AJumpToSubroutine extends PJumpToSubroutine {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AJumpToSubroutine(
          (TJsr)this.cloneNode(this._jsr_),
          (TIntegerConstant)this.cloneNode(this._pos_),

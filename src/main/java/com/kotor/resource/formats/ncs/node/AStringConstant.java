@@ -17,8 +17,9 @@ public final class AStringConstant extends PConstant {
    }
 
    @Override
-   public Object clone() {
-      return new AStringConstant((TStringLiteral)this.cloneNode(this._stringLiteral_));
+   public AStringConstant clone() {
+      TStringLiteral clonedStringLiteral = this._stringLiteral_ != null ? this._stringLiteral_.clone() : null;
+      return new AStringConstant(clonedStringLiteral);
    }
 
    @Override

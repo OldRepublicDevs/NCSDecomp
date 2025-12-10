@@ -37,7 +37,7 @@ public final class AConstCommand extends PConstCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AConstCommand(
          (TConst)this.cloneNode(this._const_),
          (TIntegerConstant)this.cloneNode(this._pos_),

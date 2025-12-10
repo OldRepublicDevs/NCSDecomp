@@ -29,7 +29,7 @@ public final class ACopyDownBpCommand extends PCopyDownBpCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ACopyDownBpCommand(
          (TCpdownbp)this.cloneNode(this._cpdownbp_),
          (TIntegerConstant)this.cloneNode(this._pos_),

@@ -18,7 +18,7 @@ public final class TShright extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TShright clone() {
       return new TShright(this.getLine(), this.getPos());
    }
 

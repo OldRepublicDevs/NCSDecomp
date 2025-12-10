@@ -23,7 +23,7 @@ public final class ARsaddCommand extends PRsaddCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ARsaddCommand(
          (TRsadd)this.cloneNode(this._rsadd_),
          (TIntegerConstant)this.cloneNode(this._pos_),

@@ -15,7 +15,7 @@ public final class X2PCmd extends XPCmd {
    }
 
    @Override
-   public Object clone() {
+   public X2PCmd clone() {
       throw new RuntimeException("Unsupported Operation");
    }
 

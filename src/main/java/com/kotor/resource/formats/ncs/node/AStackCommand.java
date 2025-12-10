@@ -25,14 +25,13 @@ public final class AStackCommand extends PStackCommand {
    }
 
    @Override
-   public Object clone() {
-      return new AStackCommand(
-         (PStackOp)this.cloneNode(this._stackOp_),
-         (TIntegerConstant)this.cloneNode(this._pos_),
-         (TIntegerConstant)this.cloneNode(this._type_),
-         (TIntegerConstant)this.cloneNode(this._offset_),
-         (TSemi)this.cloneNode(this._semi_)
-      );
+   public AStackCommand clone() {
+      PStackOp clonedStackOp = this._stackOp_ != null ? (PStackOp)this._stackOp_.clone() : null;
+      TIntegerConstant clonedPos = this._pos_ != null ? this._pos_.clone() : null;
+      TIntegerConstant clonedType = this._type_ != null ? this._type_.clone() : null;
+      TIntegerConstant clonedOffset = this._offset_ != null ? this._offset_.clone() : null;
+      TSemi clonedSemi = this._semi_ != null ? this._semi_.clone() : null;
+      return new AStackCommand(clonedStackOp, clonedPos, clonedType, clonedOffset, clonedSemi);
    }
 
    @Override

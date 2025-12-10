@@ -17,7 +17,7 @@ public final class AMulBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AMulBinaryOp((TMul)this.cloneNode(this._mul_));
    }
 

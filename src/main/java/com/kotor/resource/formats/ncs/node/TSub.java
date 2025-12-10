@@ -18,7 +18,7 @@ public final class TSub extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TSub clone() {
       return new TSub(this.getLine(), this.getPos());
    }
 

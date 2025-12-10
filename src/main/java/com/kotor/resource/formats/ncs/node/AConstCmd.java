@@ -17,7 +17,7 @@ public final class AConstCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AConstCmd((PConstCommand)this.cloneNode(this._constCommand_));
    }
 

@@ -21,7 +21,7 @@ public final class TAction extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TAction clone() {
       return new TAction(this.getLine(), this.getPos());
    }
 

@@ -17,7 +17,7 @@ public final class AShrightBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AShrightBinaryOp((TShright)this.cloneNode(this._shright_));
    }
 

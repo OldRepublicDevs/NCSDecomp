@@ -222,7 +222,14 @@ public class Type {
 
    @Override
    public boolean equals(Object obj) {
-      return Type.class.isInstance(obj) ? this.type == ((Type)obj).type : false;
+      if (this == obj) {
+         return true;
+      }
+      if (!(obj instanceof Type)) {
+         return false;
+      }
+      Type other = (Type)obj;
+      return this.type == other.type;
    }
 
    public boolean equals(byte type) {

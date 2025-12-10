@@ -18,7 +18,7 @@ public final class TJmp extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TJmp clone() {
       return new TJmp(this.getLine(), this.getPos());
    }
 

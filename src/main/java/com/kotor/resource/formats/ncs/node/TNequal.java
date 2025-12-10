@@ -18,7 +18,7 @@ public final class TNequal extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TNequal clone() {
       return new TNequal(this.getLine(), this.getPos());
    }
 

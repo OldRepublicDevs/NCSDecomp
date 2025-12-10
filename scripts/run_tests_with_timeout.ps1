@@ -61,16 +61,25 @@ if ($exitCode -ne 0) {
     exit 1
 }
 
-$profileFile = Join-Path "test-work" "test_profile.txt"
-Write-Host "Running tests with $TimeoutSeconds second timeout and profiling..."
-Write-Host "Profiling output will be in: $profileFile"
+# Ensure test-work directory exists
+$testWorkDir = "test-work"
+if (-not (Test-Path $testWorkDir)) {
+    New-Item -ItemType Directory -Path $testWorkDir -Force | Out-Null
+}
+
+$profileFile = Join-Path $testWorkDir "test_profile.txt"
+Write-Host "Running tests with $TimeoutSeconds second timeout and profiling..." -ForegroundColor Cyan
+Write-Host "Profiling output will be in: $profileFile" -ForegroundColor Gray
 Write-Host ""
 
 # Start the Java process with profiling
+# Note: -XX:+PrintCompilation is removed to avoid stdout spam
+# The compilation log is written to file instead
 $job = Start-Job -ScriptBlock {
     param($cp, $profilePath)
-    $env:JAVA_TOOL_OPTIONS = "-XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation -XX:LogFile=$profilePath -XX:+PrintCompilation"
-    java -cp $cp -XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation -XX:LogFile=$profilePath com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest 2>&1
+    # Redirect stderr to null to suppress warnings, but keep stdout for test output
+    $env:JAVA_TOOL_OPTIONS = "-XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation -XX:LogFile=$profilePath"
+    java -cp $cp -XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation -XX:LogFile=$profilePath com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest 2>$null
 } -ArgumentList $cp, $profileFile
 
 # Wait for job with timeout
@@ -99,49 +108,101 @@ if ($exitCode -ne 0) {
 if (Test-Path $profileFile) {
     Write-Host ""
     Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
-    Write-Host "PROFILE ANALYSIS" -ForegroundColor Cyan
+    Write-Host "PROFILE ANALYSIS - Performance Bottlenecks" -ForegroundColor Cyan
     Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
 
-    # Parse compilation log to find hot methods
     $profileContent = Get-Content $profileFile -ErrorAction SilentlyContinue
     if ($profileContent) {
-        # Extract method compilation info
-        $hotMethods = $profileContent | Where-Object { $_ -match '^\s*\d+\s+\d+\s+[!%]' } |
-            ForEach-Object {
-                if ($_ -match '^\s*(\d+)\s+(\d+)\s+([!%]?)\s+(\d+)\s+([^\s]+)\s+(.+)') {
-                    [PSCustomObject]@{
-                        CompileID = [int]$matches[1]
-                        Level = [int]$matches[2]
-                        Special = $matches[3]
-                        Size = [int]$matches[4]
-                        Method = $matches[6]
-                        Line = $_
+        # Parse compilation log - extract methods with compilation info
+        $methodData = @{}
+        $totalCompilations = 0
+
+        foreach ($line in $profileContent) {
+            # Match compilation lines: <timestamp> <compile_id> <level> [flags] <size> <method>
+            if ($line -match '^\s*(\d+)\s+(\d+)\s+(\d+)\s+([!%s]*)\s+(\d+)\s+(.+)') {
+                $totalCompilations++
+                $compileId = $matches[2]
+                $level = [int]$matches[3]
+                $flags = $matches[4]
+                $size = [int]$matches[5]
+                $method = $matches[6].Trim()
+
+                # Only track C1/C2 compiled methods (level 1-4)
+                if ($level -ge 1 -and $level -le 4) {
+                    if (-not $methodData.ContainsKey($method)) {
+                        $methodData[$method] = @{
+                            Method = $method
+                            MaxSize = $size
+                            MaxLevel = $level
+                            Compilations = 0
+                            Flags = @()
+                        }
+                    }
+                    $methodData[$method].Compilations++
+                    if ($size -gt $methodData[$method].MaxSize) {
+                        $methodData[$method].MaxSize = $size
+                        $methodData[$method].MaxLevel = $level
+                    }
+                    if ($flags -and -not ($methodData[$method].Flags -contains $flags)) {
+                        $methodData[$method].Flags += $flags
                     }
                 }
-            } |
-            Sort-Object -Property Size -Descending |
-            Select-Object -First 20
-
-        if ($hotMethods) {
-            Write-Host "Top 20 methods by compiled size (potential bottlenecks):" -ForegroundColor Yellow
-            Write-Host ""
-            $hotMethods | ForEach-Object {
-                $indicator = if ($_.Special -eq '!') { '[OSR]' } elseif ($_.Special -eq '%') { '[ON-STACK]' } else { '' }
-                Write-Host ("  {0,6} bytes {1,-8} {2}" -f $_.Size, $indicator, $_.Method)
             }
         }
 
-        # Count total compilations
-        $totalCompilations = ($profileContent | Where-Object { $_ -match '^\s*\d+\s+\d+\s+\d+' }).Count
+        # Sort by size and compilation count to find bottlenecks
+        $bottlenecks = $methodData.Values |
+            Where-Object { $_.MaxSize -gt 100 -or $_.Compilations -gt 1 } |
+            Sort-Object -Property @{Expression = {$_.MaxSize}; Descending = $true}, @{Expression = {$_.Compilations}; Descending = $true} |
+            Select-Object -First 15
+
+        if ($bottlenecks) {
+            Write-Host ""
+            Write-Host "Top Performance Bottlenecks:" -ForegroundColor Yellow
+            Write-Host ""
+            Write-Host ("{0,-60} {1,-8} {2,-6} {3,-10}" -f "Method", "Size", "Level", "Compiles") -ForegroundColor Gray
+            Write-Host ("{0}" -f ("-" * 90)) -ForegroundColor Gray
+
+            foreach ($method in $bottlenecks) {
+                $levelStr = "C$($method.MaxLevel)"
+                $flagStr = ""
+                if ($method.Flags -contains '!') { $flagStr += "[OSR] " }
+                if ($method.Flags -contains '%') { $flagStr += "[ON-STACK] " }
+                if ($method.Flags -contains 's') { $flagStr += "[SYNC] " }
+
+                $methodName = if ($method.Method.Length -gt 55) {
+                    $method.Method.Substring(0, 52) + "..."
+                } else {
+                    $method.Method
+                }
+
+                Write-Host ("{0,-60} {1,6} B {2,-6} {3,2}x" -f $methodName, $method.MaxSize, $levelStr, $method.Compilations)
+                if ($flagStr) {
+                    Write-Host ("  {0}" -f $flagStr.Trim()) -ForegroundColor DarkGray
+                }
+            }
+        }
+
         Write-Host ""
-        Write-Host "Total method compilations: $totalCompilations"
+        Write-Host ("Total JIT compilations: {0}" -f $totalCompilations) -ForegroundColor Gray
+        Write-Host ("Methods compiled: {0}" -f $methodData.Count) -ForegroundColor Gray
+
+        # Find frequently recompiled methods (deoptimization issues)
+        $recompiled = $methodData.Values | Where-Object { $_.Compilations -gt 2 } | Sort-Object -Property Compilations -Descending | Select-Object -First 5
+        if ($recompiled) {
+            Write-Host ""
+            Write-Host "Methods with multiple compilations (possible deoptimization):" -ForegroundColor Yellow
+            foreach ($method in $recompiled) {
+                Write-Host ("  {0} - compiled {1} times" -f $method.Method, $method.Compilations) -ForegroundColor DarkYellow
+            }
+        }
     } else {
         Write-Host "Profile file is empty or could not be read." -ForegroundColor Yellow
     }
 
     Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Cyan
     Write-Host ""
-    Write-Host "Full profile log: $profileFile" -ForegroundColor Gray
+    Write-Host "Full compilation log: $profileFile" -ForegroundColor DarkGray
 }
 
 

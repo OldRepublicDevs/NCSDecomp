@@ -34,7 +34,7 @@ public final class AUnaryCommand extends PUnaryCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AUnaryCommand(
          (PUnaryOp)this.cloneNode(this._unaryOp_),
          (TIntegerConstant)this.cloneNode(this._pos_),

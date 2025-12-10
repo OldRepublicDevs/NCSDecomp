@@ -18,7 +18,7 @@ public final class TMod extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TMod clone() {
       return new TMod(this.getLine(), this.getPos());
    }
 

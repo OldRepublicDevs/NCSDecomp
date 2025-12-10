@@ -17,7 +17,7 @@ public final class AReturnCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AReturnCmd((PReturn)this.cloneNode(this._return_));
    }
 

@@ -17,7 +17,7 @@ public final class ACopytopbpCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ACopytopbpCmd((PCopyTopBpCommand)this.cloneNode(this._copyTopBpCommand_));
    }
 

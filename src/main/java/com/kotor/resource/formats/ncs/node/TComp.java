@@ -18,7 +18,7 @@ public final class TComp extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TComp clone() {
       return new TComp(this.getLine(), this.getPos());
    }
 

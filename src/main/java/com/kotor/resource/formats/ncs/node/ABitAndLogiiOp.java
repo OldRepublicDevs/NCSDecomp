@@ -17,7 +17,7 @@ public final class ABitAndLogiiOp extends PLogiiOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ABitAndLogiiOp((TBoolandii)this.cloneNode(this._boolandii_));
    }
 

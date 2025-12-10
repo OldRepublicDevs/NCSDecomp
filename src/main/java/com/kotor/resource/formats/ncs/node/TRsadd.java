@@ -18,7 +18,7 @@ public final class TRsadd extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TRsadd clone() {
       return new TRsadd(this.getLine(), this.getPos());
    }
 

@@ -17,7 +17,7 @@ public final class AInclOrLogiiOp extends PLogiiOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AInclOrLogiiOp((TIncorii)this.cloneNode(this._incorii_));
    }
 

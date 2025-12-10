@@ -17,7 +17,7 @@ public final class X1PSubroutine extends XPSubroutine {
    }
 
    @Override
-   public Object clone() {
+   public X1PSubroutine clone() {
       throw new RuntimeException("Unsupported Operation");
    }
 

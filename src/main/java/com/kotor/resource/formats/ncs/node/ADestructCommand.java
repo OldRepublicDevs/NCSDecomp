@@ -37,7 +37,7 @@ public final class ADestructCommand extends PDestructCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ADestructCommand(
          (TDestruct)this.cloneNode(this._destruct_),
          (TIntegerConstant)this.cloneNode(this._pos_),

@@ -11,19 +11,32 @@ import com.kotor.resource.formats.ncs.utils.Type;
  * Base class for constant stack entries (int/float/string/object).
  */
 public class Const extends StackEntry {
-   public static Const newConst(Type type, Object value) {
-      switch (type.byteValue()) {
-         case 3:
-            return new IntConst(value);
-         case 4:
-            return new FloatConst(value);
-         case 5:
-            return new StringConst(value);
-         case 6:
-            return new ObjectConst(value);
-         default:
-            throw new RuntimeException("Invalid const type " + type);
+   public static Const newConst(Type type, Long intValue) {
+      if (type.byteValue() != 3) {
+         throw new RuntimeException("Invalid const type for int value: " + type);
       }
+      return new IntConst(intValue);
+   }
+
+   public static Const newConst(Type type, Float floatValue) {
+      if (type.byteValue() != 4) {
+         throw new RuntimeException("Invalid const type for float value: " + type);
+      }
+      return new FloatConst(floatValue);
+   }
+
+   public static Const newConst(Type type, String stringValue) {
+      if (type.byteValue() != 5) {
+         throw new RuntimeException("Invalid const type for string value: " + type);
+      }
+      return new StringConst(stringValue);
+   }
+
+   public static Const newConst(Type type, Integer objectValue) {
+      if (type.byteValue() != 6) {
+         throw new RuntimeException("Invalid const type for object value: " + type);
+      }
+      return new ObjectConst(objectValue);
    }
 
    @Override

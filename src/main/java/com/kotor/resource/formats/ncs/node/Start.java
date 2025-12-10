@@ -19,8 +19,10 @@ public final class Start extends Node {
    }
 
    @Override
-   public Object clone() {
-      return new Start((PProgram)this.cloneNode(this._pProgram_), (EOF)this.cloneNode(this._eof_));
+   public Start clone() {
+      PProgram clonedPProgram = this._pProgram_ != null ? (PProgram)this._pProgram_.clone() : null;
+      EOF clonedEOF = this._eof_ != null ? (EOF)this._eof_.clone() : null;
+      return new Start(clonedPProgram, clonedEOF);
    }
 
    @Override

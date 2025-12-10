@@ -1,0 +1,120 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+        type: string
+      create_tag:
+        description: 'Create a new tag for this version'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            if [ "${{ github.event.inputs.create_tag }}" == "true" ]; then
+              VERSION="${{ github.event.inputs.version }}"
+              echo "version=$VERSION" >> $GITHUB_OUTPUT
+              echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+            else
+              VERSION="${{ github.event.inputs.version }}"
+              echo "version=$VERSION" >> $GITHUB_OUTPUT
+              echo "tag=" >> $GITHUB_OUTPUT
+            fi
+          else
+            # Extract version from tag (e.g., v1.0.0 -> 1.0.0)
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "tag=$GITHUB_REF_NAME" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create tag (if needed)
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.create_tag == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.version.outputs.version }}" -m "Release v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Build with Maven
+        run: mvn clean package -B
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            # For manual releases, get commits since last tag
+            LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            if [ -n "$LAST_TAG" ]; then
+              CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" || echo "No changes found")
+            else
+              CHANGELOG=$(git log --pretty=format:"- %s (%h)" -10 || echo "Initial release")
+            fi
+          else
+            # For tag-based releases, get commits since last tag
+            LAST_TAG=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
+            if [ -n "$LAST_TAG" ]; then
+              CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" || echo "No changes found")
+            else
+              CHANGELOG=$(git log --pretty=format:"- %s (%h)" -20 || echo "Initial release")
+            fi
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release v${{ steps.version.outputs.version }}
+          body: |
+            ## Release v${{ steps.version.outputs.version }}
+
+            ### Changes
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ### Downloads
+
+            - **JAR**: `ncsdecomp-CLI-${{ steps.version.outputs.version }}.jar`
+          files: |
+            target/ncsdecomp-CLI-*.jar
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+
+      - name: Upload Release Assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: target/ncsdecomp-CLI-*.jar
+          retention-days: 90
+

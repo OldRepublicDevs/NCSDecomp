@@ -18,7 +18,7 @@ public final class TLogorii extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TLogorii clone() {
       return new TLogorii(this.getLine(), this.getPos());
    }
 

@@ -17,7 +17,7 @@ public final class AModBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AModBinaryOp((TMod)this.cloneNode(this._mod_));
    }
 

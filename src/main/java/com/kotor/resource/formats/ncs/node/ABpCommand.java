@@ -23,7 +23,7 @@ public final class ABpCommand extends PBpCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ABpCommand(
          (PBpOp)this.cloneNode(this._bpOp_),
          (TIntegerConstant)this.cloneNode(this._pos_),

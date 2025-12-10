@@ -29,7 +29,7 @@ public final class ACopyTopBpCommand extends PCopyTopBpCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ACopyTopBpCommand(
          (TCptopbp)this.cloneNode(this._cptopbp_),
          (TIntegerConstant)this.cloneNode(this._pos_),

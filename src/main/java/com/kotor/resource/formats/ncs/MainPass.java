@@ -175,7 +175,24 @@ public class MainPass extends PrunedDepthFirstAdapter {
    @Override
    public void outAConstCommand(AConstCommand node) {
       if (!this.skipdeadcode) {
-         Const aconst = Const.newConst(NodeUtils.getType(node), NodeUtils.getConstValue(node));
+         Type type = NodeUtils.getType(node);
+         Const aconst;
+         switch (type.byteValue()) {
+            case 3:
+               aconst = Const.newConst(type, NodeUtils.getIntConstValue(node));
+               break;
+            case 4:
+               aconst = Const.newConst(type, NodeUtils.getFloatConstValue(node));
+               break;
+            case 5:
+               aconst = Const.newConst(type, NodeUtils.getStringConstValue(node));
+               break;
+            case 6:
+               aconst = Const.newConst(type, NodeUtils.getObjectConstValue(node));
+               break;
+            default:
+               throw new RuntimeException("Invalid const type " + type);
+         }
          this.stack.push(aconst);
          this.state.transformConst(node);
       } else {

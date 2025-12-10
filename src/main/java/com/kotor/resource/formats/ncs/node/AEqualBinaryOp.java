@@ -17,7 +17,7 @@ public final class AEqualBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AEqualBinaryOp((TEqual)this.cloneNode(this._equal_));
    }
 

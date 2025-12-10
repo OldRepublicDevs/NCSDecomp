@@ -18,7 +18,7 @@ public final class TIncorii extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TIncorii clone() {
       return new TIncorii(this.getLine(), this.getPos());
    }
 

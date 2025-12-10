@@ -17,8 +17,9 @@ public final class AZeroJumpIf extends PJumpIf {
    }
 
    @Override
-   public Object clone() {
-      return new AZeroJumpIf((TJz)this.cloneNode(this._jz_));
+   public AZeroJumpIf clone() {
+      TJz clonedJz = this._jz_ != null ? this._jz_.clone() : null;
+      return new AZeroJumpIf(clonedJz);
    }
 
    @Override

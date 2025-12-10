@@ -17,7 +17,7 @@ public final class ARestorebpBpOp extends PBpOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ARestorebpBpOp((TRestorebp)this.cloneNode(this._restorebp_));
    }
 

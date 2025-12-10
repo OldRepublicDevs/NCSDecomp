@@ -18,7 +18,7 @@ public final class TUnright extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TUnright clone() {
       return new TUnright(this.getLine(), this.getPos());
    }
 

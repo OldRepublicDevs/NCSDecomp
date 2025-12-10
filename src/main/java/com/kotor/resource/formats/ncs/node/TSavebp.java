@@ -18,7 +18,7 @@ public final class TSavebp extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TSavebp clone() {
       return new TSavebp(this.getLine(), this.getPos());
    }
 

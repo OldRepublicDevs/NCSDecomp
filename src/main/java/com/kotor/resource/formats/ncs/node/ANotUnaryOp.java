@@ -17,7 +17,7 @@ public final class ANotUnaryOp extends PUnaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ANotUnaryOp((TNot)this.cloneNode(this._not_));
    }
 

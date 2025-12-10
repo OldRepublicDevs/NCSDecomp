@@ -23,7 +23,7 @@ public final class AActionJumpCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AActionJumpCmd(
          (PStoreStateCommand)this.cloneNode(this._storeStateCommand_),
          (PJumpCommand)this.cloneNode(this._jumpCommand_),

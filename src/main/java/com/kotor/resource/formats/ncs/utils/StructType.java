@@ -110,7 +110,14 @@ public class StructType extends Type {
 
    @Override
    public boolean equals(Object obj) {
-      return !StructType.class.isInstance(obj) ? false : this.types.equals(((StructType)obj).types());
+      if (this == obj) {
+         return true;
+      }
+      if (!(obj instanceof StructType)) {
+         return false;
+      }
+      StructType other = (StructType)obj;
+      return this.types.equals(other.types());
    }
 
    @Override

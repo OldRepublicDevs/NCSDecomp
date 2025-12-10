@@ -64,7 +64,9 @@ public class LocalTypeStack extends LocalStack<Type> {
    }
 
    public void remove(int count) {
-      for (int i = 0; i < count; i++) {
+      // Only remove as many elements as are available to avoid NoSuchElementException
+      int actualCount = Math.min(count, this.stack.size());
+      for (int i = 0; i < actualCount; i++) {
          this.stack.removeFirst();
       }
    }
@@ -72,7 +74,9 @@ public class LocalTypeStack extends LocalStack<Type> {
    public void removeParams(int count, SubroutineState state) {
       LinkedList<Type> params = new LinkedList<>();
 
-      for (int i = 0; i < count; i++) {
+      // Only remove as many elements as are available to avoid NoSuchElementException
+      int actualCount = Math.min(count, this.stack.size());
+      for (int i = 0; i < actualCount; i++) {
          Type type = this.stack.removeFirst();
          params.addFirst(type);
       }
@@ -121,7 +125,7 @@ public class LocalTypeStack extends LocalStack<Type> {
    }
 
    @Override
-   public Object clone() {
+   public LocalTypeStack clone() {
       LocalTypeStack newStack = new LocalTypeStack();
       newStack.stack = new LinkedList<>(this.stack);
       return newStack;

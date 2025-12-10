@@ -18,7 +18,7 @@ public final class TLPar extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TLPar clone() {
       return new TLPar(this.getLine(), this.getPos());
    }
 

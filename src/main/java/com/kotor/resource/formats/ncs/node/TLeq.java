@@ -18,7 +18,7 @@ public final class TLeq extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TLeq clone() {
       return new TLeq(this.getLine(), this.getPos());
    }
 

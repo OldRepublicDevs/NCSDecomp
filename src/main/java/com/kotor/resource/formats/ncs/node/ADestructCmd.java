@@ -17,7 +17,7 @@ public final class ADestructCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ADestructCmd((PDestructCommand)this.cloneNode(this._destructCommand_));
    }
 

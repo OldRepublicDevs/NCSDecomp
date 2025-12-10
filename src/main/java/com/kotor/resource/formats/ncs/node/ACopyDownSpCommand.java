@@ -29,7 +29,7 @@ public final class ACopyDownSpCommand extends PCopyDownSpCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ACopyDownSpCommand(
          (TCpdownsp)this.cloneNode(this._cpdownsp_),
          (TIntegerConstant)this.cloneNode(this._pos_),

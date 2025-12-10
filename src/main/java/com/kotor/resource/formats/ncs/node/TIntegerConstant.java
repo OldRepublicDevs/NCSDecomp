@@ -21,7 +21,7 @@ public final class TIntegerConstant extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TIntegerConstant clone() {
       return new TIntegerConstant(this.getText(), this.getLine(), this.getPos());
    }
 

@@ -25,7 +25,7 @@ public final class AMoveSpCommand extends PMoveSpCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AMoveSpCommand(
          (TMovsp)this.cloneNode(this._movsp_),
          (TIntegerConstant)this.cloneNode(this._pos_),

@@ -18,7 +18,7 @@ public final class TEqual extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TEqual clone() {
       return new TEqual(this.getLine(), this.getPos());
    }
 

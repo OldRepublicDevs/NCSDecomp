@@ -17,8 +17,9 @@ public final class ASubBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
-      return new ASubBinaryOp((TSub)this.cloneNode(this._sub_));
+   public ASubBinaryOp clone() {
+      TSub clonedSub = this._sub_ != null ? this._sub_.clone() : null;
+      return new ASubBinaryOp(clonedSub);
    }
 
    @Override

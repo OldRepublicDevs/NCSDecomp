@@ -18,7 +18,7 @@ public final class TDecisp extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TDecisp clone() {
       return new TDecisp(this.getLine(), this.getPos());
    }
 

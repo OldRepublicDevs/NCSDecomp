@@ -17,7 +17,7 @@ public final class AActionCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AActionCmd((PActionCommand)this.cloneNode(this._actionCommand_));
    }
 

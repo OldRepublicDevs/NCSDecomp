@@ -17,7 +17,7 @@ public final class AGeqBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AGeqBinaryOp((TGeq)this.cloneNode(this._geq_));
    }
 

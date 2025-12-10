@@ -18,7 +18,7 @@ public final class TGeq extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TGeq clone() {
       return new TGeq(this.getLine(), this.getPos());
    }
 

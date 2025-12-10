@@ -18,7 +18,7 @@ public final class TIncisp extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TIncisp clone() {
       return new TIncisp(this.getLine(), this.getPos());
    }
 

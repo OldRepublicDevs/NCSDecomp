@@ -6,7 +6,7 @@ KotOR Script Decompiler - A decompiler for Knights of the Old Republic NCS scrip
 
 This project follows standard Maven directory layout conventions:
 
-```
+```shell
 .
 ├── pom.xml                          # Maven project configuration
 ├── src/
@@ -41,7 +41,7 @@ This project follows standard Maven directory layout conventions:
 - Apache Maven 3.6.0 or later (optional, for Maven builds)
 - PowerShell Core 6+ (for cross-platform build scripts) or Windows PowerShell 5.1+ (Windows only)
   - PowerShell Core works on Windows, macOS, and Linux
-  - Download from: https://github.com/PowerShell/PowerShell/releases
+  - Download from: <https://github.com/PowerShell/PowerShell/releases>
 
 ### Build Options
 
@@ -64,6 +64,7 @@ This project follows standard Maven directory layout conventions:
 ```
 
 The PowerShell build script will:
+
 1. Compile all Java source files from `src/main/java`
 2. Copy resources from `src/main/resources` to the build directory
 3. Create a JAR file named `NCSDecomp-CLI.jar` in the project root

@@ -18,7 +18,7 @@ public final class TExcorii extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TExcorii clone() {
       return new TExcorii(this.getLine(), this.getPos());
    }
 

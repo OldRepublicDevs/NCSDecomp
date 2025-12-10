@@ -17,7 +17,7 @@ public final class AUnrightBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AUnrightBinaryOp((TUnright)this.cloneNode(this._unright_));
    }
 

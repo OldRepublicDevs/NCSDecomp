@@ -18,7 +18,7 @@ public final class TLt extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TLt clone() {
       return new TLt(this.getLine(), this.getPos());
    }
 

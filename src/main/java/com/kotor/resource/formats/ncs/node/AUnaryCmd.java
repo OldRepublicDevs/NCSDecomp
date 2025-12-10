@@ -17,8 +17,9 @@ public final class AUnaryCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
-      return new AUnaryCmd((PUnaryCommand)this.cloneNode(this._unaryCommand_));
+   public AUnaryCmd clone() {
+      PUnaryCommand clonedUnaryCommand = this._unaryCommand_ != null ? (PUnaryCommand)this._unaryCommand_.clone() : null;
+      return new AUnaryCmd(clonedUnaryCommand);
    }
 
    @Override

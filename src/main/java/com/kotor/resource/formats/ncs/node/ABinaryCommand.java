@@ -25,7 +25,7 @@ public final class ABinaryCommand extends PBinaryCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ABinaryCommand(
          (PBinaryOp)this.cloneNode(this._binaryOp_),
          (TIntegerConstant)this.cloneNode(this._pos_),

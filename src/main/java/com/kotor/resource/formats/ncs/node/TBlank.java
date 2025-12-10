@@ -18,7 +18,7 @@ public final class TBlank extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TBlank clone() {
       return new TBlank(this.getText(), this.getLine(), this.getPos());
    }
 

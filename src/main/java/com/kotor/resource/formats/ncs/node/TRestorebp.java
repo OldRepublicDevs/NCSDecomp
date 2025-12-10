@@ -18,7 +18,7 @@ public final class TRestorebp extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TRestorebp clone() {
       return new TRestorebp(this.getLine(), this.getPos());
    }
 

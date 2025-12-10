@@ -18,7 +18,7 @@ public final class TJsr extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TJsr clone() {
       return new TJsr(this.getLine(), this.getPos());
    }
 

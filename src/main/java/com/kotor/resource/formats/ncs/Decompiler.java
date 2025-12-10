@@ -110,14 +110,14 @@ public class Decompiler
    private String temp;
    private JPanel panel;
    private File file;
-   private Hashtable<String, Object> hash_Func2VarVec;
+   private Hashtable<String, Vector<Variable>> hash_Func2VarVec;
    private JComponent[] panels;
    private JTextArea origByteCodeJTA;
    private JTextArea newByteCodeJTA;
    private String currentNodeString;
-   private transient Map<Object, File> hash_TabComponent2File;
-   private transient Map<Object, Hashtable<String, Object>> hash_TabComponent2Func2VarVec;
-   private transient Map<Object, TreeModel> hash_TabComponent2TreeModel;
+   private transient Map<JComponent, File> hash_TabComponent2File;
+   private transient Map<JComponent, Hashtable<String, Vector<Variable>>> hash_TabComponent2Func2VarVec;
+   private transient Map<JComponent, TreeModel> hash_TabComponent2TreeModel;
    protected static List<File> unsavedFiles;
    private transient FileDecompiler fileDecompiler = new FileDecompiler();
 
@@ -248,17 +248,18 @@ public class Decompiler
          for (int i = 0; i < flavors.length; i++) {
             if (flavors[i].isFlavorJavaFileListType()) {
                dtde.acceptDrop(3);
-               final List<?> rawList = (List<?>)tr.getTransferData(flavors[i]);
+               @SuppressWarnings("unchecked")
+               final List<File> rawList = (List<File>)tr.getTransferData(flavors[i]);
                final List<File> list = new ArrayList<>();
-               for (Object obj : rawList) {
-                  if (obj instanceof File) {
-                     list.add((File)obj);
+               for (File file : rawList) {
+                  if (file != null) {
+                     list.add(file);
                   }
                }
                (new Thread() {
                   @Override
                   public void run() {
-                     Decompiler.this.open(list.toArray());
+                     Decompiler.this.open(list.toArray(new File[0]));
                   }
                }).start();
                dtde.dropComplete(true);
@@ -276,7 +277,7 @@ public class Decompiler
    @Override
    public void stateChanged(ChangeEvent arg0) {
       if (((JTabbedPane)arg0.getSource()).getSelectedIndex() >= 0) {
-         TreeModel model = this.hash_TabComponent2TreeModel.get(((JTabbedPane)arg0.getSource()).getTabComponentAt(this.jTB.getSelectedIndex()));
+         TreeModel model = this.hash_TabComponent2TreeModel.get((JComponent)((JTabbedPane)arg0.getSource()).getTabComponentAt(this.jTB.getSelectedIndex()));
          this.jTree.setModel(model);
       } else {
          this.jTree.setModel(TreeModelFactory.getEmptyModel());
@@ -292,26 +293,25 @@ public class Decompiler
       if (this.jTB.getSelectedIndex() != -1) {
          if (arg0.getSource() instanceof JTree) {
             TreePath changedPath = ((JTree)arg0.getSource()).getSelectionPath();
-            File file = this.hash_TabComponent2File.get(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()));
-            JComponent[] panels = (JComponent[])this.jTB.getClientProperty(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()));
+            File file = this.hash_TabComponent2File.get((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()));
+            JComponent[] panels = (JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()));
             if (changedPath != null && changedPath.getPathCount() == 2) {
-               Hashtable<String, Object> func2VarVec = this.fileDecompiler.updateSubName(file, this.currentNodeString, changedPath.getLastPathComponent().toString());
-               this.hash_TabComponent2Func2VarVec.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), func2VarVec);
-               this.hash_TabComponent2TreeModel.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
+               Hashtable<String, Vector<Variable>> func2VarVec = this.fileDecompiler.updateSubName(file, this.currentNodeString, changedPath.getLastPathComponent().toString());
+               this.hash_TabComponent2Func2VarVec.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), func2VarVec);
+               this.hash_TabComponent2TreeModel.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
                this.jTA = (JTextArea)((JScrollPane)((JPanel)panels[0]).getComponent(0)).getViewport().getComponent(0);
                this.jTA.setText(this.fileDecompiler.getGeneratedCode(file));
                this.jTA.setCaretPosition(0);
             } else if (changedPath != null) {
                TreeNode subroutineNode = (TreeNode)changedPath.getParentPath().getLastPathComponent();
-               Hashtable<String, Object> func2VarVec = this.hash_TabComponent2Func2VarVec.get(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()));
-               @SuppressWarnings("unchecked")
-               Vector<Variable> variables = (Vector<Variable>)func2VarVec.get(subroutineNode.toString());
+               Hashtable<String, Vector<Variable>> func2VarVec = this.hash_TabComponent2Func2VarVec.get((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()));
+               Vector<Variable> variables = func2VarVec.get(subroutineNode.toString());
                int nodeIndex = subroutineNode.getIndex((TreeNode)changedPath.getLastPathComponent());
                Variable changedVar = variables.get(nodeIndex);
                changedVar.name(changedPath.getLastPathComponent().toString());
                this.jTA = (JTextArea)((JScrollPane)((JPanel)panels[0]).getComponent(0)).getViewport().getComponent(0);
                this.jTA
-                  .setText(this.fileDecompiler.regenerateCode(this.hash_TabComponent2File.get(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()))));
+                  .setText(this.fileDecompiler.regenerateCode(this.hash_TabComponent2File.get((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()))));
                this.jTA.setCaretPosition(0);
             }
 
@@ -319,7 +319,7 @@ public class Decompiler
                this.currentNodeString = changedPath.getLastPathComponent().toString();
             }
          } else if (arg0.getSource() instanceof JTextArea) {
-            unsavedFiles.add(this.hash_TabComponent2File.get(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex())));
+            unsavedFiles.add(this.hash_TabComponent2File.get((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex())));
          }
       }
    }
@@ -446,7 +446,7 @@ public class Decompiler
       this.jTA = (JTextArea)arg0.getSource();
       this.mark = this.jTA.getCaretPosition();
       this.rootElement = this.jTA.getDocument().getDefaultRootElement();
-      this.titledBorder = (TitledBorder)((JPanel)((JComponent[])this.jTB.getClientProperty(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex())))[0])
+      this.titledBorder = (TitledBorder)((JPanel)((JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex())))[0])
          .getBorder();
       if (!(this.temp = Integer.toString(this.rootElement.getElementIndex(this.mark) + 1)).equals(this.titledBorder.getTitle())) {
          this.titledBorder.setTitle(this.temp);
@@ -559,9 +559,9 @@ public class Decompiler
             this.hash_Func2VarVec = this.fileDecompiler.getVariableData(file);
             this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
             this.fileDecompiler.getOriginalByteCode(file);
-            this.hash_TabComponent2File.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), file);
-            this.hash_TabComponent2Func2VarVec.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
-            this.hash_TabComponent2TreeModel.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
+            this.hash_TabComponent2File.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), file);
+            this.hash_TabComponent2Func2VarVec.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
+            this.hash_TabComponent2TreeModel.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
             this.status.append("success\n");
             break;
          case 2:
@@ -573,9 +573,9 @@ public class Decompiler
             this.hash_Func2VarVec = this.fileDecompiler.getVariableData(file);
             this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
             this.fileDecompiler.getOriginalByteCode(file);
-            this.hash_TabComponent2File.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), file);
-            this.hash_TabComponent2Func2VarVec.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
-            this.hash_TabComponent2TreeModel.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
+            this.hash_TabComponent2File.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), file);
+            this.hash_TabComponent2Func2VarVec.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
+            this.hash_TabComponent2TreeModel.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
             this.setTabComponentPanel(1);
             this.status.append("partial-could not recompile\n");
             break;
@@ -595,9 +595,9 @@ public class Decompiler
             this.hash_Func2VarVec = this.fileDecompiler.getVariableData(file);
             this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
             this.fileDecompiler.getOriginalByteCode(file);
-            this.hash_TabComponent2File.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), file);
-            this.hash_TabComponent2Func2VarVec.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
-            this.hash_TabComponent2TreeModel.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
+            this.hash_TabComponent2File.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), file);
+            this.hash_TabComponent2Func2VarVec.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
+            this.hash_TabComponent2TreeModel.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
             this.setTabComponentPanel(1);
             this.status.append("partial-byte code does not match\n");
       }
@@ -645,7 +645,7 @@ public class Decompiler
    private void setTabComponentPanel(int index) {
       this.jTB
          .setComponentAt(
-            this.jTB.getSelectedIndex(), ((JComponent[])this.jTB.getClientProperty(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex())))[index]
+            this.jTB.getSelectedIndex(), ((JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex())))[index]
          );
       this.repaint();
    }
@@ -690,7 +690,7 @@ public class Decompiler
       }
    }
 
-   private void open(Object[] files) {
+   private void open(File[] files) {
       if (this.jTB.getTabCount() == 0) {
          this.getJMenuBar().getMenu(0).getItem(1).setEnabled(true);
          this.getJMenuBar().getMenu(0).getItem(2).setEnabled(true);
@@ -699,9 +699,9 @@ public class Decompiler
       }
 
       for (int j = 0; j < files.length; j++) {
-         if ((this.temp = ((File)files[j]).getName()).substring(this.temp.length() - 3).equalsIgnoreCase("ncs")) {
-            this.decompile((File)files[j]);
-            unsavedFiles.add(this.hash_TabComponent2File.get(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex())));
+         if ((this.temp = files[j].getName()).substring(this.temp.length() - 3).equalsIgnoreCase("ncs")) {
+            this.decompile(files[j]);
+            unsavedFiles.add(this.hash_TabComponent2File.get((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex())));
          }
       }
    }
@@ -763,7 +763,7 @@ public class Decompiler
 
    private void save(int index) {
       File newFile = this.saveBuffer(
-         (JTextArea)((JScrollPane)((JComponent[])this.jTB.getClientProperty(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex())))[0].getComponent(0))
+         (JTextArea)((JScrollPane)((JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex())))[0].getComponent(0))
             .getViewport()
             .getView(),
          settings.getProperty("Output Directory")
@@ -771,7 +771,7 @@ public class Decompiler
             + ((JLabel)((JPanel)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex())).getComponent(0)).getText()
             + ".nss"
       );
-      this.file = this.hash_TabComponent2File.get(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()));
+      this.file = this.hash_TabComponent2File.get((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()));
       if (unsavedFiles.contains(this.file)) {
          this.status.append("Recompiling..." + this.file.getName() + ": ");
          int result = 2;
@@ -787,7 +787,7 @@ public class Decompiler
                this.status.append("failure\n");
                break;
             case 1:
-               this.panels = (JComponent[])this.jTB.getClientProperty(this.jTB.getTabComponentAt(index));
+               this.panels = (JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(index));
                this.origByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getLeftComponent()).getViewport().getComponent(0);
                this.origByteCodeJTA.setText(this.fileDecompiler.getOriginalByteCode(this.file));
                this.newByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getRightComponent()).getViewport().getComponent(0);
@@ -801,27 +801,27 @@ public class Decompiler
                this.hash_Func2VarVec = this.fileDecompiler.getVariableData(this.file);
                this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
                this.fileDecompiler.getOriginalByteCode(this.file);
-               this.hash_TabComponent2File.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.file);
-               this.hash_TabComponent2Func2VarVec.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
-               this.hash_TabComponent2TreeModel.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
+               this.hash_TabComponent2File.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.file);
+               this.hash_TabComponent2Func2VarVec.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
+               this.hash_TabComponent2TreeModel.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
                this.status.append("success\n");
                break;
             case 2:
-               this.panels = (JComponent[])this.jTB.getClientProperty(this.jTB.getTabComponentAt(index));
+               this.panels = (JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(index));
                this.origByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getLeftComponent()).getViewport().getComponent(0);
                this.origByteCodeJTA.setText(this.fileDecompiler.getOriginalByteCode(this.file));
                this.jTB.putClientProperty(this.panels[1], "left");
                this.hash_Func2VarVec = this.fileDecompiler.getVariableData(this.file);
                this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
                this.fileDecompiler.getOriginalByteCode(this.file);
-               this.hash_TabComponent2File.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.file);
-               this.hash_TabComponent2Func2VarVec.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
-               this.hash_TabComponent2TreeModel.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
+               this.hash_TabComponent2File.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.file);
+               this.hash_TabComponent2Func2VarVec.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
+               this.hash_TabComponent2TreeModel.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
                this.setTabComponentPanel(1);
                this.status.append("partial-could not recompile\n");
                break;
             case 3:
-               this.panels = (JComponent[])this.jTB.getClientProperty(this.jTB.getTabComponentAt(index));
+               this.panels = (JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(index));
                this.origByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getLeftComponent()).getViewport().getComponent(0);
                this.origByteCodeJTA.setText(this.fileDecompiler.getOriginalByteCode(this.file));
                this.newByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getRightComponent()).getViewport().getComponent(0);
@@ -835,9 +835,9 @@ public class Decompiler
                this.hash_Func2VarVec = this.fileDecompiler.getVariableData(this.file);
                this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
                this.fileDecompiler.getOriginalByteCode(this.file);
-               this.hash_TabComponent2File.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.file);
-               this.hash_TabComponent2Func2VarVec.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
-               this.hash_TabComponent2TreeModel.put(this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
+               this.hash_TabComponent2File.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.file);
+               this.hash_TabComponent2Func2VarVec.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
+               this.hash_TabComponent2TreeModel.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
                this.setTabComponentPanel(1);
                this.status.append("partial-byte code does not match\n");
          }
@@ -850,10 +850,10 @@ public class Decompiler
    private void saveAll() {
       for (int i = 0; i < this.jTB.getTabCount(); i++) {
          File newFile = this.saveBuffer(
-            (JTextArea)((JScrollPane)((JComponent[])this.jTB.getClientProperty(this.jTB.getTabComponentAt(i)))[0].getComponent(0)).getViewport().getView(),
+            (JTextArea)((JScrollPane)((JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(i)))[0].getComponent(0)).getViewport().getView(),
             settings.getProperty("Output Directory") + "/" + ((JLabel)((JPanel)this.jTB.getTabComponentAt(i)).getComponent(0)).getText() + ".nss"
          );
-         File file = this.hash_TabComponent2File.get(this.jTB.getTabComponentAt(i));
+         File file = this.hash_TabComponent2File.get((JComponent)this.jTB.getTabComponentAt(i));
          int result = 2;
 
          try {

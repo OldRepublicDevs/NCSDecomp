@@ -318,7 +318,7 @@ public class SubScriptState {
    public void transformPlaceholderVariableRemoved(Variable var) {
       AVarDecl vardec = this.vardecs.get(var);
       if (vardec != null && vardec.isFcnReturn()) {
-         Object exp = vardec.exp();
+         AExpression exp = vardec.exp();
          ScriptRootNode parent = (ScriptRootNode) vardec.parent();
          if (exp != null) {
             parent.replaceChild(vardec, (ScriptNode) exp);
@@ -332,7 +332,7 @@ public class SubScriptState {
 
       AVarDecl var8 = null;
       ScriptRootNode parent = null;
-      Object exp = null;
+      AExpression exp = null;
    }
 
    private boolean removingSwitchVar(List<Variable> vars, Node node) {

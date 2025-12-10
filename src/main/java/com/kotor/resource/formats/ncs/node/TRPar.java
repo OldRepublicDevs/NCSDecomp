@@ -18,7 +18,7 @@ public final class TRPar extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TRPar clone() {
       return new TRPar(this.getLine(), this.getPos());
    }
 

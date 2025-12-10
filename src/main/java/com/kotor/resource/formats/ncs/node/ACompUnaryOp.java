@@ -17,7 +17,7 @@ public final class ACompUnaryOp extends PUnaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ACompUnaryOp((TComp)this.cloneNode(this._comp_));
    }
 

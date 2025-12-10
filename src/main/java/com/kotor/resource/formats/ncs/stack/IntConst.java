@@ -13,9 +13,9 @@ import com.kotor.resource.formats.ncs.utils.Type;
 public class IntConst extends Const {
    private Long value;
 
-   public IntConst(Object value) {
+   public IntConst(Long value) {
       this.type = new Type((byte)3);
-      this.value = (Long)value;
+      this.value = value;
       this.size = 1;
    }
 

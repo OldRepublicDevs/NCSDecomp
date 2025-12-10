@@ -18,7 +18,7 @@ public final class TJnz extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TJnz clone() {
       return new TJnz(this.getLine(), this.getPos());
    }
 

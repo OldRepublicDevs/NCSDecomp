@@ -17,7 +17,7 @@ public final class ADivBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ADivBinaryOp((TDiv)this.cloneNode(this._div_));
    }
 

@@ -29,7 +29,7 @@ public final class AStoreStateCommand extends PStoreStateCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AStoreStateCommand(
          (TStorestate)this.cloneNode(this._storestate_),
          (TIntegerConstant)this.cloneNode(this._pos_),

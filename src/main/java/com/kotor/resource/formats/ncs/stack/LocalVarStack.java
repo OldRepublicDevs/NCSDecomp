@@ -106,8 +106,16 @@ public class LocalVarStack extends LocalStack<StackEntry> {
          this.structify(removesize - (savestart + savesize) + 1, savesize, subdata);
       }
 
-      Variable struct = (Variable)this.stack.getFirst();
-      Variable element = (Variable)struct.getElement(removesize - (savestart + savesize) + 1);
+      StackEntry firstEntry = this.stack.getFirst();
+      if (!(firstEntry instanceof Variable)) {
+         throw new IllegalStateException("Expected Variable but got: " + firstEntry.getClass().getName());
+      }
+      Variable struct = (Variable)firstEntry;
+      StackEntry elementEntry = struct.getElement(removesize - (savestart + savesize) + 1);
+      if (!(elementEntry instanceof Variable)) {
+         throw new IllegalStateException("Expected Variable but got: " + elementEntry.getClass().getName());
+      }
+      Variable element = (Variable)elementEntry;
       this.stack.set(0, element);
    }
 
@@ -119,12 +127,18 @@ public class LocalVarStack extends LocalStack<StackEntry> {
          StackEntry entry = it.next();
          pos += entry.size();
          if (pos == firstelement) {
+            if (!(entry instanceof Variable)) {
+               throw new IllegalStateException("Expected Variable but got: " + entry.getClass().getName());
+            }
             VarStruct varstruct = new VarStruct();
             varstruct.addVarStackOrder((Variable)entry);
             it.set(varstruct);
             entry = it.next();
 
             for (int var8 = pos + entry.size(); var8 <= firstelement + count - 1; var8 += entry.size()) {
+               if (!(entry instanceof Variable)) {
+                  throw new IllegalStateException("Expected Variable but got: " + entry.getClass().getName());
+               }
                it.remove();
                varstruct.addVarStackOrder((Variable)entry);
                if (!it.hasNext()) {
@@ -139,10 +153,16 @@ public class LocalVarStack extends LocalStack<StackEntry> {
          }
 
          if (pos == firstelement + count - 1) {
+            if (!(entry instanceof VarStruct)) {
+               throw new IllegalStateException("Expected VarStruct but got: " + entry.getClass().getName());
+            }
             return (VarStruct)entry;
          }
 
          if (pos > firstelement + count - 1) {
+            if (!(entry instanceof VarStruct)) {
+               throw new IllegalStateException("Expected VarStruct but got: " + entry.getClass().getName());
+            }
             return ((VarStruct)entry).structify(firstelement - (pos - entry.size()), count, subdata);
          }
       }
@@ -166,7 +186,7 @@ public class LocalVarStack extends LocalStack<StackEntry> {
    }
 
    @Override
-   public Object clone() {
+   public LocalVarStack clone() {
       LocalVarStack newStack = new LocalVarStack();
       newStack.stack = new LinkedList<>(this.stack);
 

@@ -18,7 +18,7 @@ public final class TStorestate extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TStorestate clone() {
       return new TStorestate(this.getLine(), this.getPos());
    }
 

@@ -20,8 +20,9 @@ public final class AStackOpCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
-      return new AStackOpCmd((PStackCommand)this.cloneNode(this._stackCommand_));
+   public AStackOpCmd clone() {
+      PStackCommand clonedStackCommand = this._stackCommand_ != null ? (PStackCommand)this._stackCommand_.clone() : null;
+      return new AStackOpCmd(clonedStackCommand);
    }
 
    @Override

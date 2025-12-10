@@ -17,7 +17,7 @@ public final class AIncibpStackOp extends PStackOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AIncibpStackOp((TIncibp)this.cloneNode(this._incibp_));
    }
 

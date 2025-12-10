@@ -13,9 +13,9 @@ import com.kotor.resource.formats.ncs.utils.Type;
 public class FloatConst extends Const {
    private Float value;
 
-   public FloatConst(Object value) {
+   public FloatConst(Float value) {
       this.type = new Type((byte)4);
-      this.value = (Float)value;
+      this.value = value;
       this.size = 1;
    }
 

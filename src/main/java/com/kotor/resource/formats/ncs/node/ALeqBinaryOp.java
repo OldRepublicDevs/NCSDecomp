@@ -17,7 +17,7 @@ public final class ALeqBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ALeqBinaryOp((TLeq)this.cloneNode(this._leq_));
    }
 

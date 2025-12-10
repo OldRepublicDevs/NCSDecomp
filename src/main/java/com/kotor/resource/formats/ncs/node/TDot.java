@@ -18,7 +18,7 @@ public final class TDot extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TDot clone() {
       return new TDot(this.getLine(), this.getPos());
    }
 

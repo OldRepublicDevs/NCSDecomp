@@ -17,7 +17,7 @@ public final class ASavebpBpOp extends PBpOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ASavebpBpOp((TSavebp)this.cloneNode(this._savebp_));
    }
 

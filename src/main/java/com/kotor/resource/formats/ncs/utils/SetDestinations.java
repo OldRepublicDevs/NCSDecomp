@@ -130,7 +130,7 @@ public class SetDestinations extends PrunedDepthFirstAdapter {
                      node.getReturn().apply(this);
                   }
 
-                  Object[] temp = node.getSubroutine().toArray();
+                  PSubroutine[] temp = node.getSubroutine().toArray(new PSubroutine[0]);
                   int cur = temp.length / 2;
                   int min = 0;
                   int max = temp.length - 1;
@@ -139,7 +139,7 @@ public class SetDestinations extends PrunedDepthFirstAdapter {
                      !done;
                      done = done || SetDestinations.this.destination != null || cur > max
                   ) {
-                     PSubroutine sub = (PSubroutine)temp[cur];
+                     PSubroutine sub = temp[cur];
                      if (SetDestinations.this.getPos(sub) > pos) {
                         max = cur;
                         cur = (min + cur) / 2;
@@ -161,7 +161,7 @@ public class SetDestinations extends PrunedDepthFirstAdapter {
                @Override
                public void caseACommandBlock(ACommandBlock node) {
                   this.inACommandBlock(node);
-                  Object[] temp = node.getCmd().toArray();
+                  PCmd[] temp = node.getCmd().toArray(new PCmd[0]);
                   int cur = temp.length / 2;
                   int min = 0;
                   int max = temp.length - 1;
@@ -170,7 +170,7 @@ public class SetDestinations extends PrunedDepthFirstAdapter {
                      !done;
                      done = done || SetDestinations.this.destination != null || cur > max
                   ) {
-                     PCmd cmd = (PCmd)temp[cur];
+                     PCmd cmd = temp[cur];
                      if (SetDestinations.this.getPos(cmd) > pos) {
                         max = cur;
                         cur = (min + cur) / 2;

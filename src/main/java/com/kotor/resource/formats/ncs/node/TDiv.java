@@ -18,7 +18,7 @@ public final class TDiv extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TDiv clone() {
       return new TDiv(this.getLine(), this.getPos());
    }
 

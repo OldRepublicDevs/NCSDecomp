@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  build:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        java-version: [8, 11, 17, 21]
+        exclude:
+          # Java 8 is not available on macOS-latest
+          - os: macos-latest
+            java-version: 8
+        include:
+          # Test on Java 8 with Ubuntu and Windows only
+          - os: ubuntu-latest
+            java-version: 8
+          - os: windows-latest
+            java-version: 8
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ matrix.java-version }}
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ matrix.java-version }}
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Build with Maven
+        run: mvn clean compile -B
+
+      - name: Run tests
+        run: mvn test -B
+        continue-on-error: false
+
+      - name: Package application
+        run: mvn package -B -DskipTests
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ matrix.os }}-java${{ matrix.java-version }}
+          path: target/surefire-reports/
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Upload JAR artifacts
+        if: matrix.os == 'ubuntu-latest' && matrix.java-version == '17'
+        uses: actions/upload-artifact@v4
+        with:
+          name: jar-artifacts
+          path: target/*.jar
+          retention-days: 7
+          if-no-files-found: ignore
+
+  build-summary:
+    name: Build Summary
+    runs-on: ubuntu-latest
+    needs: build
+    if: always()
+    steps:
+      - name: Check build status
+        run: |
+          if [ "${{ needs.build.result }}" != "success" ]; then
+            echo "❌ Build failed on one or more matrix combinations"
+            exit 1
+          else
+            echo "✅ All builds passed successfully"
+          fi
+

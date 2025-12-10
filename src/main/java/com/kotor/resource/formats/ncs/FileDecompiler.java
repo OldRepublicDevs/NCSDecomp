@@ -10,6 +10,7 @@ import com.kotor.resource.formats.ncs.node.Start;
 import com.kotor.resource.formats.ncs.parser.Parser;
 import com.kotor.resource.formats.ncs.scriptutils.CleanupPass;
 import com.kotor.resource.formats.ncs.scriptutils.SubScriptState;
+import com.kotor.resource.formats.ncs.stack.Variable;
 import com.kotor.resource.formats.ncs.utils.DestroyParseTree;
 import com.kotor.resource.formats.ncs.utils.FlattenSub;
 import com.kotor.resource.formats.ncs.utils.NodeAnalysisData;
@@ -36,6 +37,7 @@ import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Vector;
 
 /**
  * Core coordinator for decompiling and recompiling KotOR/TSL NSS scripts.
@@ -137,7 +139,7 @@ public class FileDecompiler {
     * @param file Script file whose variables are requested
     * @return Hashtable of variables keyed by subroutine name, or null if not loaded
     */
-   public Hashtable<String, Object> getVariableData(File file) {
+   public Hashtable<String, Vector<Variable>> getVariableData(File file) {
       FileDecompiler.FileScriptData data = this.filedata.get(file);
       return data == null ? null : data.getVars();
    }
@@ -224,7 +226,7 @@ public class FileDecompiler {
     *
     * @return Updated variable map or null if the script is not loaded
     */
-   public Hashtable<String, Object> updateSubName(File file, String oldname, String newname) {
+   public Hashtable<String, Vector<Variable>> updateSubName(File file, String oldname, String newname) {
       if (file == null) {
          return null;
       } else {
@@ -440,7 +442,6 @@ public class FileDecompiler {
       StringBuffer buffer = new StringBuffer();
       BufferedReader reader = null;
 
-      Object var7;
       try {
          reader = new BufferedReader(new FileReader(file));
 
@@ -452,15 +453,15 @@ public class FileDecompiler {
          return buffer.toString();
       } catch (IOException var14) {
          System.out.println("IO exception in read file: " + var14);
-         var7 = null;
+         return null;
       } finally {
          try {
-            reader.close();
+            if (reader != null) {
+               reader.close();
+            }
          } catch (Exception var13) {
          }
       }
-
-      return (String)var7;
    }
 
    /**
@@ -857,14 +858,14 @@ public class FileDecompiler {
     */
    private Iterable<ASubroutine> subIterable(SubroutineAnalysisData subdata) {
       List<ASubroutine> list = new ArrayList<>();
-      Iterator<?> raw = subdata.getSubroutines();
+      Iterator<ASubroutine> raw = subdata.getSubroutines();
 
       while (raw.hasNext()) {
-         Object o = raw.next();
-         if (!(o instanceof ASubroutine)) {
-            throw new IllegalStateException("Unexpected element in subroutine list: " + o);
+         ASubroutine sub = raw.next();
+         if (sub == null) {
+            throw new IllegalStateException("Unexpected null element in subroutine list");
          }
-         list.add((ASubroutine)o);
+         list.add(sub);
       }
 
       return list;
@@ -976,11 +977,11 @@ public class FileDecompiler {
       /**
        * Returns a map of subroutine/global names to their variable tables.
        */
-      public Hashtable<String, Object> getVars() {
+      public Hashtable<String, Vector<Variable>> getVars() {
          if (this.subs.size() == 0) {
             return null;
          } else {
-            Hashtable<String, Object> vars = new Hashtable<>(1);
+            Hashtable<String, Vector<Variable>> vars = new Hashtable<>(1);
 
             for (SubScriptState state : this.subs) {
                vars.put(state.getName(), state.getVariables());

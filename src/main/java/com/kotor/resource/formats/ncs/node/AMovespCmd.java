@@ -17,8 +17,9 @@ public final class AMovespCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
-      return new AMovespCmd((PMoveSpCommand)this.cloneNode(this._moveSpCommand_));
+   public AMovespCmd clone() {
+      PMoveSpCommand clonedMoveSpCommand = this._moveSpCommand_ != null ? (PMoveSpCommand)this._moveSpCommand_.clone() : null;
+      return new AMovespCmd(clonedMoveSpCommand);
    }
 
    @Override

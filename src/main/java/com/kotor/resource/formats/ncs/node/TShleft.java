@@ -18,7 +18,7 @@ public final class TShleft extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TShleft clone() {
       return new TShleft(this.getLine(), this.getPos());
    }
 

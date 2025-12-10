@@ -18,7 +18,7 @@ public final class TStringLiteral extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TStringLiteral clone() {
       return new TStringLiteral(this.getText(), this.getLine(), this.getPos());
    }
 

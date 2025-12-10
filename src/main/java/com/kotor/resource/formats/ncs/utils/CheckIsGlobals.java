@@ -24,10 +24,10 @@ public class CheckIsGlobals extends PrunedReversedDepthFirstAdapter {
    @Override
    public void caseACommandBlock(ACommandBlock node) {
       this.inACommandBlock(node);
-      Object[] temp = node.getCmd().toArray();
+      PCmd[] temp = node.getCmd().toArray(new PCmd[0]);
 
       for (int i = temp.length - 1; i >= 0; i--) {
-         ((PCmd)temp[i]).apply(this);
+         temp[i].apply(this);
          if (this.isGlobals) {
             return;
          }

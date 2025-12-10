@@ -18,7 +18,7 @@ public final class TMovsp extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TMovsp clone() {
       return new TMovsp(this.getLine(), this.getPos());
    }
 

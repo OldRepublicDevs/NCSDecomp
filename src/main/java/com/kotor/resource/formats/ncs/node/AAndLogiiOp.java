@@ -17,7 +17,7 @@ public final class AAndLogiiOp extends PLogiiOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AAndLogiiOp((TLogandii)this.cloneNode(this._logandii_));
    }
 

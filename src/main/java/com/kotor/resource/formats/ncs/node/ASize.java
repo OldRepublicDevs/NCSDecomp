@@ -23,13 +23,12 @@ public final class ASize extends PSize {
    }
 
    @Override
-   public Object clone() {
-      return new ASize(
-         (TT)this.cloneNode(this._t_),
-         (TIntegerConstant)this.cloneNode(this._pos_),
-         (TIntegerConstant)this.cloneNode(this._integerConstant_),
-         (TSemi)this.cloneNode(this._semi_)
-      );
+   public ASize clone() {
+      TT clonedT = this._t_ != null ? this._t_.clone() : null;
+      TIntegerConstant clonedPos = this._pos_ != null ? this._pos_.clone() : null;
+      TIntegerConstant clonedIntegerConstant = this._integerConstant_ != null ? this._integerConstant_.clone() : null;
+      TSemi clonedSemi = this._semi_ != null ? this._semi_.clone() : null;
+      return new ASize(clonedT, clonedPos, clonedIntegerConstant, clonedSemi);
    }
 
    @Override

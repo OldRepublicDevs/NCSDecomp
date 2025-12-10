@@ -18,7 +18,7 @@ public final class TNop extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TNop clone() {
       return new TNop(this.getLine(), this.getPos());
    }
 

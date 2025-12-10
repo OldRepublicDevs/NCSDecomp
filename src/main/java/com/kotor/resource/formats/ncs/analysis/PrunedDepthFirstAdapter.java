@@ -106,10 +106,10 @@ public class PrunedDepthFirstAdapter extends AnalysisAdapter {
          node.getReturn().apply(this);
       }
 
-      Object[] temp = node.getSubroutine().toArray();
+      PSubroutine[] temp = node.getSubroutine().toArray(new PSubroutine[0]);
 
       for (int i = 0; i < temp.length; i++) {
-         ((PSubroutine)temp[i]).apply(this);
+         temp[i].apply(this);
       }
 
       this.outAProgram(node);
@@ -148,10 +148,10 @@ public class PrunedDepthFirstAdapter extends AnalysisAdapter {
    @Override
    public void caseACommandBlock(ACommandBlock node) {
       this.inACommandBlock(node);
-      Object[] temp = node.getCmd().toArray();
+      PCmd[] temp = node.getCmd().toArray(new PCmd[0]);
 
       for (int i = 0; i < temp.length; i++) {
-         ((PCmd)temp[i]).apply(this);
+         temp[i].apply(this);
       }
 
       this.outACommandBlock(node);

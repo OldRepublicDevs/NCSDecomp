@@ -17,7 +17,7 @@ public final class AAddBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AAddBinaryOp((TAdd)this.cloneNode(this._add_));
    }
 

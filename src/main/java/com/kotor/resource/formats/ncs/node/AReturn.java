@@ -23,7 +23,7 @@ public final class AReturn extends PReturn {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AReturn(
          (TRetn)this.cloneNode(this._retn_),
          (TIntegerConstant)this.cloneNode(this._pos_),

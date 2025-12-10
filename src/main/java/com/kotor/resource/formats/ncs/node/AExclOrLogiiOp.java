@@ -17,7 +17,7 @@ public final class AExclOrLogiiOp extends PLogiiOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AExclOrLogiiOp((TExcorii)this.cloneNode(this._excorii_));
    }
 

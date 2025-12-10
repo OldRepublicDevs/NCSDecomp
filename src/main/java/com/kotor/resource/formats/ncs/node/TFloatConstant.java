@@ -18,7 +18,7 @@ public final class TFloatConstant extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TFloatConstant clone() {
       return new TFloatConstant(this.getText(), this.getLine(), this.getPos());
    }
 

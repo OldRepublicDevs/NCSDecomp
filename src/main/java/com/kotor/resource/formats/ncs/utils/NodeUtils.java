@@ -323,21 +323,40 @@ public final class NodeUtils {
       return !type.equals((byte)60) && !type.equals((byte)59) && !type.equals((byte)58) ? 1 : 3;
    }
 
-   public static Object getConstValue(AConstCommand node) {
+   public static Long getIntConstValue(AConstCommand node) {
       PConstant pconst = node.getConstant();
       Type type = getType(node);
-      switch (type.byteValue()) {
-         case 3:
-            return Long.parseLong(((AIntConstant)pconst).getIntegerConstant().getText());
-         case 4:
-            return Float.parseFloat(((AFloatConstant)pconst).getFloatConstant().getText());
-         case 5:
-            return ((AStringConstant)pconst).getStringLiteral().getText();
-         case 6:
-            return Integer.parseInt(((AIntConstant)pconst).getIntegerConstant().getText());
-         default:
-            throw new RuntimeException("Invalid const type " + type);
+      if (type.byteValue() != 3) {
+         throw new RuntimeException("Expected int const type (3), got " + type);
       }
+      return Long.parseLong(((AIntConstant)pconst).getIntegerConstant().getText());
+   }
+
+   public static Float getFloatConstValue(AConstCommand node) {
+      PConstant pconst = node.getConstant();
+      Type type = getType(node);
+      if (type.byteValue() != 4) {
+         throw new RuntimeException("Expected float const type (4), got " + type);
+      }
+      return Float.parseFloat(((AFloatConstant)pconst).getFloatConstant().getText());
+   }
+
+   public static String getStringConstValue(AConstCommand node) {
+      PConstant pconst = node.getConstant();
+      Type type = getType(node);
+      if (type.byteValue() != 5) {
+         throw new RuntimeException("Expected string const type (5), got " + type);
+      }
+      return ((AStringConstant)pconst).getStringLiteral().getText();
+   }
+
+   public static Integer getObjectConstValue(AConstCommand node) {
+      PConstant pconst = node.getConstant();
+      Type type = getType(node);
+      if (type.byteValue() != 6) {
+         throw new RuntimeException("Expected object const type (6), got " + type);
+      }
+      return Integer.parseInt(((AIntConstant)pconst).getIntegerConstant().getText());
    }
 
    public static int getSubEnd(ASubroutine sub) {

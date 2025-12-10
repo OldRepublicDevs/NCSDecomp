@@ -18,7 +18,7 @@ public final class TDestruct extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TDestruct clone() {
       return new TDestruct(this.getLine(), this.getPos());
    }
 

@@ -61,6 +61,7 @@ test_profile.txt
 # Test working directories (created by tests)
 test-work/
 roundtrip-work/
+addcompile-temp/
 
 # Build artifacts
 dist-exe/

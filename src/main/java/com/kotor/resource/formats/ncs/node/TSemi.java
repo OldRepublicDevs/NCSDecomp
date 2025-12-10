@@ -18,7 +18,7 @@ public final class TSemi extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TSemi clone() {
       return new TSemi(this.getLine(), this.getPos());
    }
 

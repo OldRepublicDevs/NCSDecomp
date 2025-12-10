@@ -25,7 +25,7 @@ public final class AConditionalJumpCommand extends PConditionalJumpCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AConditionalJumpCommand(
          (PJumpIf)this.cloneNode(this._jumpIf_),
          (TIntegerConstant)this.cloneNode(this._pos_),

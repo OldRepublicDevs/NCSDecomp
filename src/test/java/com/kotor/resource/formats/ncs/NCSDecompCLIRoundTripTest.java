@@ -32,20 +32,25 @@ import java.util.stream.Stream;
 public class NCSDecompCLIRoundTripTest {
 
    // Working directory (gitignored)
-   private static final Path TEST_WORK_DIR = Paths.get(".").toAbsolutePath().normalize()
-         .resolve("test-work");
-   private static final Path VANILLA_REPO_DIR = TEST_WORK_DIR.resolve("Vanilla_KOTOR_Script_Source");
-   private static final String VANILLA_REPO_URL = "https://github.com/KOTORCommunityPatches/Vanilla_KOTOR_Script_Source.git";
+  private static final Path TEST_WORK_DIR = Paths.get(".").toAbsolutePath().normalize()
+        .resolve("test-work");
+  private static final Path VANILLA_REPO_DIR = TEST_WORK_DIR.resolve("Vanilla_KOTOR_Script_Source");
+  private static final java.util.List<String> VANILLA_REPO_URLS = java.util.Arrays.asList(
+        "https://github.com/KOTORCommunityPatches/Vanilla_KOTOR_Script_Source.git",
+        "https://github.com/th3w1zard1/Vanilla_KOTOR_Script_Source.git"
+  );
 
    // Paths relative to DeNCS directory
    private static final Path REPO_ROOT = Paths.get(".").toAbsolutePath().normalize();
    private static final Path NWN_COMPILER = REPO_ROOT.resolve("tools").resolve("nwnnsscomp.exe");
    private static final Path K1_NWSCRIPT = REPO_ROOT.resolve("src").resolve("main").resolve("resources").resolve("k1_nwscript.nss");
+   private static final Path K1_ASC_NWSCRIPT = REPO_ROOT.resolve("k1_asc_nwscript.nss");
    private static final Path K2_NWSCRIPT = REPO_ROOT.resolve("src").resolve("main").resolve("resources").resolve("tsl_nwscript.nss");
 
    // Test output directories (gitignored)
    private static final Path WORK_ROOT = TEST_WORK_DIR.resolve("roundtrip-work");
    private static final Path PROFILE_OUTPUT = TEST_WORK_DIR.resolve("test_profile.txt");
+   private static final Path COMPILE_TEMP_ROOT = TEST_WORK_DIR.resolve("compile-temp");
 
    private static final Duration PROC_TIMEOUT = Duration.ofSeconds(25);
 
@@ -76,34 +81,56 @@ public class NCSDecompCLIRoundTripTest {
          }
       }
 
-      // Clone the repository
+      // Clone the repository - try each URL in order until one succeeds
       System.out.println("Cloning Vanilla_KOTOR_Script_Source repository...");
-      System.out.println("  URL: " + VANILLA_REPO_URL);
       System.out.println("  Destination: " + VANILLA_REPO_DIR);
 
       Files.createDirectories(VANILLA_REPO_DIR.getParent());
 
-      ProcessBuilder pb = new ProcessBuilder("git", "clone", VANILLA_REPO_URL, VANILLA_REPO_DIR.toString());
-      pb.redirectErrorStream(true);
-      Process proc = pb.start();
+      IOException lastException = null;
+      for (int i = 0; i < VANILLA_REPO_URLS.size(); i++) {
+         String repoUrl = VANILLA_REPO_URLS.get(i);
+         System.out.println("  Attempting URL " + (i + 1) + "/" + VANILLA_REPO_URLS.size() + ": " + repoUrl);
 
-      // Capture output
-      StringBuilder output = new StringBuilder();
-      try (java.io.BufferedReader reader = new java.io.BufferedReader(
-            new java.io.InputStreamReader(proc.getInputStream()))) {
-         String line;
-         while ((line = reader.readLine()) != null) {
-            output.append(line).append("\n");
+         ProcessBuilder pb = new ProcessBuilder("git", "clone", repoUrl, VANILLA_REPO_DIR.toString());
+         pb.redirectErrorStream(true);
+         Process proc = pb.start();
+
+         // Capture output
+         StringBuilder output = new StringBuilder();
+         try (java.io.BufferedReader reader = new java.io.BufferedReader(
+               new java.io.InputStreamReader(proc.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+               output.append(line).append("\n");
+            }
+         }
+
+         int exitCode = proc.waitFor();
+         if (exitCode == 0) {
+            System.out.println("Repository cloned successfully from: " + repoUrl);
+            return;
+         }
+
+         // Clone failed, save error and try next URL
+         lastException = new IOException("Failed to clone from " + repoUrl + ". Exit code: " + exitCode +
+               "\nOutput: " + output.toString());
+         System.out.println("  Failed: " + lastException.getMessage().split("\n")[0]);
+
+         // Clean up any partial clone attempt
+         if (Files.exists(VANILLA_REPO_DIR)) {
+            try {
+               deleteDirectory(VANILLA_REPO_DIR);
+            } catch (Exception e) {
+               // Ignore cleanup errors
+            }
          }
       }
 
-      int exitCode = proc.waitFor();
-      if (exitCode != 0) {
-         throw new IOException("Failed to clone repository. Exit code: " + exitCode +
-               "\nOutput: " + output.toString());
-      }
-
-      System.out.println("Repository cloned successfully.");
+      // All URLs failed
+      throw new IOException("Failed to clone repository from all " + VANILLA_REPO_URLS.size() + " URLs:\n" +
+            String.join("\n", VANILLA_REPO_URLS) + "\n\nLast error: " +
+            (lastException != null ? lastException.getMessage() : "Unknown error"));
    }
 
    static void preflight() throws IOException, InterruptedException {
@@ -122,6 +149,11 @@ public class NCSDecompCLIRoundTripTest {
          throw new IOException("k1_nwscript.nss missing at: " + K1_NWSCRIPT);
       }
       System.out.println("✓ Found K1 nwscript: " + K1_NWSCRIPT);
+
+      if (!Files.isRegularFile(K1_ASC_NWSCRIPT)) {
+         throw new IOException("k1_asc_nwscript.nss missing at: " + K1_ASC_NWSCRIPT);
+      }
+      System.out.println("✓ Found K1 ASC nwscript: " + K1_ASC_NWSCRIPT);
 
       if (!Files.isRegularFile(K2_NWSCRIPT)) {
          throw new IOException("tsl_nwscript.nss missing at: " + K2_NWSCRIPT);
@@ -235,89 +267,341 @@ public class NCSDecompCLIRoundTripTest {
       long startTime = System.nanoTime();
 
       Path rel = VANILLA_REPO_DIR.relativize(nssPath);
+      String displayPath = rel.toString().replace('\\', '/');
+
       Path outDir = scratchRoot.resolve(rel.getParent() == null ? Paths.get("") : rel.getParent());
       Files.createDirectories(outDir);
 
       // Compile: NSS -> NCS
       Path compiled = outDir.resolve(stripExt(rel.getFileName().toString()) + ".ncs");
+      System.out.print("  Compiling " + displayPath + " to .ncs with nwnnsscomp.exe");
       long compileStart = System.nanoTime();
-      runCompiler(nssPath, compiled, gameFlag, scratchRoot);
-      long compileTime = System.nanoTime() - compileStart;
-      operationTimes.merge("compile", compileTime, Long::sum);
+      try {
+         runCompiler(nssPath, compiled, gameFlag, scratchRoot);
+         long compileTime = System.nanoTime() - compileStart;
+         operationTimes.merge("compile", compileTime, Long::sum);
+         System.out.println(" ✓ (" + String.format("%.3f", compileTime / 1_000_000.0) + " ms)");
+      } catch (Exception e) {
+         long compileTime = System.nanoTime() - compileStart;
+         operationTimes.merge("compile", compileTime, Long::sum);
+         throw e; // Re-throw after recording time
+      }
 
       // Decompile: NCS -> NSS
       Path decompiled = outDir.resolve(stripExt(rel.getFileName().toString()) + ".dec.nss");
+      System.out.print("  Decompiling " + compiled.getFileName() + " back to .nss");
       long decompileStart = System.nanoTime();
-      runDecompile(compiled, decompiled, gameFlag);
-      long decompileTime = System.nanoTime() - decompileStart;
-      operationTimes.merge("decompile", decompileTime, Long::sum);
+      try {
+         runDecompile(compiled, decompiled, gameFlag);
+         long decompileTime = System.nanoTime() - decompileStart;
+         operationTimes.merge("decompile", decompileTime, Long::sum);
+         System.out.println(" ✓ (" + String.format("%.3f", decompileTime / 1_000_000.0) + " ms)");
+      } catch (Exception e) {
+         long decompileTime = System.nanoTime() - decompileStart;
+         operationTimes.merge("decompile", decompileTime, Long::sum);
+         throw e; // Re-throw after recording time
+      }
+
+      System.out.print("  Comparing original vs round-trip");
 
       // Compare
       long compareStart = System.nanoTime();
-      String original = normalizeNewlines(Files.readString(nssPath, StandardCharsets.UTF_8));
-      String roundtrip = normalizeNewlines(Files.readString(decompiled, StandardCharsets.UTF_8));
-      long compareTime = System.nanoTime() - compareStart;
-      operationTimes.merge("compare", compareTime, Long::sum);
+      try {
+         String original = normalizeNewlines(Files.readString(nssPath, StandardCharsets.UTF_8));
+         String roundtrip = normalizeNewlines(Files.readString(decompiled, StandardCharsets.UTF_8));
+         long compareTime = System.nanoTime() - compareStart;
+         operationTimes.merge("compare", compareTime, Long::sum);
 
-      if (!original.equals(roundtrip)) {
-         String diff = formatUnifiedDiff(original, roundtrip);
-         StringBuilder message = new StringBuilder("Round-trip mismatch for ").append(nssPath);
-         if (diff != null) {
-            message.append(System.lineSeparator()).append(diff);
+         if (!original.equals(roundtrip)) {
+            System.out.println(" ✗ MISMATCH");
+            String diff = formatUnifiedDiff(original, roundtrip);
+            StringBuilder message = new StringBuilder("Round-trip mismatch for ").append(nssPath);
+            if (diff != null) {
+               message.append(System.lineSeparator()).append(diff);
+            }
+            throw new IllegalStateException(message.toString());
          }
-         throw new IllegalStateException(message.toString());
-      }
 
+         System.out.println(" ✓ MATCH");
+      } catch (Exception e) {
+         long compareTime = System.nanoTime() - compareStart;
+         operationTimes.merge("compare", compareTime, Long::sum);
+         throw e; // Re-throw after recording time
+      }
       long totalTime = System.nanoTime() - startTime;
       operationTimes.merge("total", totalTime, Long::sum);
    }
 
-   private static void runCompiler(Path nssPath, Path compiledOut, String gameFlag, Path workDir) throws Exception {
+   /**
+    * Detects if a script file needs the ASC nwscript (for ActionStartConversation with 11 parameters).
+    * Checks if the file contains ActionStartConversation calls with exactly 11 parameters
+    * by counting commas in the parameter list. A call with 10 commas indicates 11 parameters.
+    */
+   private static boolean needsAscNwscript(Path nssPath) throws Exception {
+      String content = Files.readString(nssPath, StandardCharsets.UTF_8);
+      // Look for ActionStartConversation calls with 11 parameters (10 commas)
+      // Pattern matches ActionStartConversation( ... ) where the content between parens
+      // contains exactly 10 commas (indicating 11 parameters)
+      // This is more flexible than requiring specific parameter values
+      java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+         "ActionStartConversation\\s*\\(([^,)]*,\\s*){10}[^)]*\\)",
+         java.util.regex.Pattern.MULTILINE
+      );
+      return pattern.matcher(content).find();
+   }
+
+   /**
+    * Extracts include file names from a script file.
+    * Parses #include statements and returns the include file names (without quotes).
+    */
+   private static List<String> extractIncludes(Path nssPath) throws Exception {
+      String content = Files.readString(nssPath, StandardCharsets.UTF_8);
+      List<String> includes = new ArrayList<>();
+      java.util.regex.Pattern includePattern = java.util.regex.Pattern.compile(
+         "#include\\s+[\"<]([^\">]+)[\">]",
+         java.util.regex.Pattern.MULTILINE
+      );
+      java.util.regex.Matcher matcher = includePattern.matcher(content);
+      while (matcher.find()) {
+         includes.add(matcher.group(1));
+      }
+      return includes;
+   }
+
+   /**
+    * Finds an include file in the repository structure.
+    * Checks common locations: same directory as source, K1/Data/scripts.bif, TSL/Data/Scripts, etc.
+    * Handles include names with or without .nss extension.
+    */
+   private static Path findIncludeFile(String includeName, Path sourceFile, String gameFlag) {
+      // Normalize include name - add .nss extension if missing
+      String normalizedName = includeName;
+      if (!normalizedName.endsWith(".nss") && !normalizedName.endsWith(".h")) {
+         normalizedName = includeName + ".nss";
+      }
+
+      // Check same directory as source file
+      Path sourceDir = sourceFile.getParent();
+      Path localInc = sourceDir.resolve(normalizedName);
+      if (Files.exists(localInc)) {
+         return localInc;
+      }
+      // Also try without extension
+      localInc = sourceDir.resolve(includeName);
+      if (Files.exists(localInc)) {
+         return localInc;
+      }
+
+      // Check K1/Data/scripts.bif (common location for includes, used by both K1 and TSL)
+      Path k1IncludesDir = VANILLA_REPO_DIR.resolve("K1").resolve("Data").resolve("scripts.bif");
+      Path k1Inc = k1IncludesDir.resolve(normalizedName);
+      if (Files.exists(k1Inc)) {
+         return k1Inc;
+      }
+      // Also try without extension
+      k1Inc = k1IncludesDir.resolve(includeName);
+      if (Files.exists(k1Inc)) {
+         return k1Inc;
+      }
+
+      // For TSL, also check TSL/Data/Scripts
+      if ("k2".equals(gameFlag)) {
+         Path tslScriptsDir = VANILLA_REPO_DIR.resolve("TSL").resolve("Vanilla").resolve("Data").resolve("Scripts");
+         Path tslInc = tslScriptsDir.resolve(normalizedName);
+         if (Files.exists(tslInc)) {
+            return tslInc;
+         }
+         // Also try without extension
+         tslInc = tslScriptsDir.resolve(includeName);
+         if (Files.exists(tslInc)) {
+            return tslInc;
+         }
+
+         // Check TSLRCM if it exists
+         Path tslRcmScriptsDir = VANILLA_REPO_DIR.resolve("TSL").resolve("TSLRCM").resolve("Data").resolve("Scripts");
+         Path tslRcmInc = tslRcmScriptsDir.resolve(normalizedName);
+         if (Files.exists(tslRcmInc)) {
+            return tslRcmInc;
+         }
+         // Also try without extension
+         tslRcmInc = tslRcmScriptsDir.resolve(includeName);
+         if (Files.exists(tslRcmInc)) {
+            return tslRcmInc;
+         }
+      }
+
+      return null;
+   }
+
+   /**
+    * Creates a temporary working directory with the source file and all its includes.
+    * Returns the temp directory path and the path to the copied source file.
+    */
+   private static Path setupTempCompileDir(Path originalNssPath, String gameFlag) throws Exception {
+      // Ensure parent directory exists
+      Files.createDirectories(COMPILE_TEMP_ROOT);
+      // Create unique temp directory for this compilation
+      Path tempDir = Files.createTempDirectory(COMPILE_TEMP_ROOT, "compile_");
+
+      // Copy source file to temp directory
+      Path tempSourceFile = tempDir.resolve(originalNssPath.getFileName());
+      Files.copy(originalNssPath, tempSourceFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+      // Find and copy all include files
+      List<String> includes = extractIncludes(originalNssPath);
+      for (String includeName : includes) {
+         Path includeFile = findIncludeFile(includeName, originalNssPath, gameFlag);
+         if (includeFile != null && Files.exists(includeFile)) {
+            Path tempInclude = tempDir.resolve(includeName);
+            Files.copy(includeFile, tempInclude, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+         } else {
+            // Include file not found - this might cause compilation to fail, but let compiler report it
+         }
+      }
+
+      return tempDir;
+   }
+
+   private static void runCompiler(Path originalNssPath, Path compiledOut, String gameFlag, Path workDir) throws Exception {
+      // Store original path for logging (show path relative to vanilla repo)
+      Path relPath = VANILLA_REPO_DIR.relativize(originalNssPath);
+
+      // Determine which nwscript.nss to use based on game
+      // K1 files (from test-work\Vanilla_KOTOR_Script_Source\K1) use k1_nwscript.nss
+      // K1 files with ActionStartConversation(11 params) use k1_asc_nwscript.nss
+      // TSL files (from test-work\Vanilla_KOTOR_Script_Source\TSL) use tsl_nwscript.nss
+      Path nwscriptSource;
+      if ("k1".equals(gameFlag)) {
+         // Check if this script needs ASC nwscript
+         if (needsAscNwscript(originalNssPath)) {
+            nwscriptSource = K1_ASC_NWSCRIPT;
+            if (!Files.exists(nwscriptSource)) {
+               throw new IllegalStateException("K1 ASC nwscript file not found: " + nwscriptSource);
+            }
+         } else {
+            nwscriptSource = K1_NWSCRIPT;
+            if (!Files.exists(nwscriptSource)) {
+               throw new IllegalStateException("K1 nwscript file not found: " + nwscriptSource);
+            }
+         }
+      } else if ("k2".equals(gameFlag)) {
+         nwscriptSource = K2_NWSCRIPT;
+         if (!Files.exists(nwscriptSource)) {
+            throw new IllegalStateException("TSL nwscript file not found: " + nwscriptSource);
+         }
+      } else {
+         throw new IllegalArgumentException("Invalid game flag: " + gameFlag + " (expected 'k1' or 'k2')");
+      }
+
       // Ensure nwscript.nss is in the compiler's directory
       Path compilerDir = NWN_COMPILER.getParent();
-      Path nwscriptSource = "k2".equals(gameFlag) ? K2_NWSCRIPT : K1_NWSCRIPT;
       Path compilerNwscript = compilerDir.resolve("nwscript.nss");
       if (!Files.exists(compilerNwscript) || !Files.isSameFile(nwscriptSource, compilerNwscript)) {
          Files.copy(nwscriptSource, compilerNwscript, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
       }
 
-      Files.createDirectories(compiledOut.getParent());
+      // Create temp directory with source file and all includes
+      Path tempDir = null;
+      Path tempSourceFile = null;
+      try {
+         tempDir = setupTempCompileDir(originalNssPath, gameFlag);
+         tempSourceFile = tempDir.resolve(originalNssPath.getFileName());
 
-      java.io.File compilerFile = NWN_COMPILER.toAbsolutePath().toFile();
-      java.io.File sourceFile = nssPath.toAbsolutePath().toFile();
-      java.io.File outputFile = compiledOut.toAbsolutePath().toFile();
-      boolean isK2 = "k2".equals(gameFlag);
+         Files.createDirectories(compiledOut.getParent());
 
-      NwnnsscompConfig config = new NwnnsscompConfig(compilerFile, sourceFile, outputFile, isK2);
-      String[] cmd = config.getCompileArgs(compilerFile.getAbsolutePath());
+         java.io.File compilerFile = NWN_COMPILER.toAbsolutePath().toFile();
+         java.io.File sourceFile = tempSourceFile.toAbsolutePath().toFile();
+         java.io.File outputFile = compiledOut.toAbsolutePath().toFile();
+         boolean isK2 = "k2".equals(gameFlag);
 
-      ProcessBuilder pb = new ProcessBuilder(cmd);
-      pb.redirectErrorStream(true);
-      Process proc = pb.start();
+         NwnnsscompConfig config = new NwnnsscompConfig(compilerFile, sourceFile, outputFile, isK2);
+         String[] cmd = config.getCompileArgs(compilerFile.getAbsolutePath());
 
-      java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(proc.getInputStream()));
-      StringBuilder output = new StringBuilder();
-      String line;
-      while ((line = reader.readLine()) != null) {
-         output.append(line).append("\n");
-      }
-
-      boolean finished = proc.waitFor(PROC_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
-      if (!finished) {
-         proc.destroyForcibly();
-         throw new RuntimeException("nwnnsscomp timed out for " + nssPath);
-      }
-      if (proc.exitValue() != 0 || !Files.isRegularFile(compiledOut)) {
-         String errorMsg = "nwnnsscomp failed (exit=" + proc.exitValue() + ") for " + nssPath;
-         if (output.length() > 0) {
-            errorMsg += "\nCompiler output:\n" + output.toString();
+         // Log compilation command and args (but show original path in the log)
+         System.out.print(" (");
+         for (int i = 0; i < cmd.length; i++) {
+            if (i > 0) System.out.print(" ");
+            String arg = cmd[i];
+            // Replace temp path with original path in log output for readability
+            if (arg.equals(sourceFile.getAbsolutePath())) {
+               arg = originalNssPath.toAbsolutePath().toString();
+            }
+            // Quote arguments with spaces
+            if (arg.contains(" ") && !arg.startsWith("\"")) {
+               System.out.print("\"" + arg + "\"");
+            } else {
+               System.out.print(arg);
+            }
          }
-         throw new RuntimeException(errorMsg);
+         System.out.print(")");
+
+         ProcessBuilder pb = new ProcessBuilder(cmd);
+         // Set working directory to temp directory so includes are found
+         pb.directory(tempDir.toFile());
+         pb.redirectErrorStream(true);
+         Process proc = pb.start();
+
+         java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(proc.getInputStream()));
+         StringBuilder output = new StringBuilder();
+         String line;
+         while ((line = reader.readLine()) != null) {
+            output.append(line).append("\n");
+         }
+
+         boolean finished = proc.waitFor(PROC_TIMEOUT.toMillis(), java.util.concurrent.TimeUnit.MILLISECONDS);
+         if (!finished) {
+            proc.destroyForcibly();
+            System.out.println(" ✗ TIMEOUT");
+            throw new RuntimeException("nwnnsscomp timed out for " + originalNssPath);
+         }
+
+         int exitCode = proc.exitValue();
+         boolean fileExists = Files.isRegularFile(compiledOut);
+
+         if (exitCode != 0 || !fileExists) {
+            System.out.println(" ✗ FAILED");
+            String errorMsg = "nwnnsscomp failed (exit=" + exitCode + ", fileExists=" + fileExists + ") for " + originalNssPath;
+            if (output.length() > 0) {
+               // Show relevant error lines
+               String[] outputLines = output.toString().split("\n");
+               boolean foundError = false;
+               for (String outputLine : outputLines) {
+                  if (outputLine.toLowerCase().contains("error") ||
+                      outputLine.toLowerCase().contains("unable") ||
+                      outputLine.toLowerCase().contains("include")) {
+                     if (!foundError) {
+                        errorMsg += "\nCompiler errors:";
+                        foundError = true;
+                     }
+                     // Replace temp path with original path in error messages
+                     String displayLine = outputLine.replace(tempSourceFile.toAbsolutePath().toString(), originalNssPath.toAbsolutePath().toString());
+                     errorMsg += "\n  " + displayLine;
+                  }
+               }
+               // If no errors found, show all output
+               if (!foundError && outputLines.length > 0) {
+                  String displayOutput = output.toString().replace(tempSourceFile.toAbsolutePath().toString(), originalNssPath.toAbsolutePath().toString());
+                  errorMsg += "\nCompiler output:\n" + displayOutput;
+               }
+            }
+            throw new RuntimeException(errorMsg);
+         }
+      } finally {
+         // Clean up temp directory
+         if (tempDir != null) {
+            try {
+               deleteDirectory(tempDir);
+            } catch (Exception e) {
+               // Log but don't fail on cleanup errors
+               System.err.println("Warning: Failed to clean up temp directory " + tempDir + ": " + e.getMessage());
+            }
+         }
       }
    }
 
    private static void runDecompile(Path ncsPath, Path nssOut, String gameFlag) throws Exception {
       FileDecompiler.isK2Selected = "k2".equals(gameFlag);
+      System.out.print(" (game=" + gameFlag + ", output=" + nssOut.getFileName() + ")");
 
       try {
          FileDecompiler fd = new FileDecompiler();
@@ -329,9 +613,11 @@ public class NCSDecompCLIRoundTripTest {
          fd.decompileToFile(ncsFile, nssFile, StandardCharsets.UTF_8, true);
 
          if (!Files.isRegularFile(nssOut)) {
+            System.out.println(" ✗ FAILED - no output file created");
             throw new RuntimeException("Decompile did not produce output: " + nssOut);
          }
       } catch (DecompilerException ex) {
+         System.out.println(" ✗ FAILED - " + ex.getMessage());
          throw new RuntimeException("Decompile failed for " + ncsPath + ": " + ex.getMessage(), ex);
       }
    }
@@ -597,17 +883,21 @@ public class NCSDecompCLIRoundTripTest {
 
          System.out.println("=== Running Round-Trip Tests ===");
          System.out.println("Total tests: " + tests.size());
-         System.out.println("Fast-fail: enabled (will stop on first failure)\n");
+         System.out.println("Fast-fail: enabled (will stop on first failure)");
+         System.out.println();
 
          for (RoundTripCase testCase : tests) {
             testsProcessed++;
-            System.out.print(String.format("[%d/%d] %s ... ", testsProcessed, totalTests, testCase.displayName));
+            Path relPath = VANILLA_REPO_DIR.relativize(testCase.item.path);
+            String displayPath = relPath.toString().replace('\\', '/');
+            System.out.println(String.format("[%d/%d] %s", testsProcessed, totalTests, displayPath));
 
             try {
                roundTripSingle(testCase.item.path, testCase.item.gameFlag, testCase.item.scratchRoot);
-               System.out.println("✓ PASSED");
+               System.out.println("  Result: ✓ PASSED");
+               System.out.println();
             } catch (Exception ex) {
-               System.out.println("✗ FAILED");
+               System.out.println("  Result: ✗ FAILED");
                System.out.println();
                System.out.println("═══════════════════════════════════════════════════════════");
                System.out.println("FAILURE: " + testCase.displayName);

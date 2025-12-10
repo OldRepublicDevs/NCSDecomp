@@ -17,7 +17,7 @@ public final class ANequalBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ANequalBinaryOp((TNequal)this.cloneNode(this._nequal_));
    }
 

@@ -81,10 +81,10 @@ public class DestroyParseTree extends AnalysisAdapter {
          node.getReturn().apply(this);
       }
 
-      Object[] temp = node.getSubroutine().toArray();
+      PSubroutine[] temp = node.getSubroutine().toArray(new PSubroutine[0]);
 
       for (int i = 0; i < temp.length; i++) {
-         ((PSubroutine)temp[i]).apply(this);
+         temp[i].apply(this);
       }
 
       node.setSize(null);
@@ -110,10 +110,10 @@ public class DestroyParseTree extends AnalysisAdapter {
 
    @Override
    public void caseACommandBlock(ACommandBlock node) {
-      Object[] temp = node.getCmd().toArray();
+      PCmd[] temp = node.getCmd().toArray(new PCmd[0]);
 
       for (int i = 0; i < temp.length; i++) {
-         ((PCmd)temp[i]).apply(this);
+         temp[i].apply(this);
       }
 
       node.setCmd(new Vector<PCmd>(1));

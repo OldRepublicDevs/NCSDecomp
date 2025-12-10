@@ -13,9 +13,9 @@ import com.kotor.resource.formats.ncs.utils.Type;
 public class StringConst extends Const {
    private String value;
 
-   public StringConst(Object value) {
+   public StringConst(String value) {
       this.type = new Type((byte)5);
-      this.value = (String)value;
+      this.value = value;
       this.size = 1;
    }
 

@@ -21,7 +21,7 @@ public final class TBoolandii extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TBoolandii clone() {
       return new TBoolandii(this.getLine(), this.getPos());
    }
 

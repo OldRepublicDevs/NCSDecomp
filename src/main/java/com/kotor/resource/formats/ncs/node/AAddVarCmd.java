@@ -17,7 +17,7 @@ public final class AAddVarCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AAddVarCmd((PRsaddCommand)this.cloneNode(this._rsaddCommand_));
    }
 

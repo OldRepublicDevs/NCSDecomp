@@ -18,7 +18,7 @@ public final class TCpdownsp extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TCpdownsp clone() {
       return new TCpdownsp(this.getLine(), this.getPos());
    }
 

@@ -17,7 +17,7 @@ public final class ANonzeroJumpIf extends PJumpIf {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ANonzeroJumpIf((TJnz)this.cloneNode(this._jnz_));
    }
 

@@ -17,7 +17,7 @@ public final class ANegUnaryOp extends PUnaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ANegUnaryOp((TNeg)this.cloneNode(this._neg_));
    }
 

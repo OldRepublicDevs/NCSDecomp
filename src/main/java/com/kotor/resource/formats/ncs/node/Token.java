@@ -48,5 +48,15 @@ public abstract class Token extends Node {
    @Override
    void replaceChild(Node oldChild, Node newChild) {
    }
+
+   /**
+    * Creates and returns a copy of this token.
+    * Subclasses should override this method to return their specific type
+    * (covariant return type) instead of Node for better type safety.
+    *
+    * @return a clone of this token
+    */
+   @Override
+   public abstract Token clone();
 }
 

@@ -18,7 +18,7 @@ public final class TNot extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TNot clone() {
       return new TNot(this.getLine(), this.getPos());
    }
 

@@ -14,8 +14,15 @@ import java.util.List;
 public abstract class Node implements Switchable, Cloneable {
    private Node parent;
 
+   /**
+    * Creates and returns a copy of this node.
+    * Subclasses should override this method to return their specific type
+    * (covariant return type) instead of Object for better type safety.
+    *
+    * @return a clone of this node
+    */
    @Override
-   public abstract Object clone();
+   public abstract Node clone();
 
    public Node parent() {
       return this.parent;
@@ -51,7 +58,7 @@ public abstract class Node implements Switchable, Cloneable {
    }
 
    protected Node cloneNode(Node node) {
-      return node != null ? (Node)node.clone() : null;
+      return node != null ? node.clone() : null;
    }
 
    protected <T extends Node> List<T> cloneList(List<T> list) {

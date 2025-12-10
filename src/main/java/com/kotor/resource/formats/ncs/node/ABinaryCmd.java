@@ -17,7 +17,7 @@ public final class ABinaryCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ABinaryCmd((PBinaryCommand)this.cloneNode(this._binaryCommand_));
    }
 

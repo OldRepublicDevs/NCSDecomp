@@ -8,6 +8,7 @@ package com.kotor.resource.formats.ncs.utils;
 import com.kotor.resource.formats.ncs.node.AProgram;
 import com.kotor.resource.formats.ncs.node.ASubroutine;
 import com.kotor.resource.formats.ncs.node.Node;
+import com.kotor.resource.formats.ncs.node.PSubroutine;
 import com.kotor.resource.formats.ncs.node.Start;
 import com.kotor.resource.formats.ncs.scriptutils.SubScriptState;
 import com.kotor.resource.formats.ncs.stack.LocalVarStack;
@@ -20,34 +21,33 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.TreeSet;
 
-@SuppressWarnings({"rawtypes", "unchecked"})
 public class SubroutineAnalysisData {
    private NodeAnalysisData nodedata;
-   private Hashtable subroutines;
-   private Hashtable substates;
+   private Hashtable<Integer, ASubroutine> subroutines;
+   private Hashtable<Node, SubroutineState> substates;
    private ASubroutine mainsub;
    private ASubroutine globalsub;
    private LocalVarStack globalstack;
-   private ArrayList globalstructs;
+   private ArrayList<StructType> globalstructs;
    private SubScriptState globalstate;
 
    public SubroutineAnalysisData(NodeAnalysisData nodedata) {
       this.nodedata = nodedata;
-      this.subroutines = new Hashtable(1);
-      this.substates = new Hashtable(1);
+      this.subroutines = new Hashtable<>(1);
+      this.substates = new Hashtable<>(1);
       this.globalsub = null;
       this.globalstack = null;
       this.mainsub = null;
-      this.globalstructs = new ArrayList();
+      this.globalstructs = new ArrayList<>();
    }
 
    public void parseDone() {
       this.nodedata = null;
       if (this.substates != null) {
-         Enumeration subs = this.substates.elements();
+         Enumeration<SubroutineState> subs = this.substates.elements();
 
          while (subs.hasMoreElements()) {
-            ((SubroutineState)subs.nextElement()).parseDone();
+            subs.nextElement().parseDone();
          }
 
          subs = null;
@@ -67,10 +67,10 @@ public class SubroutineAnalysisData {
       }
 
       if (this.substates != null) {
-         Enumeration subs = this.substates.elements();
+         Enumeration<SubroutineState> subs = this.substates.elements();
 
          while (subs.hasMoreElements()) {
-            ((SubroutineState)subs.nextElement()).close();
+            subs.nextElement().close();
          }
 
          this.substates = null;
@@ -90,10 +90,10 @@ public class SubroutineAnalysisData {
       }
 
       if (this.globalstructs != null) {
-         Iterator it = this.globalstructs.iterator();
+         Iterator<StructType> it = this.globalstructs.iterator();
 
          while (it.hasNext()) {
-            ((StructType)it.next()).close();
+            it.next().close();
          }
 
          this.globalstructs = null;
@@ -106,11 +106,11 @@ public class SubroutineAnalysisData {
    }
 
    public void printStates() {
-      Enumeration subnodes = this.substates.keys();
+      Enumeration<Node> subnodes = this.substates.keys();
 
       while (subnodes.hasMoreElements()) {
-         Node node = (Node)subnodes.nextElement();
-         SubroutineState state = (SubroutineState)this.substates.get(node);
+         Node node = subnodes.nextElement();
+         SubroutineState state = this.substates.get(node);
          System.out.println("Printing state for subroutine at " + Integer.toString(this.nodedata.getPos(node)));
          state.printState();
       }
@@ -153,11 +153,11 @@ public class SubroutineAnalysisData {
    }
 
    public int countSubsDone() {
-      Enumeration subs = this.substates.elements();
+      Enumeration<SubroutineState> subs = this.substates.elements();
       int count = 0;
 
       while (subs.hasMoreElements()) {
-         if (((SubroutineState)subs.nextElement()).isTotallyPrototyped()) {
+         if (subs.nextElement().isTotallyPrototyped()) {
             count++;
          }
       }
@@ -166,11 +166,11 @@ public class SubroutineAnalysisData {
    }
 
    public SubroutineState getState(Node sub) {
-      return (SubroutineState)this.substates.get(sub);
+      return this.substates.get(sub);
    }
 
    public boolean isPrototyped(int pos, boolean nullok) {
-      Node sub = (Node)this.subroutines.get(pos);
+      ASubroutine sub = this.subroutines.get(pos);
       if (sub == null) {
          if (nullok) {
             return false;
@@ -178,27 +178,27 @@ public class SubroutineAnalysisData {
             throw new RuntimeException("Checking prototype on a subroutine not in the hash");
          }
       } else {
-         SubroutineState state = (SubroutineState)this.substates.get(sub);
+         SubroutineState state = this.substates.get(sub);
          return state != null && state.isPrototyped();
       }
    }
 
    public boolean isBeingPrototyped(int pos) {
-      Node sub = (Node)this.subroutines.get(pos);
+      ASubroutine sub = this.subroutines.get(pos);
       if (sub == null) {
          throw new RuntimeException("Checking prototype on a subroutine not in the hash");
       } else {
-         SubroutineState state = (SubroutineState)this.substates.get(sub);
+         SubroutineState state = this.substates.get(sub);
          return state != null && state.isBeingPrototyped();
       }
    }
 
    public boolean isFullyPrototyped(int pos) {
-      Node sub = (Node)this.subroutines.get(pos);
+      ASubroutine sub = this.subroutines.get(pos);
       if (sub == null) {
          throw new RuntimeException("Checking prototype on a subroutine not in the hash");
       } else {
-         SubroutineState state = (SubroutineState)this.substates.get(sub);
+         SubroutineState state = this.substates.get(sub);
          return state != null && state.isTotallyPrototyped();
       }
    }
@@ -225,13 +225,13 @@ public class SubroutineAnalysisData {
       StringBuffer buff = new StringBuffer();
 
       for (int i = 0; i < this.globalstructs.size(); i++) {
-         StructType structtype = (StructType)this.globalstructs.get(i);
+         StructType structtype = this.globalstructs.get(i);
          if (!structtype.isVector()) {
             buff.append(structtype.toDeclString() + " {" + newline);
-            ArrayList types = structtype.types();
+            ArrayList<Type> types = structtype.types();
 
             for (int j = 0; j < types.size(); j++) {
-               buff.append("\t" + ((Type)types.get(j)).toDeclString() + " " + structtype.elementName(j) + ";" + newline);
+               buff.append("\t" + types.get(j).toDeclString() + " " + structtype.elementName(j) + ";" + newline);
             }
 
             buff.append("};" + newline + newline);
@@ -254,10 +254,10 @@ public class SubroutineAnalysisData {
          index = this.globalstructs.size() - 1;
       }
 
-      return (StructType)this.globalstructs.get(index);
+      return this.globalstructs.get(index);
    }
 
-   private void addSubroutine(int pos, Node node, byte id) {
+   private void addSubroutine(int pos, ASubroutine node, byte id) {
       this.subroutines.put(pos, node);
       this.addSubState(node, id);
    }
@@ -286,11 +286,11 @@ public class SubroutineAnalysisData {
       this.globalsub = sub;
    }
 
-   public Iterator getSubroutines() {
-      ArrayList subs = new ArrayList();
-      TreeSet keys = new TreeSet(Collections.reverseOrder());
+   public Iterator<ASubroutine> getSubroutines() {
+      ArrayList<ASubroutine> subs = new ArrayList<>();
+      TreeSet<Integer> keys = new TreeSet<>(Collections.reverseOrder());
       keys.addAll(this.subroutines.keySet());
-      Iterator it = keys.iterator();
+      Iterator<Integer> it = keys.iterator();
 
       while (it.hasNext()) {
          subs.add(this.subroutines.get(it.next()));
@@ -301,7 +301,7 @@ public class SubroutineAnalysisData {
 
    public void splitOffSubroutines(Start ast) {
       boolean conditional = NodeUtils.isConditionalProgram(ast);
-      LinkedList subroutines = ((AProgram)ast.getPProgram()).getSubroutine();
+      LinkedList<PSubroutine> subroutines = ((AProgram)ast.getPProgram()).getSubroutine();
       ASubroutine node = (ASubroutine)subroutines.remove(0);
       if (subroutines.size() > 0 && this.isGlobalsSub(node)) {
          this.addGlobals(node);

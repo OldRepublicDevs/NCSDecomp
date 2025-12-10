@@ -18,7 +18,7 @@ public final class TIncibp extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TIncibp clone() {
       return new TIncibp(this.getLine(), this.getPos());
    }
 

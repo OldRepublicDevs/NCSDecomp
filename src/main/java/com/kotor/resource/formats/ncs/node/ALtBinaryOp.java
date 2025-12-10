@@ -17,7 +17,7 @@ public final class ALtBinaryOp extends PBinaryOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ALtBinaryOp((TLt)this.cloneNode(this._lt_));
    }
 

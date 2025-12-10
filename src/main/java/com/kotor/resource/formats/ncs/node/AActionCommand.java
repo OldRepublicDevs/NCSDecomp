@@ -39,7 +39,7 @@ public final class AActionCommand extends PActionCommand {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AActionCommand(
          (TAction)this.cloneNode(this._action_),
          (TIntegerConstant)this.cloneNode(this._pos_),

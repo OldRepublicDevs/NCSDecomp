@@ -17,7 +17,7 @@ public final class AFloatConstant extends PConstant {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AFloatConstant((TFloatConstant)this.cloneNode(this._floatConstant_));
    }
 

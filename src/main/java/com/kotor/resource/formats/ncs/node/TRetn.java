@@ -18,7 +18,7 @@ public final class TRetn extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TRetn clone() {
       return new TRetn(this.getLine(), this.getPos());
    }
 

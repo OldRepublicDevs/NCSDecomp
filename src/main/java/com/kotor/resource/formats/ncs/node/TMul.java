@@ -18,7 +18,7 @@ public final class TMul extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TMul clone() {
       return new TMul(this.getLine(), this.getPos());
    }
 

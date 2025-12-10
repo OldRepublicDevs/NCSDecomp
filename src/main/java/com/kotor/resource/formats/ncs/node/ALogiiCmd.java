@@ -17,7 +17,7 @@ public final class ALogiiCmd extends PCmd {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ALogiiCmd((PLogiiCommand)this.cloneNode(this._logiiCommand_));
    }
 

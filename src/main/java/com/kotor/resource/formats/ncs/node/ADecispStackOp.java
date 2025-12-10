@@ -17,7 +17,7 @@ public final class ADecispStackOp extends PStackOp {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new ADecispStackOp((TDecisp)this.cloneNode(this._decisp_));
    }
 

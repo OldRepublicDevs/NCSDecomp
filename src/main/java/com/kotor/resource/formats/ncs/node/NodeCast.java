@@ -16,6 +16,9 @@ public class NodeCast implements Cast<Node> {
 
    @Override
    public Node cast(Object o) {
+      if (!(o instanceof Node)) {
+         throw new ClassCastException("Expected Node but got: " + (o != null ? o.getClass().getName() : "null"));
+      }
       return (Node)o;
    }
 }

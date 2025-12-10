@@ -21,7 +21,7 @@ public final class TAdd extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TAdd clone() {
       return new TAdd(this.getLine(), this.getPos());
    }
 

@@ -18,7 +18,7 @@ public final class TNeg extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TNeg clone() {
       return new TNeg(this.getLine(), this.getPos());
    }
 

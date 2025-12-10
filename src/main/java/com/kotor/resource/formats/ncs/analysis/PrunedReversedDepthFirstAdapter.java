@@ -89,10 +89,10 @@ public class PrunedReversedDepthFirstAdapter extends AnalysisAdapter {
    @Override
    public void caseAProgram(AProgram node) {
       this.inAProgram(node);
-      Object[] temp = node.getSubroutine().toArray();
+      PSubroutine[] temp = node.getSubroutine().toArray(new PSubroutine[0]);
 
       for (int i = temp.length - 1; i >= 0; i--) {
-         ((PSubroutine)temp[i]).apply(this);
+         temp[i].apply(this);
       }
 
       if (node.getReturn() != null) {
@@ -139,10 +139,10 @@ public class PrunedReversedDepthFirstAdapter extends AnalysisAdapter {
    @Override
    public void caseACommandBlock(ACommandBlock node) {
       this.inACommandBlock(node);
-      Object[] temp = node.getCmd().toArray();
+      PCmd[] temp = node.getCmd().toArray(new PCmd[0]);
 
       for (int i = temp.length - 1; i >= 0; i--) {
-         ((PCmd)temp[i]).apply(this);
+         temp[i].apply(this);
       }
 
       this.outACommandBlock(node);

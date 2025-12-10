@@ -21,7 +21,7 @@ public final class TConst extends Token {
    }
 
    @Override
-   public Object clone() {
+   public TConst clone() {
       return new TConst(this.getLine(), this.getPos());
    }
 

@@ -18,7 +18,7 @@ public final class EOF extends Token {
    }
 
    @Override
-   public Object clone() {
+   public EOF clone() {
       return new EOF(this.getLine(), this.getPos());
    }
 

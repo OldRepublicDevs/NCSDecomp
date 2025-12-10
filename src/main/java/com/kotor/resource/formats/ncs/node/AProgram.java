@@ -47,12 +47,16 @@ public final class AProgram extends PProgram {
    }
 
    @Override
-   public Object clone() {
+   public AProgram clone() {
+      PSize clonedSize = this._size_ != null ? (PSize)this._size_.clone() : null;
+      PRsaddCommand clonedConditional = this._conditional_ != null ? (PRsaddCommand)this._conditional_.clone() : null;
+      PJumpToSubroutine clonedJumpToSubroutine = this._jumpToSubroutine_ != null ? (PJumpToSubroutine)this._jumpToSubroutine_.clone() : null;
+      PReturn clonedReturn = this._return_ != null ? (PReturn)this._return_.clone() : null;
       return new AProgram(
-         (PSize)this.cloneNode(this._size_),
-         (PRsaddCommand)this.cloneNode(this._conditional_),
-         (PJumpToSubroutine)this.cloneNode(this._jumpToSubroutine_),
-         (PReturn)this.cloneNode(this._return_),
+         clonedSize,
+         clonedConditional,
+         clonedJumpToSubroutine,
+         clonedReturn,
          this.cloneList(this._subroutine_)
       );
    }
@@ -211,6 +215,9 @@ public final class AProgram extends PProgram {
 
       @Override
       public PSubroutine cast(Object o) {
+         if (!(o instanceof PSubroutine)) {
+            throw new ClassCastException("Expected PSubroutine but got: " + (o != null ? o.getClass().getName() : "null"));
+         }
          PSubroutine node = (PSubroutine)o;
          if (node.parent() != null && node.parent() != AProgram.this) {
             node.parent().removeChild(node);

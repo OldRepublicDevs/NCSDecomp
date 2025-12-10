@@ -17,7 +17,7 @@ public final class AIntConstant extends PConstant {
    }
 
    @Override
-   public Object clone() {
+   public Node clone() {
       return new AIntConstant((TIntegerConstant)this.cloneNode(this._integerConstant_));
    }
 

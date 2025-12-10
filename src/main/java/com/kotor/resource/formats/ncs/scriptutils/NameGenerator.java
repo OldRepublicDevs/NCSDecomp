@@ -7,12 +7,13 @@ package com.kotor.resource.formats.ncs.scriptutils;
 
 import com.kotor.resource.formats.ncs.scriptnode.AActionExp;
 import com.kotor.resource.formats.ncs.scriptnode.AConst;
+import com.kotor.resource.formats.ncs.scriptnode.AExpression;
 
 /**
  * Heuristics for deriving readable variable names from common NWScript actions.
  */
 public class NameGenerator {
-   private static String actionParamTag(Object in) {
+   private static String actionParamTag(AExpression in) {
       if (AConst.class.isInstance(in)) {
          String str = ((AConst)in).toString();
          if (str.length() > 2) {
@@ -23,7 +24,7 @@ public class NameGenerator {
       return null;
    }
 
-   private static int actionParamToInt(Object in) {
+   private static int actionParamToInt(AExpression in) {
       return AConst.class.isInstance(in) ? Integer.parseInt(((AConst)in).toString()) : -1;
    }
 
