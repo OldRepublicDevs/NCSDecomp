@@ -768,6 +768,7 @@ public class NCSDecompCLIRoundTripTest {
    private static String normalizeNewlines(String s) {
       String normalized = s.replace("\r\n", "\n").replace("\r", "\n");
       normalized = stripComments(normalized);
+      normalized = normalizeIncludes(normalized);
       normalized = normalizeVariableNames(normalized);
       normalized = normalizeDeclarationAssignment(normalized);
       normalized = normalizeTrailingZeroParams(normalized);
@@ -834,6 +835,11 @@ public class NCSDecompCLIRoundTripTest {
       }
 
       return result;
+   }
+
+   /** Removes #include lines since compiled NCS does not retain them. */
+   private static String normalizeIncludes(String code) {
+      return code.replaceAll("(?m)^\\s*#include[^\n]*\\n?", "");
    }
 
    /**

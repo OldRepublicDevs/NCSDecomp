@@ -80,7 +80,7 @@ public class AActionExp extends ScriptNode implements AExpression {
             }
 
             // Only trim when there are multiple optional parameters and all of them
-            // match their defaults (compiler-inserted boilerplate).
+            // match defaults that look like compiler-inserted sentinels.
             if (optionalCount > 1 && !hasNonDefaultOptional) {
                int lastNonDefault = paramCount;
                for (int i = paramCount - 1; i >= 0 && i < defaults.size(); i--) {
@@ -89,14 +89,18 @@ public class AActionExp extends ScriptNode implements AExpression {
                      break;
                   }
 
-               String paramStr = this.params.get(i).toString();
-               String normalizedParam = normalizeValue(paramStr);
-               String normalizedDefault = normalizeValue(defaultValue);
-               if (normalizedParam.equals(normalizedDefault)) {
-                  lastNonDefault = i;
-               } else {
-                  break;
-               }
+                  if (!isLikelyCompilerInsertedDefault(defaultValue)) {
+                     break;
+                  }
+
+                  String paramStr = this.params.get(i).toString();
+                  String normalizedParam = normalizeValue(paramStr);
+                  String normalizedDefault = normalizeValue(defaultValue);
+                  if (normalizedParam.equals(normalizedDefault)) {
+                     lastNonDefault = i;
+                  } else {
+                     break;
+                  }
                }
                paramCount = lastNonDefault;
             } else {
@@ -115,6 +119,14 @@ public class AActionExp extends ScriptNode implements AExpression {
 
       buff.append(")");
       return buff.toString();
+   }
+
+   private boolean isLikelyCompilerInsertedDefault(String defaultValue) {
+      if (defaultValue == null) {
+         return false;
+      }
+      String v = defaultValue.trim();
+      return v.equals("-1") || v.equals("0xFFFFFFFF") || v.equals("0xFFFFFFFFFFFFFFFF");
    }
 
    /**

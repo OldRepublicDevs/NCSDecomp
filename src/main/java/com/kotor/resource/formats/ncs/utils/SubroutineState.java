@@ -151,7 +151,7 @@ public class SubroutineState {
    }
 
    public boolean isTotallyPrototyped() {
-      return this.status == 2 && this.paramstyped && this.type.isTyped();
+      return this.status == 2 && this.params.size() >= this.paramsize;
    }
 
    public boolean getSkipStart(int pos) {
@@ -189,6 +189,7 @@ public class SubroutineState {
             this.type = new Type((byte)0);
          }
       }
+      this.ensureParamPlaceholders();
    }
 
    public int getParamCount() {
@@ -234,6 +235,16 @@ public class SubroutineState {
          if (!this.params.get(i).isTyped()) {
             this.paramstyped = false;
          }
+      }
+   }
+
+   /** Ensure params list matches paramsize using placeholder types. */
+   public void ensureParamPlaceholders() {
+      while (this.params.size() < this.paramsize) {
+         this.params.add(new Type(Type.VT_STRING));
+      }
+      while (this.params.size() > this.paramsize) {
+         this.params.remove(this.params.size() - 1);
       }
    }
 

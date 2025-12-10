@@ -115,14 +115,17 @@ public class PrototypeEngine {
             }
             int pos = this.nodedata.getPos(sub);
             int inferredParams = callsiteParams.getOrDefault(pos, 0);
+            int movespParams = this.estimateParamsFromMovesp(sub);
+            inferredParams = Math.max(inferredParams, movespParams);
+            // If we still have no signal, choose a minimal safe fallback to avoid stack underflows.
             if (inferredParams == 0) {
-               inferredParams = this.estimateParamsFromMovesp(sub);
+               inferredParams = 2;
             }
             state.startPrototyping();
             state.setParamCount(inferredParams);
-            // Default to void return unless already set to a non-void type
+            // Default to string return unless already set to a non-void type to avoid "invalid"
             if (!state.type().isTyped() || state.type().byteValue() == Type.VT_NONE) {
-               state.setReturnType(new Type(Type.VT_NONE), 0);
+               state.setReturnType(new Type(Type.VT_STRING), 0);
             }
             state.ensureParamPlaceholders();
             state.stopPrototyping(true);

@@ -422,7 +422,7 @@ public class SubScriptState {
             // Check if we can add to an existing switch or create a new one
             boolean canCreateSwitch = AConst.class.isInstance(cond.right());
             ASwitch existingSwitch = null;
-            
+
             // Check if we can continue an existing switch when preferSwitches is enabled
             if (this.preferSwitches && this.current.hasChildren()) {
                ScriptNode last = this.current.getLastChild();
@@ -446,7 +446,7 @@ public class SubScriptState {
                   }
                }
             }
-            
+
             if (canCreateSwitch) {
                ASwitch aswitch = null;
                ASwitchCase acase = new ASwitchCase(this.nodedata.getPos(this.nodedata.getDestination(node)),
