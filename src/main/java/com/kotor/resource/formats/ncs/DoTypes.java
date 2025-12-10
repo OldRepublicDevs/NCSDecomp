@@ -246,9 +246,9 @@ public class DoTypes extends PrunedDepthFirstAdapter {
       if (!this.protoskipping && !this.skipdeadcode) {
          SubroutineState substate = this.subdata.getState(this.nodedata.getDestination(node));
          if (!substate.isPrototyped()) {
-            System.out.println("Uh-oh...");
-            substate.printState();
-            throw new RuntimeException("Hit JSR on unprototyped subroutine " + Integer.toString(this.nodedata.getPos(this.nodedata.getDestination(node))));
+            throw new RuntimeException(
+               "Hit JSR on unprototyped subroutine " + Integer.toString(this.nodedata.getPos(this.nodedata.getDestination(node)))
+            );
          }
 
          int paramsize = substate.getParamCount();

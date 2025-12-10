@@ -5,6 +5,7 @@
 package com.kotor.resource.formats.ncs;
 
 import com.kotor.resource.formats.ncs.lexer.Lexer;
+import com.kotor.resource.formats.ncs.analysis.PrototypeEngine;
 import com.kotor.resource.formats.ncs.node.ASubroutine;
 import com.kotor.resource.formats.ncs.node.Start;
 import com.kotor.resource.formats.ncs.parser.Parser;
@@ -18,7 +19,7 @@ import com.kotor.resource.formats.ncs.utils.SetDeadCode;
 import com.kotor.resource.formats.ncs.utils.SetDestinations;
 import com.kotor.resource.formats.ncs.utils.SetPositions;
 import com.kotor.resource.formats.ncs.utils.SubroutineAnalysisData;
-import com.kotor.resource.formats.ncs.utils.SubroutinePathFinder;
+import com.kotor.resource.formats.ncs.utils.SubroutineState;
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -72,6 +73,8 @@ public class FileDecompiler {
    public static boolean isK2Selected = false;
    /** Global flag to prefer generating switch structures instead of if-elseif chains. */
    public static boolean preferSwitches = false;
+   /** Whether to abort when any signature stays partially inferred. */
+   public static boolean strictSignatures = false;
 
    /**
     * Builds a decompiler configured for the current working directory.
@@ -218,6 +221,7 @@ public class FileDecompiler {
     * @throws DecompilerException when parsing or external compilation fails
     */
    public int decompile(File file) throws DecompilerException {
+      this.ensureActionsLoaded();
       FileDecompiler.FileScriptData data = this.filedata.get(file);
       if (data == null) {
          System.out.println("\n---> starting decompilation: " + file.getName() + " <---");
@@ -418,6 +422,7 @@ public class FileDecompiler {
     * Convenience overload that writes generated code to disk before comparison.
     */
    private int compileAndCompare(File file, String code, FileDecompiler.FileScriptData data) throws DecompilerException {
+      this.ensureActionsLoaded();
       File gennedcode = null;
 
       int var6;
@@ -661,7 +666,8 @@ public class FileDecompiler {
 
          // Use compiler detection to get correct command-line arguments
          NwnnsscompConfig config = new NwnnsscompConfig(compiler, file, result, k2);
-         String[] args = config.getCompileArgs(compiler.getAbsolutePath());
+         List<File> includeDirs = this.buildIncludeDirs(k2);
+         String[] args = config.getCompileArgs(compiler.getAbsolutePath(), includeDirs);
 
          System.out.println("Using compiler: " + config.getChosenCompiler().getName() +
             " (SHA256: " + config.getSha256Hash().substring(0, 16) + "...)");
@@ -672,6 +678,31 @@ public class FileDecompiler {
          System.out.println("Error during external compile: " + e.getMessage());
          e.printStackTrace();
          return null;
+      }
+   }
+
+   private List<File> buildIncludeDirs(boolean k2) {
+      List<File> dirs = new ArrayList<>();
+      File base = new File("test-work" + File.separator + "Vanilla_KOTOR_Script_Source");
+      File gameDir = new File(base, k2 ? "TSL" : "K1");
+      File scriptsBif = new File(gameDir, "Data" + File.separator + "scripts.bif");
+      if (scriptsBif.exists()) {
+         dirs.add(scriptsBif);
+      }
+      File rootOverride = new File(gameDir, "Override");
+      if (rootOverride.exists()) {
+         dirs.add(rootOverride);
+      }
+      // Fallback: allow includes relative to the game dir root.
+      if (gameDir.exists()) {
+         dirs.add(gameDir);
+      }
+      return dirs;
+   }
+
+   private void ensureActionsLoaded() throws DecompilerException {
+      if (this.actions == null) {
+         this.actions = loadActionsDataInternal(isK2Selected);
       }
    }
 
@@ -743,34 +774,8 @@ public class FileDecompiler {
             cleanpass.done();
          }
 
-         boolean alldone = false;
-         boolean onedone = true;
-
-         for (int pass = 1; !alldone && (onedone || pass < 5); ++pass) {
-            alldone = true;
-            onedone = false;
-
-            for (ASubroutine iterSub : this.subIterable(subdata)) {
-               if (subdata.isPrototyped(nodedata.getPos(iterSub), true)) {
-                  continue;
-               }
-
-               iterSub.apply(new SubroutinePathFinder(subdata.getState(iterSub), nodedata, subdata, pass));
-               if (subdata.isBeingPrototyped(nodedata.getPos(iterSub))) {
-                  dotypes = new DoTypes(subdata.getState(iterSub), nodedata, subdata, this.actions, true);
-                  iterSub.apply(dotypes);
-                  dotypes.done();
-                  onedone = true;
-               } else {
-                  alldone = false;
-               }
-            }
-         }
-
-         if (!alldone) {
-            subdata.printStates();
-            throw new RuntimeException("Unable to do initial prototype of all subroutines.");
-         }
+         PrototypeEngine proto = new PrototypeEngine(nodedata, subdata, this.actions, FileDecompiler.strictSignatures);
+         proto.run();
 
          dotypes = new DoTypes(subdata.getState(mainsub), nodedata, subdata, this.actions, false);
          mainsub.apply(dotypes);
@@ -811,6 +816,8 @@ public class FileDecompiler {
             //FileScriptData fileScriptData = null;
             //return fileScriptData;
          }
+
+         this.enforceStrictSignatures(subdata, nodedata);
 
          dotypes = null;
          nodedata.clearProtoData();
@@ -908,6 +915,21 @@ public class FileDecompiler {
       }
 
       return list;
+   }
+
+   private void enforceStrictSignatures(SubroutineAnalysisData subdata, NodeAnalysisData nodedata) {
+      if (!FileDecompiler.strictSignatures) {
+         return;
+      }
+
+      for (ASubroutine iterSub : this.subIterable(subdata)) {
+         SubroutineState state = subdata.getState(iterSub);
+         if (!state.isTotallyPrototyped()) {
+            throw new RuntimeException(
+               "Strict signatures enabled: unresolved signature for subroutine at " + Integer.toString(nodedata.getPos(iterSub))
+            );
+         }
+      }
    }
 
    /**

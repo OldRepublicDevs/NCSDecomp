@@ -134,6 +134,7 @@ public final class NCSDecompCLI {
 
       FileDecompiler.isK2Selected = cfg.isK2;
       FileDecompiler.preferSwitches = cfg.preferSwitches;
+      FileDecompiler.strictSignatures = cfg.strictSignatures;
       Charset charset = cfg.encoding;
 
       // Collect files with their base directories for hierarchy preservation
@@ -400,6 +401,9 @@ public final class NCSDecompCLI {
             case "--prefer-switches":
                cfg.preferSwitches = true;
                break;
+            case "--strict-signatures":
+               cfg.strictSignatures = true;
+               break;
             default:
                if (a.startsWith("-")) {
                   throw new IllegalArgumentException("Unknown option: " + a);
@@ -458,6 +462,7 @@ public final class NCSDecompCLI {
       System.out.println("      --fail-fast            Stop on first decompile failure");
       System.out.println("      --prefer-switches      Prefer generating switch structures instead");
       System.out.println("                            of if-elseif chains when possible");
+      System.out.println("      --strict-signatures    Fail if any subroutine signature remains unknown");
       System.out.println();
       System.out.println("Examples:");
       System.out.println("  Decompile single file to stdout:");
@@ -509,6 +514,7 @@ public final class NCSDecompCLI {
       boolean isK2 = false;
       boolean gameExplicitlySet = false;  // Track if user explicitly set a game flag
       boolean preferSwitches = false;  // Prefer switch structures over if-elseif chains
+      boolean strictSignatures = false;  // Abort if signatures stay partially inferred
       String nwscriptPath = null;  // Explicit nwscript file path (CLI-only)
    }
 }
