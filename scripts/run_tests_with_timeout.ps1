@@ -48,10 +48,16 @@ $mainSourceDir = Join-Path "." (Join-Path "src" (Join-Path "main" "java"))
 $pathSeparator = if ($IsWindows) { ";" } else { ":" }
 $sourcepath = "$testSourceDir$pathSeparator$mainSourceDir"
 $cp = "$buildDir$pathSeparator$junitStandalone$pathSeparator."
-javac -cp $cp -d $buildDir -encoding UTF-8 -sourcepath $sourcepath $testFile 2>&1 | Out-Null
 
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "Compilation failed!"
+$compileOutput = javac -cp $cp -d $buildDir -encoding UTF-8 -sourcepath $sourcepath $testFile 2>&1
+$exitCode = $LASTEXITCODE
+
+if ($exitCode -ne 0) {
+    Write-Host "Compilation failed!" -ForegroundColor Red
+    Write-Host ""
+    if ($compileOutput) {
+        $compileOutput | Write-Host
+    }
     exit 1
 }
 
@@ -60,10 +66,10 @@ Write-Host "Profiling output will be in: test_profile.txt"
 
 # Start the Java process with profiling
 $job = Start-Job -ScriptBlock {
-    param($cp, $junitStandalone)
+    param($cp)
     $env:JAVA_TOOL_OPTIONS = "-XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation -XX:LogFile=test_profile.txt -XX:+PrintCompilation"
-    java -cp $cp -XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation -XX:LogFile=test_profile.txt org.junit.platform.console.ConsoleLauncher --class-path $cp --select-class com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest 2>&1
-} -ArgumentList $cp, $junitStandalone
+    java -cp $cp -XX:+UnlockDiagnosticVMOptions -XX:+LogCompilation -XX:LogFile=test_profile.txt com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest 2>&1
+} -ArgumentList $cp
 
 # Wait for job with timeout
 $result = Wait-Job -Job $job -Timeout $TimeoutSeconds

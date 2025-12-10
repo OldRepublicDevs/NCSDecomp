@@ -234,7 +234,7 @@ Write-Host ""
 Write-Host "Step 4: Creating version info..." -ForegroundColor Yellow
 $versionInfo = @"
 NCSDecomp CLI Distribution Package
-Version: 2.0
+Version: 1.0.0
 Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
 Platform: $(if ($IsWindows) { "Windows" } elseif ($IsMacOS) { "macOS" } elseif ($IsLinux) { "Linux" } else { "Unknown" })
 
@@ -253,7 +253,7 @@ Write-Host "Step 5: Creating ZIP archive..." -ForegroundColor Yellow
 
 # Create ZIP archive name with version and platform
 $platformSuffix = if ($IsWindows) { "Windows" } elseif ($IsMacOS) { "macOS" } else { "Linux" }
-$zipFileName = "NCSDecomp-CLI-v2.0-$platformSuffix.zip"
+$zipFileName = "NCSDecomp-CLI-v1.0.0-$platformSuffix.zip"
 $zipPath = Join-Path "." $zipFileName
 
 # Remove existing ZIP if it exists
