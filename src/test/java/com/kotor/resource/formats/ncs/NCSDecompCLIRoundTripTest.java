@@ -2318,22 +2318,24 @@ public class NCSDecompCLIRoundTripTest {
     */
    private static String normalizeFunctionBraces(String code) {
       String result = code.replaceAll("\\)\\s*\\n\\s*\\{", ") {");
-      
+
       // Remove unnecessary extra blocks around function bodies
       // Pattern: function() { { body } return; } -> function() { body return; }
       // This handles cases where decompiler adds an extra block
       // We need to match the opening brace after function signature and remove it,
       // then match the closing brace before return and remove it
-      
+
       // Use a more careful approach: find function signatures followed by double opening braces
-      // Pattern matches: function() { followed by optional whitespace/newline/tabs and another {
+      // Pattern matches: function() { followed by newline, optional tabs/spaces, and another {
       // Replace with just: function() { (preserving the newline and ALL content after, including declarations)
       // The key is to preserve everything after the function opening brace, including the first line
+      // Be very specific: match function() {, then newline, then tabs/spaces, then extra {
+      // This ensures we don't accidentally match across function boundaries
       java.util.regex.Pattern funcWithExtraBlock = java.util.regex.Pattern.compile(
-            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*[\\r\\n]+\\s*)\\{\\s*",
+            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\n\\s*)\\{\\s*",
             java.util.regex.Pattern.MULTILINE);
       result = funcWithExtraBlock.matcher(result).replaceAll("$1");
-      
+
       // Remove closing brace of extra block before return: } return; } -> return; }
       // Match: closing brace, optional whitespace/newlines, return statement,
       // optional whitespace/newlines, closing brace of function
@@ -2342,12 +2344,12 @@ public class NCSDecompCLIRoundTripTest {
             "\\}\\s*[\\r\\n]+\\s*return\\s*;\\s*[\\r\\n]+\\s*\\}",
             java.util.regex.Pattern.MULTILINE);
       result = extraBlockClosePattern.matcher(result).replaceAll("\nreturn; }");
-      
+
       // Also handle case where return is on same line: } return; } -> return; }
       java.util.regex.Pattern extraBlockCloseSameLine = java.util.regex.Pattern.compile(
             "\\}\\s+return\\s*;\\s*\\}");
       result = extraBlockCloseSameLine.matcher(result).replaceAll("return; }");
-      
+
       return result;
    }
 
@@ -2383,13 +2385,13 @@ public class NCSDecompCLIRoundTripTest {
             "([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*([^;\\n}]+);\\s*\\n\\s*return\\s*;",
             java.util.regex.Pattern.MULTILINE);
       result = outputParamPattern.matcher(result).replaceAll("return $2;");
-      
+
       // Handle case where assignment is before closing brace: param = value; } return;
       java.util.regex.Pattern outputParamPatternWithBrace = java.util.regex.Pattern.compile(
             "([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*([^;}]+);\\s*\\}\\s*\\n\\s*return\\s*;",
             java.util.regex.Pattern.MULTILINE);
       result = outputParamPatternWithBrace.matcher(result).replaceAll("return $2;");
-      
+
       // Also handle single-line case: param = value; return;
       java.util.regex.Pattern outputParamPatternSingle = java.util.regex.Pattern.compile(
             "([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*([^;]+);\\s+return\\s*;");
