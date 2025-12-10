@@ -19,5 +19,15 @@ public class DecompilerException extends Exception {
    public DecompilerException(String msg) {
       super(msg);
    }
+
+   /**
+    * Creates a new decompiler exception with a message and underlying cause.
+    *
+    * @param msg description of the failure
+    * @param cause root cause for debugging
+    */
+   public DecompilerException(String msg, Throwable cause) {
+      super(msg, cause);
+   }
 }
 

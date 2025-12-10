@@ -36,9 +36,13 @@ public class AConditionalExp extends ScriptNode implements AExpression {
       return this.right;
    }
 
+   public String op() {
+      return this.op;
+   }
+
    @Override
    public String toString() {
-      return "(" + this.left.toString() + " " + this.op + " " + this.right.toString() + ")";
+      return ExpressionFormatter.format(this);
    }
 
    @Override

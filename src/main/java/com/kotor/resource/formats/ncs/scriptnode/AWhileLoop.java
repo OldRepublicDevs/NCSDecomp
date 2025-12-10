@@ -13,7 +13,7 @@ public class AWhileLoop extends AControlLoop {
    @Override
    public String toString() {
       StringBuffer buff = new StringBuffer();
-      buff.append(this.tabs + "while " + this.formattedCondition() + " {" + this.newline);
+      buff.append(this.tabs + "while" + this.formattedCondition() + " {" + this.newline);
 
       for (int i = 0; i < this.children.size(); i++) {
          buff.append(this.children.get(i).toString());

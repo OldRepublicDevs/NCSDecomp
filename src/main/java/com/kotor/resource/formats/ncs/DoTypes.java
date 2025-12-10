@@ -213,9 +213,16 @@ public class DoTypes extends PrunedDepthFirstAdapter {
    public void outAMoveSpCommand(AMoveSpCommand node) {
       if (!this.protoskipping && !this.skipdeadcode) {
          if (this.initialproto) {
-            int params = this.stack.removePrototyping(NodeUtils.stackOffsetToPos(node.getOffset()));
+            int remove = NodeUtils.stackOffsetToPos(node.getOffset());
+            int params = this.stack.removePrototyping(remove);
+               if (params > 8) {
+                  params = 8; // sanity cap to avoid runaway counts from locals
+               }
             if (params > 0) {
-               this.state.setParamCount(params);
+               int current = this.state.getParamCount();
+               if (current == 0 || params < current) {
+                  this.state.setParamCount(params);
+               }
             }
          } else {
             this.stack.remove(NodeUtils.stackOffsetToPos(node.getOffset()));

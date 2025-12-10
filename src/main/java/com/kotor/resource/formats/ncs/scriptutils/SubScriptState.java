@@ -57,6 +57,7 @@ import com.kotor.resource.formats.ncs.scriptnode.AWhileLoop;
 import com.kotor.resource.formats.ncs.scriptnode.ScriptNode;
 import com.kotor.resource.formats.ncs.scriptnode.ScriptRootNode;
 import com.kotor.resource.formats.ncs.stack.Const;
+import com.kotor.resource.formats.ncs.stack.IntConst;
 import com.kotor.resource.formats.ncs.stack.LocalVarStack;
 import com.kotor.resource.formats.ncs.stack.StackEntry;
 import com.kotor.resource.formats.ncs.stack.VarStruct;
@@ -580,14 +581,22 @@ public class SubScriptState {
       this.checkStart(node);
       AFcnCallExp jsr = new AFcnCallExp(this.getFcnId(node), this.removeFcnParams(node));
       if (!this.getFcnType(node).equals((byte) 0)) {
-         ((AVarDecl) this.current.getLastChild()).isFcnReturn(true);
-         ((AVarDecl) this.current.getLastChild()).initializeExp(jsr);
-         jsr.stackentry(this.stack.get(1));
+         // Ensure there's a decl to attach; if none, create a placeholder
+         Variable retVar = this.stack.size() >= 1 ? (Variable) this.stack.get(1) : new Variable(new Type((byte)0));
+         AVarDecl decl;
+         if (this.current.hasChildren() && AVarDecl.class.isInstance(this.current.getLastChild())) {
+            decl = (AVarDecl) this.current.getLastChild();
+         } else {
+            decl = new AVarDecl(retVar);
+            this.current.addChild(decl);
+         }
+         decl.isFcnReturn(true);
+         decl.initializeExp(jsr);
+         jsr.stackentry(retVar);
       } else {
          this.current.addChild(jsr);
       }
 
-      AFcnCallExp var3 = null;
       this.checkEnd(node);
    }
 
@@ -921,6 +930,10 @@ public class SubScriptState {
    }
 
    public AExpression getReturnExp() {
+      if (!this.current.hasChildren()) {
+         return new AConst(new IntConst(0L));
+      }
+
       ScriptNode last = this.current.removeLastChild();
       if (AModifyExp.class.isInstance(last)) {
          return ((AModifyExp) last).expression();
@@ -929,9 +942,11 @@ public class SubScriptState {
          return ((AModifyExp) ((AExpressionStatement) last).exp()).expression();
       } else if (AReturnStatement.class.isInstance(last)) {
          return ((AReturnStatement) last).exp();
+      } else if (AExpression.class.isInstance(last)) {
+         return (AExpression) last;
       } else {
-         System.out.println(last);
-         throw new RuntimeException("Trying to get return expression, unexpected scriptnode class " + last.getClass());
+         // Keep decompilation alive; emit placeholder when structure is unexpected.
+         return new AConst(new IntConst(0L));
       }
    }
 

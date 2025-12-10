@@ -22,9 +22,17 @@ public class AUnaryExp extends ScriptNode implements AExpression {
       exp.parent(this);
    }
 
+   public AExpression exp() {
+      return this.exp;
+   }
+
+   public String op() {
+      return this.op;
+   }
+
    @Override
    public String toString() {
-      return "(" + this.op + this.exp.toString() + ")";
+      return ExpressionFormatter.format(this);
    }
 
    @Override

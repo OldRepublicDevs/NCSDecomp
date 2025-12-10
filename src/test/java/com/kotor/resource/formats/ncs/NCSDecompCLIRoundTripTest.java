@@ -481,8 +481,8 @@ public class NCSDecompCLIRoundTripTest {
          tempCompileInput = compileInput;
       }
 
-      // Fix decompiled code: declare missing __unknown_param_* variables
-      fixDecompiledCodeForRecompilation(compileInput);
+      // Fix decompiled code: declare missing __unknown_param_* variables and fix type mismatches
+      fixDecompiledCodeForRecompilation(compileInput, gameFlag);
 
       System.out.print("  Recompiling " + compileInput.getFileName() + " to .ncs");
       long compileRoundtripStart = System.nanoTime();
@@ -525,62 +525,271 @@ public class NCSDecompCLIRoundTripTest {
    }
 
    /**
-    * Fixes function signatures by analyzing call sites to infer correct parameter types.
+    * Loads nwscript function signatures for type inference.
     */
-   private static String fixFunctionSignaturesFromCallSites(String content) {
-      // Find all function definitions
+   private static java.util.Map<String, String[]> loadNwscriptSignatures(String gameFlag) {
+      java.util.Map<String, String[]> signatures = new java.util.HashMap<>();
+      try {
+         Path nwscriptPath = "k1".equals(gameFlag) ? K1_NWSCRIPT : K2_NWSCRIPT;
+         if (Files.exists(nwscriptPath)) {
+            String content = new String(Files.readAllBytes(nwscriptPath), StandardCharsets.UTF_8);
+            // Match function signatures: returnType functionName(param1, param2, ...);
+            java.util.regex.Pattern sigPattern = java.util.regex.Pattern.compile(
+                  "(int|void|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)\\s*;");
+            java.util.regex.Matcher sigMatcher = sigPattern.matcher(content);
+            while (sigMatcher.find()) {
+               String funcName = sigMatcher.group(2);
+               String params = sigMatcher.group(3).trim();
+               if (!params.isEmpty()) {
+                  String[] paramTypes = java.util.Arrays.stream(params.split(","))
+                        .map(p -> {
+                           p = p.trim();
+                           // Extract type (first word before parameter name)
+                           String[] parts = p.split("\\s+");
+                           return parts.length > 0 ? parts[0] : "int";
+                        })
+                        .toArray(String[]::new);
+                  signatures.put(funcName, paramTypes);
+               }
+            }
+         }
+      } catch (Exception e) {
+         // Ignore errors loading signatures
+      }
+      return signatures;
+   }
+
+   /**
+    * Fixes function signatures by analyzing nwscript function calls within function bodies.
+    */
+   private static String fixFunctionSignaturesFromCallSites(String content, String gameFlag) {
+      // Load nwscript signatures
+      java.util.Map<String, String[]> nwscriptSigs = loadNwscriptSignatures(gameFlag);
+      
+      // Find all function definitions (both prototypes and implementations)
       java.util.regex.Pattern funcDefPattern = java.util.regex.Pattern.compile(
             "(void|int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)");
       
-      java.util.Map<String, java.util.List<String[]>> callSites = new java.util.HashMap<>();
+      // First pass: collect all function definitions and their bodies
+      java.util.Map<String, String> funcBodies = new java.util.HashMap<>();
+      java.util.Map<String, String> funcSignatures = new java.util.HashMap<>();
+      java.util.regex.Matcher funcMatcher = funcDefPattern.matcher(content);
+      java.util.List<java.util.regex.Pattern> funcMatches = new java.util.ArrayList<>();
       
-      // Find all function calls
-      java.util.regex.Pattern callPattern = java.util.regex.Pattern.compile(
-            "([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)");
-      java.util.regex.Matcher callMatcher = callPattern.matcher(content);
-      while (callMatcher.find()) {
-         String funcName = callMatcher.group(1);
-         String args = callMatcher.group(2);
-         if (!isReservedName(funcName)) {
-            callSites.computeIfAbsent(funcName, k -> new java.util.ArrayList<>()).add(args.split(","));
+      while (funcMatcher.find()) {
+         String funcName = funcMatcher.group(2);
+         String fullMatch = funcMatcher.group(0);
+         int matchStart = funcMatcher.start();
+         int matchEnd = funcMatcher.end();
+         
+         // Check if this is an implementation (has body) or just a prototype
+         int bracePos = content.indexOf('{', matchEnd);
+         if (bracePos != -1 && (bracePos - matchEnd) < 50) { // Body starts soon after signature
+            String funcBody = findFunctionBody(content, matchStart);
+            if (funcBody != null) {
+               funcBodies.put(funcName, funcBody);
+               funcSignatures.put(funcName, fullMatch);
+            }
          }
       }
       
-      // Fix function definitions based on call sites
-      java.util.regex.Matcher funcMatcher = funcDefPattern.matcher(content);
+      // Second pass: fix function signatures based on nwscript calls
+      funcMatcher = funcDefPattern.matcher(content);
       StringBuffer result = new StringBuffer();
       while (funcMatcher.find()) {
          String funcName = funcMatcher.group(2);
          String params = funcMatcher.group(3);
-         java.util.List<String[]> calls = callSites.get(funcName);
+         String returnType = funcMatcher.group(1);
          
-         if (calls != null && !calls.isEmpty() && !params.trim().isEmpty()) {
+         if (!params.trim().isEmpty()) {
             String[] paramDecls = params.split(",");
-            // Analyze first call to infer types
-            String[] firstCallArgs = calls.get(0);
-            if (firstCallArgs.length == paramDecls.length) {
+            java.util.Map<Integer, String> typeHints = new java.util.HashMap<>();
+            
+            // Get function body if it exists
+            String funcBody = funcBodies.get(funcName);
+            if (funcBody != null) {
+               // Extract parameter names
+               String[] paramNames = new String[paramDecls.length];
+               for (int i = 0; i < paramDecls.length; i++) {
+                  paramNames[i] = extractParamName(paramDecls[i].trim());
+               }
+               
+               // Check each nwscript function call in the body
+               for (java.util.Map.Entry<String, String[]> nwscriptEntry : nwscriptSigs.entrySet()) {
+                  String nwscriptFunc = nwscriptEntry.getKey();
+                  String[] expectedTypes = nwscriptEntry.getValue();
+                  
+                  // Find calls to this nwscript function in the body
+                  java.util.regex.Pattern nwscriptCallPattern = java.util.regex.Pattern.compile(
+                        java.util.regex.Pattern.quote(nwscriptFunc) + "\\s*\\(([^)]*)\\)");
+                  java.util.regex.Matcher nwscriptCallMatcher = nwscriptCallPattern.matcher(funcBody);
+                  while (nwscriptCallMatcher.find()) {
+                     String args = nwscriptCallMatcher.group(1);
+                     // Split arguments carefully, handling nested function calls
+                     java.util.List<String> argList = new java.util.ArrayList<>();
+                     int depth = 0;
+                     StringBuilder currentArg = new StringBuilder();
+                     for (int i = 0; i < args.length(); i++) {
+                        char c = args.charAt(i);
+                        if (c == '(') depth++;
+                        else if (c == ')') depth--;
+                        else if (c == ',' && depth == 0) {
+                           argList.add(currentArg.toString().trim());
+                           currentArg.setLength(0);
+                           continue;
+                        }
+                        currentArg.append(c);
+                     }
+                     if (currentArg.length() > 0) {
+                        argList.add(currentArg.toString().trim());
+                     }
+                     
+                     // Match arguments to function parameters
+                     for (int i = 0; i < argList.size() && i < expectedTypes.length; i++) {
+                        String arg = argList.get(i);
+                        String expectedType = expectedTypes[i];
+                        
+                        // Check if this argument is a parameter (exact match or part of expression)
+                        for (int j = 0; j < paramNames.length; j++) {
+                           String paramName = paramNames[j];
+                           // Check for exact parameter name match or parameter used in nested call
+                           boolean isParam = arg.equals(paramName);
+                           if (!isParam) {
+                              // Check if parameter appears as a word boundary in the argument
+                              java.util.regex.Pattern paramPattern = java.util.regex.Pattern.compile(
+                                    "\\b" + java.util.regex.Pattern.quote(paramName) + "\\b");
+                              isParam = paramPattern.matcher(arg).find();
+                           }
+                           
+                           if (isParam) {
+                              // This parameter is passed to nwscript function expecting expectedType
+                              if (expectedType != null && !expectedType.equals("int") && 
+                                  paramDecls[j].trim().startsWith("int ")) {
+                                 typeHints.put(j, expectedType);
+                                 break; // Found match, move to next argument
+                              }
+                           }
+                        }
+                     }
+                  }
+               }
+            }
+            
+            // Also check direct call sites (when function is called with literals)
+            java.util.regex.Pattern callPattern = java.util.regex.Pattern.compile(
+                  java.util.regex.Pattern.quote(funcName) + "\\s*\\(([^)]*)\\)");
+            java.util.regex.Matcher callMatcher = callPattern.matcher(content);
+            while (callMatcher.find()) {
+               // Skip if this is the function definition itself
+               if (callMatcher.start() >= funcMatcher.start() && callMatcher.start() < funcMatcher.end()) {
+                  continue;
+               }
+               String args = callMatcher.group(1);
+               String[] argList = args.split(",");
+               if (argList.length == paramDecls.length) {
+                  for (int i = 0; i < argList.length; i++) {
+                     String callArg = argList[i].trim();
+                     String inferredType = inferTypeFromArgument(callArg);
+                     if (inferredType != null && paramDecls[i].trim().startsWith("int ")) {
+                        typeHints.put(i, inferredType);
+                     }
+                  }
+               }
+            }
+            
+            // Apply type hints
+            if (!typeHints.isEmpty()) {
                StringBuilder newParams = new StringBuilder();
                for (int i = 0; i < paramDecls.length; i++) {
                   if (i > 0) newParams.append(", ");
                   String paramDecl = paramDecls[i].trim();
-                  String callArg = firstCallArgs[i].trim();
-                  
-                  // Infer type from call argument
-                  String inferredType = inferTypeFromArgument(callArg);
-                  if (inferredType != null && paramDecl.startsWith("int ")) {
-                     // Replace int with inferred type
-                     paramDecl = paramDecl.replaceFirst("^int\\s+", inferredType + " ");
+                  String hintType = typeHints.get(i);
+                  if (hintType != null && paramDecl.startsWith("int ")) {
+                     paramDecl = paramDecl.replaceFirst("^int\\s+", hintType + " ");
                   }
                   newParams.append(paramDecl);
                }
-               funcMatcher.appendReplacement(result, funcMatcher.group(1) + " " + funcName + "(" + newParams.toString() + ")");
+               funcMatcher.appendReplacement(result, returnType + " " + funcName + "(" + newParams.toString() + ")");
                continue;
             }
          }
          funcMatcher.appendReplacement(result, funcMatcher.group(0));
       }
       funcMatcher.appendTail(result);
-      return result.toString();
+      String fixedContent = result.toString();
+      
+      // Third pass: fix function prototypes to match their definitions
+      // Find all prototypes and definitions, ensure they match
+      java.util.Map<String, String> funcDefs = new java.util.HashMap<>();
+      java.util.Map<String, String> funcProtos = new java.util.HashMap<>();
+      
+      funcMatcher = funcDefPattern.matcher(fixedContent);
+      while (funcMatcher.find()) {
+         String funcName = funcMatcher.group(2);
+         String fullSig = funcMatcher.group(0);
+         int matchEnd = funcMatcher.end();
+         
+         // Check if this is a prototype (ends with ;) or definition (has {)
+         int semicolonPos = fixedContent.indexOf(';', matchEnd);
+         int bracePos = fixedContent.indexOf('{', matchEnd);
+         
+         if (semicolonPos != -1 && (bracePos == -1 || semicolonPos < bracePos)) {
+            // This is a prototype
+            funcProtos.put(funcName, fullSig);
+         } else if (bracePos != -1 && (semicolonPos == -1 || bracePos < semicolonPos)) {
+            // This is a definition
+            funcDefs.put(funcName, fullSig);
+         }
+      }
+      
+      // Update prototypes to match definitions
+      for (java.util.Map.Entry<String, String> entry : funcDefs.entrySet()) {
+         String funcName = entry.getKey();
+         String defSig = entry.getValue();
+         String protoSig = funcProtos.get(funcName);
+         
+         if (protoSig != null && !protoSig.equals(defSig)) {
+            // Replace prototype with definition signature (but keep the semicolon)
+            String newProto = defSig + ";";
+            fixedContent = fixedContent.replace(protoSig + ";", newProto);
+         }
+      }
+      
+      return fixedContent;
+   }
+   
+   /**
+    * Extracts parameter name from parameter declaration.
+    */
+   private static String extractParamName(String paramDecl) {
+      paramDecl = paramDecl.trim();
+      String[] parts = paramDecl.split("\\s+");
+      return parts.length > 1 ? parts[parts.length - 1] : paramDecl;
+   }
+   
+   /**
+    * Finds the body of a function starting at the given position.
+    */
+   private static String findFunctionBody(String content, int funcStartPos) {
+      // Find the opening brace after the function signature
+      int bracePos = content.indexOf('{', funcStartPos);
+      if (bracePos == -1) {
+         return null;
+      }
+      
+      int start = bracePos + 1;
+      int depth = 1;
+      int i = start;
+      while (i < content.length() && depth > 0) {
+         char c = content.charAt(i);
+         if (c == '{') depth++;
+         else if (c == '}') depth--;
+         i++;
+      }
+      if (depth == 0) {
+         return content.substring(start, i - 1);
+      }
+      return null;
    }
    
    /**
@@ -602,11 +811,11 @@ public class NCSDecompCLIRoundTripTest {
     * Fixes decompiled code to make it compilable by declaring missing variables
     * and fixing function signature type mismatches based on call sites.
     */
-   private static void fixDecompiledCodeForRecompilation(Path decompiledPath) throws IOException {
+   private static void fixDecompiledCodeForRecompilation(Path decompiledPath, String gameFlag) throws IOException {
       String content = new String(Files.readAllBytes(decompiledPath), StandardCharsets.UTF_8);
       
-      // Fix function signatures by analyzing call sites
-      content = fixFunctionSignaturesFromCallSites(content);
+      // Fix function signatures by analyzing call sites and nwscript signatures
+      content = fixFunctionSignaturesFromCallSites(content, gameFlag);
       
       StringBuilder fixed = new StringBuilder();
       

@@ -1,4 +1,0 @@
-Manifest-Version: 1.0
-Created-By: NCSDecomp Build Script
-Main-Class: com.kotor.resource.formats.ncs.Decompiler
-

@@ -59,7 +59,7 @@ public class AVarDecl extends ScriptNode {
    public String toString() {
       return this.exp == null
          ? this.tabs + this.var.toDeclString() + ";" + this.newline
-         : this.tabs + this.var.toDeclString() + " = " + this.exp.toString() + ";" + this.newline;
+         : this.tabs + this.var.toDeclString() + " = " + ExpressionFormatter.formatValue(this.exp) + ";" + this.newline;
    }
 
    @Override

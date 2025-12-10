@@ -24,9 +24,21 @@ public class AUnaryModExp extends ScriptNode implements AExpression {
       varref.parent(this);
    }
 
+   public AVarRef varRef() {
+      return this.varref;
+   }
+
+   public String op() {
+      return this.op;
+   }
+
+   public boolean prefix() {
+      return this.prefix;
+   }
+
    @Override
    public String toString() {
-      return this.prefix ? "(" + this.op + this.varref.toString() + ")" : "(" + this.varref.toString() + this.op + ")";
+      return ExpressionFormatter.format(this);
    }
 
    @Override

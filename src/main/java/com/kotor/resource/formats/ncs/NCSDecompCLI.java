@@ -8,7 +8,6 @@ import java.io.File;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -429,13 +428,42 @@ public final class NCSDecompCLI {
       }
    }
 
+   private static String getExecutableName() {
+      // Try to get jpackaged EXE name first
+      String exePath = System.getProperty("java.launcher.path");
+      if (exePath != null) {
+         File exeFile = new File(exePath);
+         return exeFile.getName();
+      }
+      
+      // Otherwise, try to get JAR name
+      try {
+         String jarPath = NCSDecompCLI.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+         File jarFile = new File(jarPath);
+         return jarFile.getName();
+      } catch (Exception e) {
+         // Fallback to default name if we can't determine it
+         return "NCSDecomp.jar";
+      }
+   }
+
    private static void printUsage() {
+      String executableName = getExecutableName();
       String summary = "KotOR NCSDecomp headless decompiler (Beta 2, May 30 2006). Decompiles NCS -> NSS without external tools.";
       String author = "Original: JdNoa (decompiler), Dashus (GUI); further mods: th3w1zard1 | https://bolabaden.org | https://github.com/bolabaden";
       System.out.println(summary);
       System.out.println(author);
       System.out.println();
-      System.out.println("Usage: java -cp NCSDecomp.jar com.kotor.resource.formats.ncs.NCSDecompCLI [options] <files/dirs>");
+      
+      // Format usage line based on whether it's a JAR or EXE
+      String usageLine;
+      if (executableName.endsWith(".jar")) {
+         usageLine = "Usage: java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI [options] <files/dirs>";
+      } else {
+         usageLine = "Usage: " + executableName + " [options] <files/dirs>";
+      }
+      System.out.println(usageLine);
+      
       System.out.println("Options:");
       System.out.println("  -h, --help                 Show help");
       System.out.println("  -v, --version              Show version info");
@@ -465,17 +493,33 @@ public final class NCSDecompCLI {
       System.out.println("      --strict-signatures    Fail if any subroutine signature remains unknown");
       System.out.println();
       System.out.println("Examples:");
-      System.out.println("  Decompile single file to stdout:");
-      System.out.println("    java -cp NCSDecomp.jar ...NCSDecompCLI -i foo.ncs --stdout");
-      System.out.println("  Decompile single file to specific output:");
-      System.out.println("    java -cp NCSDecomp.jar ...NCSDecompCLI -i foo.ncs -o bar.nss");
-      System.out.println("  Decompile directory recursively preserving hierarchy:");
-      System.out.println("    java -cp NCSDecomp.jar ...NCSDecompCLI -i scripts_dir -r -o out_dir");
-      System.out.println("  Decompile directory recursively to out folder using TSL definitions:");
-      System.out.println("    java -cp NCSDecomp.jar ...NCSDecompCLI -i scripts_dir -r -g k2 -O out_dir");
-      System.out.println("  Decompile with game selection using -g flag:");
-      System.out.println("    java -cp NCSDecomp.jar ...NCSDecompCLI -i file.ncs -g k1");
-      System.out.println("    java -cp NCSDecomp.jar ...NCSDecompCLI -i file.ncs -g 2");
+      
+      // Format examples based on whether it's a JAR or EXE
+      if (executableName.endsWith(".jar")) {
+         System.out.println("  Decompile single file to stdout:");
+         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI -i foo.ncs --stdout");
+         System.out.println("  Decompile single file to specific output:");
+         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI -i foo.ncs -o bar.nss");
+         System.out.println("  Decompile directory recursively preserving hierarchy:");
+         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI -i scripts_dir -r -o out_dir");
+         System.out.println("  Decompile directory recursively to out folder using TSL definitions:");
+         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI -i scripts_dir -r -g k2 -O out_dir");
+         System.out.println("  Decompile with game selection using -g flag:");
+         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI -i file.ncs -g k1");
+         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI -i file.ncs -g 2");
+      } else {
+         System.out.println("  Decompile single file to stdout:");
+         System.out.println("    " + executableName + " -i foo.ncs --stdout");
+         System.out.println("  Decompile single file to specific output:");
+         System.out.println("    " + executableName + " -i foo.ncs -o bar.nss");
+         System.out.println("  Decompile directory recursively preserving hierarchy:");
+         System.out.println("    " + executableName + " -i scripts_dir -r -o out_dir");
+         System.out.println("  Decompile directory recursively to out folder using TSL definitions:");
+         System.out.println("    " + executableName + " -i scripts_dir -r -g k2 -O out_dir");
+         System.out.println("  Decompile with game selection using -g flag:");
+         System.out.println("    " + executableName + " -i file.ncs -g k1");
+         System.out.println("    " + executableName + " -i file.ncs -g 2");
+      }
    }
 
    private static void printVersion() {

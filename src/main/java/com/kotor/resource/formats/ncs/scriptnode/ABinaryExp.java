@@ -28,9 +28,21 @@ public class ABinaryExp extends ScriptNode implements AExpression {
       right.parent(this);
    }
 
+   public AExpression left() {
+      return this.left;
+   }
+
+   public AExpression right() {
+      return this.right;
+   }
+
+   public String op() {
+      return this.op;
+   }
+
    @Override
    public String toString() {
-      return "(" + this.left.toString() + " " + this.op + " " + this.right.toString() + ")";
+      return ExpressionFormatter.format(this);
    }
 
    @Override

@@ -53,22 +53,26 @@ build/
 !gradle/wrapper/gradle-wrapper.jar
 !build-support/**
 
-# Test output
+# Test output (moved to target/test-output/)
 test_*.txt
 test_output.txt
 test_results*.txt
 test_udiff*.txt
 test_fastfail.txt
 test_profile.txt
+test-output.txt
 
 # Test working directories (created by tests)
 test-work/
 roundtrip-work/
 addcompile-temp/
 
-# Build artifacts
+# Build artifacts (old locations - now using target/)
 dist-exe/
 publish/
+build/
+build-gui/
+META-INF/
 
 # Vendor dependencies (external code)
 vendor/

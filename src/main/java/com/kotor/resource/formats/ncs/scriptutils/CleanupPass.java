@@ -79,6 +79,24 @@ public class CleanupPass {
 
          while (it.hasNext()) {
             ScriptNode node1 = (ScriptNode)it.next();
+         if (AVarDecl.class.isInstance(node1)) {
+            AVarDecl decl = (AVarDecl) node1;
+            if (decl.exp() == null && it.hasNext()) {
+               ScriptNode maybeAssign = (ScriptNode) it.next();
+               if (AExpressionStatement.class.isInstance(maybeAssign)
+                     && AModifyExp.class.isInstance(((AExpressionStatement) maybeAssign).exp())) {
+                  AModifyExp modexp = (AModifyExp) ((AExpressionStatement) maybeAssign).exp();
+                  if (modexp.varRef().var() == decl.var()) {
+                     decl.initializeExp(modexp.expression());
+                     it.remove(); // drop the now-merged assignment statement
+                  } else {
+                     it.previous();
+                  }
+               } else {
+                  it.previous();
+               }
+            }
+         }
             if (AVarDecl.class.isInstance(node1)) {
                Variable var = ((AVarDecl)node1).var();
                if (var != null && var.isStruct()) {

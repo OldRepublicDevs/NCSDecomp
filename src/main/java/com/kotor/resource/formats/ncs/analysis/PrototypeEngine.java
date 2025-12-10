@@ -116,15 +116,21 @@ public class PrototypeEngine {
             int pos = this.nodedata.getPos(sub);
             int inferredParams = callsiteParams.getOrDefault(pos, 0);
             int movespParams = this.estimateParamsFromMovesp(sub);
-            inferredParams = Math.max(inferredParams, movespParams);
+            // Prefer the smaller non-zero estimate to avoid over-counting locals;
+            // fall back to whichever is available when the other is zero.
+            if (inferredParams > 0 && movespParams > 0) {
+               inferredParams = Math.min(inferredParams, movespParams);
+            } else if (inferredParams == 0 && movespParams > 0) {
+               inferredParams = movespParams;
+            }
             if (inferredParams < 0) {
                inferredParams = 0;
             }
             state.startPrototyping();
             state.setParamCount(inferredParams);
-            // Default to int return (bool-compatible) when unknown to preserve call usage.
-            if (!state.type().isTyped() || state.type().byteValue() == Type.VT_NONE) {
-               state.setReturnType(new Type(Type.VT_INTEGER), 0);
+            // Default to void when return type is still unknown.
+            if (!state.type().isTyped()) {
+               state.setReturnType(new Type(Type.VT_NONE), 0);
             }
             state.ensureParamPlaceholders();
             state.stopPrototyping(true);

@@ -91,7 +91,7 @@ public class ASwitch extends ScriptNode {
    @Override
    public String toString() {
       StringBuffer buff = new StringBuffer();
-      buff.append(this.tabs + "switch (" + this.switchexp + ") {" + this.newline);
+      buff.append(this.tabs + "switch(" + this.switchexp + ") {" + this.newline);
 
       for (int i = 0; i < this.cases.size(); i++) {
          buff.append(this.cases.get(i).toString());

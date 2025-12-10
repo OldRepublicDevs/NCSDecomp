@@ -26,7 +26,9 @@ public class AReturnStatement extends ScriptNode {
 
    @Override
    public String toString() {
-      return this.returnexp == null ? this.tabs + "return;" + this.newline : this.tabs + "return " + this.returnexp.toString() + ";" + this.newline;
+      return this.returnexp == null
+         ? this.tabs + "return;" + this.newline
+         : this.tabs + "return " + ExpressionFormatter.formatValue(this.returnexp) + ";" + this.newline;
    }
 
    @Override

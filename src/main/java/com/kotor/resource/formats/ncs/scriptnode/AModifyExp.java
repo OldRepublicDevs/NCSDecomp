@@ -36,7 +36,7 @@ public class AModifyExp extends ScriptNode implements AExpression {
 
    @Override
    public String toString() {
-      return this.varref.toString() + " = " + this.exp.toString();
+      return ExpressionFormatter.format(this);
    }
 
    @Override
