@@ -248,6 +248,15 @@ public class FileDecompiler {
          this.ensureActionsLoaded();
       } catch (DecompilerException e) {
          System.out.println("Error loading actions data: " + e.getMessage());
+         // Create comprehensive fallback stub for actions data loading failure
+         FileDecompiler.FileScriptData errorData = new FileDecompiler.FileScriptData();
+         String expectedFile = isK2Selected ? "tsl_nwscript.nss" : "k1_nwscript.nss";
+         String stubCode = this.generateComprehensiveFallbackStub(file, "Actions data loading", e,
+            "The actions data table (nwscript.nss) is required to decompile NCS files.\n" +
+            "Expected file: " + expectedFile + "\n" +
+            "Please ensure the appropriate nwscript.nss file is available in the working directory or configured path.");
+         errorData.setCode(stubCode);
+         this.filedata.put(file, errorData);
          return PARTIAL_COMPILE;
       }
       FileDecompiler.FileScriptData data = this.filedata.get(file);
@@ -258,14 +267,14 @@ public class FileDecompiler {
             // decompileNcs now always returns a FileScriptData (never null)
             // but it may contain minimal/fallback code if decompilation failed
             this.filedata.put(file, data);
-         } catch (Exception e) {
-            // Last resort: create minimal stub data so we always have something to show
-            System.out.println("Critical error during decompilation, creating fallback stub: " + e.getMessage());
-            e.printStackTrace(System.out);
-            data = new FileDecompiler.FileScriptData();
-            data.setCode("// Decompilation failed: " + e.getMessage() + "\n// File: " + file.getName() + "\n// Attempting to show partial results...\n");
-            this.filedata.put(file, data);
-         }
+      } catch (Exception e) {
+         // Last resort: create comprehensive fallback stub data so we always have something to show
+         System.out.println("Critical error during decompilation, creating fallback stub: " + e.getMessage());
+         e.printStackTrace(System.out);
+         data = new FileDecompiler.FileScriptData();
+         data.setCode(this.generateComprehensiveFallbackStub(file, "Initial decompilation attempt", e, null));
+         this.filedata.put(file, data);
+      }
       }
 
       // Always generate code, even if validation fails
@@ -273,20 +282,17 @@ public class FileDecompiler {
          data.generateCode();
          String code = data.getCode();
          if (code == null || code.trim().isEmpty()) {
-            // If code generation failed, provide at least a minimal stub
+            // If code generation failed, provide comprehensive fallback stub
             System.out.println("Warning: Generated code is empty, creating fallback stub.");
-            String fallback = "// Warning: Decompilation produced no code.\n" +
-                             "// File: " + file.getName() + "\n" +
-                             "// This may indicate a corrupted or invalid NCS file.\n" +
-                             "void main() {\n    // No code could be decompiled\n}\n";
+            String fallback = this.generateComprehensiveFallbackStub(file, "Code generation - empty output", null, 
+               "The decompilation process completed but generated no source code. This may indicate the file contains no executable code or all code was marked as dead/unreachable.");
             data.setCode(fallback);
             return PARTIAL_COMPILE;
          }
       } catch (Exception e) {
          System.out.println("Error during code generation (creating fallback stub): " + e.getMessage());
-         String fallback = "// Error during code generation: " + e.getMessage() + "\n" +
-                          "// File: " + file.getName() + "\n" +
-                          "void main() {\n    // Code generation failed\n}\n";
+         String fallback = this.generateComprehensiveFallbackStub(file, "Code generation", e, 
+            "An exception occurred while generating NSS source code from the decompiled parse tree.");
          data.setCode(fallback);
          return PARTIAL_COMPILE;
       }
@@ -787,6 +793,151 @@ public class FileDecompiler {
    }
 
    /**
+    * Converts a byte array to a hexadecimal string representation.
+    *
+    * @param bytes The byte array to convert
+    * @param length The number of bytes to convert
+    * @return Hexadecimal string representation
+    */
+   private String bytesToHex(byte[] bytes, int length) {
+      StringBuilder hex = new StringBuilder();
+      for (int i = 0; i < length; i++) {
+         hex.append(String.format("%02X", bytes[i] & 0xFF));
+         if (i < length - 1) {
+            hex.append(" ");
+         }
+      }
+      return hex.toString();
+   }
+
+   /**
+    * Generates a comprehensive fallback stub with all available diagnostic information.
+    * This ensures fallback stubs are as exhaustive, accurate, and complete as possible.
+    *
+    * @param file The file being decompiled
+    * @param errorStage Description of the stage where the error occurred
+    * @param exception The exception that occurred (may be null)
+    * @param additionalInfo Additional context information (may be null)
+    * @return A comprehensive fallback stub string
+    */
+   private String generateComprehensiveFallbackStub(File file, String errorStage, Exception exception, String additionalInfo) {
+      StringBuilder stub = new StringBuilder();
+      String newline = System.getProperty("line.separator");
+      
+      // Header with error type
+      stub.append("// ========================================").append(newline);
+      stub.append("// DECOMPILATION ERROR - FALLBACK STUB").append(newline);
+      stub.append("// ========================================").append(newline);
+      stub.append(newline);
+      
+      // File information
+      stub.append("// File Information:").append(newline);
+      if (file != null) {
+         stub.append("//   Name: ").append(file.getName()).append(newline);
+         stub.append("//   Path: ").append(file.getAbsolutePath()).append(newline);
+         if (file.exists()) {
+            stub.append("//   Size: ").append(file.length()).append(" bytes").append(newline);
+            stub.append("//   Last Modified: ").append(new java.util.Date(file.lastModified())).append(newline);
+            stub.append("//   Readable: ").append(file.canRead()).append(newline);
+         } else {
+            stub.append("//   Status: FILE DOES NOT EXIST").append(newline);
+         }
+      } else {
+         stub.append("//   Status: FILE IS NULL").append(newline);
+      }
+      stub.append(newline);
+      
+      // Error stage information
+      stub.append("// Error Stage: ").append(errorStage != null ? errorStage : "Unknown").append(newline);
+      stub.append(newline);
+      
+      // Exception information
+      if (exception != null) {
+         stub.append("// Exception Details:").append(newline);
+         stub.append("//   Type: ").append(exception.getClass().getName()).append(newline);
+         stub.append("//   Message: ").append(exception.getMessage() != null ? exception.getMessage() : "(no message)").append(newline);
+         
+         // Include cause if available
+         Throwable cause = exception.getCause();
+         if (cause != null) {
+            stub.append("//   Caused by: ").append(cause.getClass().getName()).append(newline);
+            stub.append("//   Cause Message: ").append(cause.getMessage() != null ? cause.getMessage() : "(no message)").append(newline);
+         }
+         
+         // Include stack trace summary (first few frames)
+         StackTraceElement[] stack = exception.getStackTrace();
+         if (stack != null && stack.length > 0) {
+            stub.append("//   Stack Trace (first 5 frames):").append(newline);
+            int maxFrames = Math.min(5, stack.length);
+            for (int i = 0; i < maxFrames; i++) {
+               stub.append("//     at ").append(stack[i].toString()).append(newline);
+            }
+            if (stack.length > maxFrames) {
+               stub.append("//     ... (").append(stack.length - maxFrames).append(" more frames)").append(newline);
+            }
+         }
+         stub.append(newline);
+      }
+      
+      // Additional context information
+      if (additionalInfo != null && !additionalInfo.trim().isEmpty()) {
+         stub.append("// Additional Context:").append(newline);
+         // Split long additional info into lines if needed
+         String[] lines = additionalInfo.split("\n");
+         for (String line : lines) {
+            stub.append("//   ").append(line).append(newline);
+         }
+         stub.append(newline);
+      }
+      
+      // Decompiler configuration
+      stub.append("// Decompiler Configuration:").append(newline);
+      stub.append("//   Game Mode: ").append(isK2Selected ? "KotOR 2 (TSL)" : "KotOR 1").append(newline);
+      stub.append("//   Prefer Switches: ").append(preferSwitches).append(newline);
+      stub.append("//   Strict Signatures: ").append(strictSignatures).append(newline);
+      stub.append("//   Actions Data Loaded: ").append(this.actions != null).append(newline);
+      stub.append(newline);
+      
+      // System information
+      stub.append("// System Information:").append(newline);
+      stub.append("//   Java Version: ").append(System.getProperty("java.version")).append(newline);
+      stub.append("//   OS: ").append(System.getProperty("os.name")).append(" ").append(System.getProperty("os.version")).append(newline);
+      stub.append("//   Working Directory: ").append(System.getProperty("user.dir")).append(newline);
+      stub.append(newline);
+      
+      // Timestamp
+      stub.append("// Error Timestamp: ").append(new java.util.Date()).append(newline);
+      stub.append(newline);
+      
+      // Recommendations
+      stub.append("// Recommendations:").append(newline);
+      if (file != null && file.exists() && file.length() == 0) {
+         stub.append("//   - File is empty (0 bytes). This may indicate a corrupted or incomplete file.").append(newline);
+      } else if (file != null && !file.exists()) {
+         stub.append("//   - File does not exist. Verify the file path is correct.").append(newline);
+      } else if (this.actions == null) {
+         stub.append("//   - Actions data not loaded. Ensure k1_nwscript.nss or tsl_nwscript.nss is available.").append(newline);
+      } else {
+         stub.append("//   - This may indicate a corrupted, invalid, or unsupported NCS file format.").append(newline);
+         stub.append("//   - The file may be from a different game version or modded in an incompatible way.").append(newline);
+      }
+      stub.append("//   - Check the exception details above for specific error information.").append(newline);
+      stub.append("//   - Verify the file is a valid KotOR/TSL NCS bytecode file.").append(newline);
+      stub.append(newline);
+      
+      // Minimal valid NSS stub
+      stub.append("// Minimal fallback function:").append(newline);
+      stub.append("void main() {").append(newline);
+      stub.append("    // Decompilation failed at stage: ").append(errorStage != null ? errorStage : "Unknown").append(newline);
+      if (exception != null && exception.getMessage() != null) {
+         stub.append("    // Error: ").append(exception.getMessage().replace("\n", " ").replace("\r", "")).append(newline);
+      }
+      stub.append("}").append(newline);
+      
+      return stub.toString();
+   }
+
+   /**
     * Core decompilation pipeline that converts NCS bytecode to in-memory script state.
     * <p>
     * Steps include decoding the bytecode stream, building a parse tree, running
@@ -815,12 +966,14 @@ public class FileDecompiler {
       DestroyParseTree destroytree = null;
       if (this.actions == null) {
          System.out.println("null action! Creating fallback stub.");
-         // Return minimal stub instead of null
+         // Return comprehensive stub instead of null
          FileDecompiler.FileScriptData stub = new FileDecompiler.FileScriptData();
-         stub.setCode("// Error: Actions data not loaded.\n" +
-                     "// File: " + file.getName() + "\n" +
-                     "// Please ensure k1_nwscript.nss or tsl_nwscript.nss is available.\n" +
-                     "void main() {\n    // Actions data missing\n}\n");
+         String expectedFile = isK2Selected ? "tsl_nwscript.nss" : "k1_nwscript.nss";
+         String stubCode = this.generateComprehensiveFallbackStub(file, "Actions data loading", null,
+            "The actions data table (nwscript.nss) is required to decompile NCS files.\n" +
+            "Expected file: " + expectedFile + "\n" +
+            "Please ensure the appropriate nwscript.nss file is available in the working directory or configured path.");
+         stub.setCode(stubCode);
          return stub;
       }
 
@@ -832,12 +985,19 @@ public class FileDecompiler {
             commands = new Decoder(new BufferedInputStream(new FileInputStream(file)), this.actions).decode();
          } catch (Exception decodeEx) {
             System.out.println("Error during bytecode decoding: " + decodeEx.getMessage());
-            // Create fallback stub for decoding errors
-            String stub = "// Error: Failed to decode bytecode from NCS file.\n" +
-                         "// File: " + file.getName() + "\n" +
-                         "// Error: " + decodeEx.getMessage() + "\n" +
-                         "// The file may be corrupted, invalid, or in an unsupported format.\n" +
-                         "void main() {\n    // Bytecode decode failed\n}\n";
+            // Create comprehensive fallback stub for decoding errors
+            long fileSize = file.exists() ? file.length() : -1;
+            String fileInfo = "File size: " + fileSize + " bytes";
+            if (fileSize > 0) {
+               try (FileInputStream fis = new FileInputStream(file)) {
+                  byte[] header = new byte[Math.min(16, (int)fileSize)];
+                  int read = fis.read(header);
+                  if (read > 0) {
+                     fileInfo += "\nFile header (hex): " + bytesToHex(header, read);
+                  }
+               } catch (Exception ignored) {}
+            }
+            String stub = this.generateComprehensiveFallbackStub(file, "Bytecode decoding", decodeEx, fileInfo);
             data.setCode(stub);
             return data;
          }
@@ -847,14 +1007,19 @@ public class FileDecompiler {
             ast = new Parser(new Lexer(new PushbackReader(new StringReader(commands), 1024))).parse();
          } catch (Exception parseEx) {
             System.out.println("Error during parsing: " + parseEx.getMessage());
-            // Try to create partial code from decoded commands if possible
-            String stub = "// Error: Failed to parse decoded bytecode.\n" +
-                         "// File: " + file.getName() + "\n" +
-                         "// Error: " + parseEx.getMessage() + "\n" +
-                         "// Decoded commands (partial):\n" +
-                         "// " + (commands != null && commands.length() > 0 ? 
-                                  commands.substring(0, Math.min(500, commands.length())) + "..." : "none") + "\n" +
-                         "void main() {\n    // Parse failed\n}\n";
+            // Create comprehensive fallback stub with partial decoded commands
+            String commandsPreview = "none";
+            if (commands != null && commands.length() > 0) {
+               int previewLength = Math.min(1000, commands.length());
+               commandsPreview = commands.substring(0, previewLength);
+               if (commands.length() > previewLength) {
+                  commandsPreview += "\n... (truncated, total length: " + commands.length() + " characters)";
+               }
+            }
+            String additionalInfo = "Bytecode was successfully decoded but parsing failed.\n" +
+                                   "Decoded commands length: " + (commands != null ? commands.length() : 0) + " characters\n" +
+                                   "Decoded commands preview:\n" + commandsPreview;
+            String stub = this.generateComprehensiveFallbackStub(file, "Parsing decoded bytecode", parseEx, additionalInfo);
             data.setCode(stub);
             return data;
          }
@@ -1003,11 +1168,32 @@ public class FileDecompiler {
             System.out.println("Could not generate partial code: " + genEx.getMessage());
          }
          
-         // Last resort: create a minimal stub so we always have something to show
-         String errorStub = "// Decompilation encountered errors: " + e.getMessage() + "\n" +
-                           "// File: " + file.getName() + "\n" +
-                           "// Attempting to show partial results...\n" +
-                           "void main() {\n    // Partial decompilation failed\n}\n";
+         // Last resort: create comprehensive stub with any available partial information
+         String partialInfo = "Partial decompilation state:\n";
+         try {
+            if (data != null) {
+               Hashtable<String, Vector<Variable>> vars = data.getVars();
+               if (vars != null) {
+                  partialInfo += "  Subroutines with variable data: " + vars.size() + "\n";
+               }
+            }
+            if (subdata != null) {
+               partialInfo += "  Total subroutines detected: " + subdata.numSubs() + "\n";
+               partialInfo += "  Subroutines fully typed: " + subdata.countSubsDone() + "\n";
+            }
+            if (commands != null) {
+               partialInfo += "  Commands decoded: " + commands.length() + " characters\n";
+            }
+            if (ast != null) {
+               partialInfo += "  Parse tree created: yes\n";
+            }
+            if (nodedata != null) {
+               partialInfo += "  Node analysis data available: yes\n";
+            }
+         } catch (Exception ignored) {
+            partialInfo += "  (Unable to gather partial state information)\n";
+         }
+         String errorStub = this.generateComprehensiveFallbackStub(file, "General decompilation pipeline", e, partialInfo);
          data.setCode(errorStub);
          System.out.println("Created fallback stub code due to decompilation errors.");
          return data;
@@ -1233,11 +1419,32 @@ public class FileDecompiler {
       public void generateCode() {
          String newline = System.getProperty("line.separator");
          
-         // If we have no subs, generate a minimal stub so we always show something
+         // If we have no subs, generate comprehensive stub so we always show something
          if (this.subs.size() == 0) {
-            String stub = "// Warning: No subroutines could be decompiled.\n" +
-                         "// This may indicate a corrupted or invalid NCS file.\n" +
-                         "void main() {\n    // No code could be decompiled\n}\n";
+            // Note: We don't have direct file access here, but we can still provide useful info
+            String stub = "// ========================================" + newline +
+                         "// DECOMPILATION WARNING - NO SUBROUTINES" + newline +
+                         "// ========================================" + newline + newline +
+                         "// Warning: No subroutines could be decompiled from this file." + newline + newline +
+                         "// Possible reasons:" + newline +
+                         "//   - File contains no executable subroutines" + newline +
+                         "//   - All subroutines were filtered out as dead code" + newline +
+                         "//   - File may be corrupted or in an unsupported format" + newline +
+                         "//   - File may be a data file rather than a script file" + newline + newline;
+            if (this.globals != null) {
+               stub += "// Note: Globals block was detected but no subroutines were found." + newline + newline;
+            }
+            if (this.subdata != null) {
+               try {
+                  stub += "// Analysis data:" + newline;
+                  stub += "//   Total subroutines detected: " + this.subdata.numSubs() + newline;
+                  stub += "//   Subroutines processed: " + this.subdata.countSubsDone() + newline + newline;
+               } catch (Exception ignored) {}
+            }
+            stub += "// Minimal fallback function:" + newline +
+                   "void main() {" + newline +
+                   "    // No code could be decompiled" + newline +
+                   "}" + newline;
             this.code = stub;
             return;
          }
@@ -1294,8 +1501,27 @@ public class FileDecompiler {
          
          // Ensure we always have at least something
          if (generated == null || generated.trim().isEmpty()) {
-            generated = "// Warning: Code generation produced empty output.\n" +
-                       "void main() {\n    // No code could be generated\n}\n";
+            String stub = "// ========================================" + newline +
+                         "// CODE GENERATION WARNING - EMPTY OUTPUT" + newline +
+                         "// ========================================" + newline + newline +
+                         "// Warning: Code generation produced empty output despite having " + this.subs.size() + " subroutine(s)." + newline + newline;
+            if (this.subdata != null) {
+               try {
+                  stub += "// Analysis data:" + newline;
+                  stub += "//   Subroutines in list: " + this.subs.size() + newline;
+                  stub += "//   Total subroutines detected: " + this.subdata.numSubs() + newline;
+                  stub += "//   Subroutines fully typed: " + this.subdata.countSubsDone() + newline + newline;
+               } catch (Exception ignored) {}
+            }
+            stub += "// This may indicate:" + newline +
+                   "//   - All subroutines failed to generate code" + newline +
+                   "//   - All code was filtered or marked as unreachable" + newline +
+                   "//   - An internal error during code generation" + newline + newline +
+                   "// Minimal fallback function:" + newline +
+                   "void main() {" + newline +
+                   "    // No code could be generated" + newline +
+                   "}" + newline;
+            generated = stub;
          }
          
          this.code = generated;
