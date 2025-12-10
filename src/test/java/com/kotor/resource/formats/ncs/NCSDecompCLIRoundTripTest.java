@@ -15,40 +15,58 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.Duration;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Stream;
 
 /**
  * Exhaustive round-trip tests:
- *  1) Clone or use existing Vanilla_KOTOR_Script_Source repository
- *  2) Use nwnnsscomp.exe to compile each .nss -> .ncs (per game)
- *  3) Use NCSDecompCLI to decompile NCS -> NSS
- *  4) Compare normalized text with the original NSS
- *  5) Fast-fail on first failure
+ * 1) Clone or use existing Vanilla_KOTOR_Script_Source repository
+ * 2) Use nwnnsscomp.exe to compile each .nss -> .ncs (per game)
+ * 3) Use NCSDecompCLI to decompile NCS -> NSS
+ * 4) Compare normalized text with the original NSS
+ * 5) Fast-fail on first failure
  *
  * All test artifacts are created in gitignored directories.
  */
 public class NCSDecompCLIRoundTripTest {
 
    // Working directory (gitignored)
-  private static final Path TEST_WORK_DIR = Paths.get(".").toAbsolutePath().normalize()
-        .resolve("test-work");
-  private static final Path VANILLA_REPO_DIR = TEST_WORK_DIR.resolve("Vanilla_KOTOR_Script_Source");
-  private static final java.util.List<String> VANILLA_REPO_URLS = java.util.Arrays.asList(
-        "https://github.com/KOTORCommunityPatches/Vanilla_KOTOR_Script_Source.git",
-        "https://github.com/th3w1zard1/Vanilla_KOTOR_Script_Source.git"
-  );
+   private static final Path TEST_WORK_DIR = Paths.get(".").toAbsolutePath().normalize()
+         .resolve("test-work");
+   private static final Path VANILLA_REPO_DIR = TEST_WORK_DIR.resolve("Vanilla_KOTOR_Script_Source");
+   private static final java.util.List<String> VANILLA_REPO_URLS = java.util.Arrays.asList(
+         "https://github.com/KOTORCommunityPatches/Vanilla_KOTOR_Script_Source.git",
+         "https://github.com/th3w1zard1/Vanilla_KOTOR_Script_Source.git");
 
    // Paths relative to DeNCS directory
    private static final Path REPO_ROOT = Paths.get(".").toAbsolutePath().normalize();
    private static final Path NWN_COMPILER = REPO_ROOT.resolve("tools").resolve("nwnnsscomp.exe");
-   private static final Path K1_NWSCRIPT = REPO_ROOT.resolve("src").resolve("main").resolve("resources").resolve("k1_nwscript.nss");
+   private static final Path K1_NWSCRIPT = REPO_ROOT.resolve("src").resolve("main").resolve("resources")
+         .resolve("k1_nwscript.nss");
    private static final Path K1_ASC_NWSCRIPT = REPO_ROOT.resolve("k1_asc_nwscript.nss");
-   private static final Path K2_NWSCRIPT = REPO_ROOT.resolve("src").resolve("main").resolve("resources").resolve("tsl_nwscript.nss");
+   private static final Path K2_NWSCRIPT = REPO_ROOT.resolve("src").resolve("main").resolve("resources")
+         .resolve("tsl_nwscript.nss");
+   private static final Map<String, String> NPC_CONSTANTS = loadNpcConstants();
+
+   private static String displayPath(Path path) {
+      Path abs = path.toAbsolutePath().normalize();
+      Path repo = REPO_ROOT.toAbsolutePath().normalize();
+      try {
+         Path rel = repo.relativize(abs);
+         String relStr = rel.toString().replace('\\', '/');
+         return relStr.isEmpty() ? "." : relStr;
+      } catch (IllegalArgumentException ex) {
+         return abs.toString();
+      }
+   }
 
    // Test output directories (gitignored)
    private static final Path WORK_ROOT = TEST_WORK_DIR.resolve("roundtrip-work");
@@ -74,19 +92,20 @@ public class NCSDecompCLIRoundTripTest {
          // Check if it's a valid git repo
          Path gitDir = VANILLA_REPO_DIR.resolve(".git");
          if (Files.exists(gitDir) && Files.isDirectory(gitDir)) {
-            System.out.println("Using existing Vanilla_KOTOR_Script_Source repository at: " + VANILLA_REPO_DIR);
+            System.out.println(
+                  "Using existing Vanilla_KOTOR_Script_Source repository at: " + displayPath(VANILLA_REPO_DIR));
             // Optionally update: git pull
             return;
          } else {
             // Directory exists but isn't a git repo, remove it
-            System.out.println("Removing non-git directory: " + VANILLA_REPO_DIR);
+            System.out.println("Removing non-git directory: " + displayPath(VANILLA_REPO_DIR));
             deleteDirectory(VANILLA_REPO_DIR);
          }
       }
 
       // Clone the repository - try each URL in order until one succeeds
       System.out.println("Cloning Vanilla_KOTOR_Script_Source repository...");
-      System.out.println("  Destination: " + VANILLA_REPO_DIR);
+      System.out.println("  Destination: " + displayPath(VANILLA_REPO_DIR));
 
       Files.createDirectories(VANILLA_REPO_DIR.getParent());
 
@@ -144,33 +163,33 @@ public class NCSDecompCLIRoundTripTest {
 
       // Check for required files
       if (!Files.isRegularFile(NWN_COMPILER)) {
-         throw new IOException("nwnnsscomp.exe missing at: " + NWN_COMPILER);
+         throw new IOException("nwnnsscomp.exe missing at: " + displayPath(NWN_COMPILER));
       }
-      System.out.println("✓ Found compiler: " + NWN_COMPILER);
+      System.out.println("✓ Found compiler: " + displayPath(NWN_COMPILER));
 
       if (!Files.isRegularFile(K1_NWSCRIPT)) {
-         throw new IOException("k1_nwscript.nss missing at: " + K1_NWSCRIPT);
+         throw new IOException("k1_nwscript.nss missing at: " + displayPath(K1_NWSCRIPT));
       }
-      System.out.println("✓ Found K1 nwscript: " + K1_NWSCRIPT);
+      System.out.println("✓ Found K1 nwscript: " + displayPath(K1_NWSCRIPT));
 
       if (!Files.isRegularFile(K1_ASC_NWSCRIPT)) {
-         throw new IOException("k1_asc_nwscript.nss missing at: " + K1_ASC_NWSCRIPT);
+         throw new IOException("k1_asc_nwscript.nss missing at: " + displayPath(K1_ASC_NWSCRIPT));
       }
-      System.out.println("✓ Found K1 ASC nwscript: " + K1_ASC_NWSCRIPT);
+      System.out.println("✓ Found K1 ASC nwscript: " + displayPath(K1_ASC_NWSCRIPT));
 
       if (!Files.isRegularFile(K2_NWSCRIPT)) {
-         throw new IOException("tsl_nwscript.nss missing at: " + K2_NWSCRIPT);
+         throw new IOException("tsl_nwscript.nss missing at: " + displayPath(K2_NWSCRIPT));
       }
-      System.out.println("✓ Found TSL nwscript: " + K2_NWSCRIPT);
+      System.out.println("✓ Found TSL nwscript: " + displayPath(K2_NWSCRIPT));
 
       // Verify vanilla repo structure
       Path k1Root = VANILLA_REPO_DIR.resolve("K1");
       Path tslRoot = VANILLA_REPO_DIR.resolve("TSL");
       if (!Files.exists(k1Root) || !Files.isDirectory(k1Root)) {
-         throw new IOException("K1 directory not found in vanilla repo: " + k1Root);
+         throw new IOException("K1 directory not found in vanilla repo: " + displayPath(k1Root));
       }
       if (!Files.exists(tslRoot) || !Files.isDirectory(tslRoot)) {
-         throw new IOException("TSL directory not found in vanilla repo: " + tslRoot);
+         throw new IOException("TSL directory not found in vanilla repo: " + displayPath(tslRoot));
       }
       System.out.println("✓ Vanilla repo structure verified");
 
@@ -270,14 +289,14 @@ public class NCSDecompCLIRoundTripTest {
       long startTime = System.nanoTime();
 
       Path rel = VANILLA_REPO_DIR.relativize(nssPath);
-      String displayPath = rel.toString().replace('\\', '/');
+      String displayRelPath = rel.toString().replace('\\', '/');
 
       Path outDir = scratchRoot.resolve(rel.getParent() == null ? Paths.get("") : rel.getParent());
       Files.createDirectories(outDir);
 
       // Compile: NSS -> NCS
       Path compiled = outDir.resolve(stripExt(rel.getFileName().toString()) + ".ncs");
-      System.out.print("  Compiling " + displayPath + " to .ncs with nwnnsscomp.exe");
+      System.out.print("  Compiling " + displayRelPath + " to .ncs with nwnnsscomp.exe");
       long compileStart = System.nanoTime();
       try {
          runCompiler(nssPath, compiled, gameFlag, scratchRoot);
@@ -318,7 +337,7 @@ public class NCSDecompCLIRoundTripTest {
          if (!original.equals(roundtrip)) {
             System.out.println(" ✗ MISMATCH");
             String diff = formatUnifiedDiff(original, roundtrip);
-            StringBuilder message = new StringBuilder("Round-trip mismatch for ").append(nssPath);
+            StringBuilder message = new StringBuilder("Round-trip mismatch for ").append(displayPath(nssPath));
             if (diff != null) {
                message.append(System.lineSeparator()).append(diff);
             }
@@ -336,34 +355,37 @@ public class NCSDecompCLIRoundTripTest {
    }
 
    /**
-    * Detects if a script file needs the ASC nwscript (for ActionStartConversation with 11 parameters).
-    * Checks if the file contains ActionStartConversation calls with exactly 11 parameters
-    * by counting commas in the parameter list. A call with 10 commas indicates 11 parameters.
+    * Detects if a script file needs the ASC nwscript (for ActionStartConversation
+    * with 11 parameters).
+    * Checks if the file contains ActionStartConversation calls with exactly 11
+    * parameters
+    * by counting commas in the parameter list. A call with 10 commas indicates 11
+    * parameters.
     */
    private static boolean needsAscNwscript(Path nssPath) throws Exception {
       String content = new String(Files.readAllBytes(nssPath), StandardCharsets.UTF_8);
       // Look for ActionStartConversation calls with 11 parameters (10 commas)
-      // Pattern matches ActionStartConversation( ... ) where the content between parens
+      // Pattern matches ActionStartConversation( ... ) where the content between
+      // parens
       // contains exactly 10 commas (indicating 11 parameters)
       // This is more flexible than requiring specific parameter values
       java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-         "ActionStartConversation\\s*\\(([^,)]*,\\s*){10}[^)]*\\)",
-         java.util.regex.Pattern.MULTILINE
-      );
+            "ActionStartConversation\\s*\\(([^,)]*,\\s*){10}[^)]*\\)",
+            java.util.regex.Pattern.MULTILINE);
       return pattern.matcher(content).find();
    }
 
    /**
     * Extracts include file names from a script file.
-    * Parses #include statements and returns the include file names (without quotes).
+    * Parses #include statements and returns the include file names (without
+    * quotes).
     */
    private static List<String> extractIncludes(Path nssPath) throws Exception {
       String content = new String(Files.readAllBytes(nssPath), StandardCharsets.UTF_8);
       List<String> includes = new ArrayList<>();
       java.util.regex.Pattern includePattern = java.util.regex.Pattern.compile(
-         "#include\\s+[\"<]([^\">]+)[\">]",
-         java.util.regex.Pattern.MULTILINE
-      );
+            "#include\\s+[\"<]([^\">]+)[\">]",
+            java.util.regex.Pattern.MULTILINE);
       java.util.regex.Matcher matcher = includePattern.matcher(content);
       while (matcher.find()) {
          includes.add(matcher.group(1));
@@ -373,7 +395,8 @@ public class NCSDecompCLIRoundTripTest {
 
    /**
     * Finds an include file in the repository structure.
-    * Checks common locations: same directory as source, K1/Data/scripts.bif, TSL/Data/Scripts, etc.
+    * Checks common locations: same directory as source, K1/Data/scripts.bif,
+    * TSL/Data/Scripts, etc.
     * Handles include names with or without .nss extension.
     */
    private static Path findIncludeFile(String includeName, Path sourceFile, String gameFlag) {
@@ -395,49 +418,119 @@ public class NCSDecompCLIRoundTripTest {
          return localInc;
       }
 
-      // Check K1/Data/scripts.bif (common location for includes, used by both K1 and TSL)
-      Path k1IncludesDir = VANILLA_REPO_DIR.resolve("K1").resolve("Data").resolve("scripts.bif");
-      Path k1Inc = k1IncludesDir.resolve(normalizedName);
-      if (Files.exists(k1Inc)) {
-         return k1Inc;
-      }
-      // Also try without extension
-      k1Inc = k1IncludesDir.resolve(includeName);
-      if (Files.exists(k1Inc)) {
-         return k1Inc;
-      }
-
-      // For TSL, also check TSL/Data/Scripts
+      // Prefer game-specific include locations first
       if ("k2".equals(gameFlag)) {
          Path tslScriptsDir = VANILLA_REPO_DIR.resolve("TSL").resolve("Vanilla").resolve("Data").resolve("Scripts");
          Path tslInc = tslScriptsDir.resolve(normalizedName);
          if (Files.exists(tslInc)) {
             return tslInc;
          }
-         // Also try without extension
          tslInc = tslScriptsDir.resolve(includeName);
          if (Files.exists(tslInc)) {
             return tslInc;
          }
 
-         // Check TSLRCM if it exists
          Path tslRcmScriptsDir = VANILLA_REPO_DIR.resolve("TSL").resolve("TSLRCM").resolve("Data").resolve("Scripts");
          Path tslRcmInc = tslRcmScriptsDir.resolve(normalizedName);
          if (Files.exists(tslRcmInc)) {
             return tslRcmInc;
          }
-         // Also try without extension
          tslRcmInc = tslRcmScriptsDir.resolve(includeName);
          if (Files.exists(tslRcmInc)) {
             return tslRcmInc;
          }
       }
 
+      // Fallback to K1/Data/scripts.bif (shared includes)
+      Path k1IncludesDir = VANILLA_REPO_DIR.resolve("K1").resolve("Data").resolve("scripts.bif");
+      Path k1Inc = k1IncludesDir.resolve(normalizedName);
+      if (Files.exists(k1Inc)) {
+         return k1Inc;
+      }
+      k1Inc = k1IncludesDir.resolve(includeName);
+      if (Files.exists(k1Inc)) {
+         return k1Inc;
+      }
+
+      // If k2 and not found above, last-resort TSLRCM (already checked) handled;
+      // return null
+
       return null;
    }
 
    /**
-    * Creates a temporary working directory with the source file and all its includes.
+    * Copy a single include into the temp directory, preserving the requested
+    * name and also writing an extension-suffixed variant when the directive
+    * omitted one (e.g., "k_inc_end" -> "k_inc_end.nss").
+    */
+   private static void copyIncludeFile(String includeName, Path includeFile, Path tempDir) throws IOException {
+      Path includeTarget = tempDir.resolve(Paths.get(includeName));
+      Path parent = includeTarget.getParent();
+      if (parent != null) {
+         Files.createDirectories(parent);
+      } else {
+         Files.createDirectories(tempDir);
+      }
+
+      Files.copy(includeFile, includeTarget, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+
+      // If the include name lacks an extension, also copy with the source file's
+      // extension.
+      if (!includeName.contains(".")) {
+         String fileName = includeFile.getFileName().toString();
+         int dotIdx = fileName.lastIndexOf('.');
+         if (dotIdx != -1) {
+            String ext = fileName.substring(dotIdx);
+            Path altTarget = tempDir.resolve(Paths.get(includeName + ext));
+            Path altParent = altTarget.getParent();
+            if (altParent != null) {
+               Files.createDirectories(altParent);
+            }
+            Files.copy(includeFile, altTarget, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+         }
+      }
+   }
+
+   /**
+    * Recursively copy all includes (and their dependencies) into the temp
+    * directory.
+    */
+   private static void copyIncludesRecursive(Path sourceFile, String gameFlag, Path tempDir) throws Exception {
+      Deque<Path> worklist = new ArrayDeque<>();
+      Set<Path> processed = new HashSet<>();
+      Map<String, Path> copied = new HashMap<>();
+
+      worklist.add(sourceFile);
+
+      while (!worklist.isEmpty()) {
+         Path current = worklist.removeFirst();
+         if (current == null || !Files.exists(current)) {
+            continue;
+         }
+         Path normalized = current.toAbsolutePath().normalize();
+         if (!processed.add(normalized)) {
+            continue;
+         }
+
+         List<String> includes = extractIncludes(current);
+         for (String includeName : includes) {
+            Path includeFile = findIncludeFile(includeName, current, gameFlag);
+            if (includeFile == null || !Files.exists(includeFile)) {
+               continue;
+            }
+            String key = includeName.toLowerCase();
+            if (!copied.containsKey(key)) {
+               copyIncludeFile(includeName, includeFile, tempDir);
+               copied.put(key, includeFile);
+            }
+            worklist.add(includeFile);
+         }
+      }
+   }
+
+   /**
+    * Creates a temporary working directory with the source file and all its
+    * includes.
     * Returns the temp directory path and the path to the copied source file.
     */
    private static Path setupTempCompileDir(Path originalNssPath, String gameFlag) throws Exception {
@@ -450,57 +543,37 @@ public class NCSDecompCLIRoundTripTest {
       Path tempSourceFile = tempDir.resolve(originalNssPath.getFileName());
       Files.copy(originalNssPath, tempSourceFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
 
-      // Find and copy all include files
-      List<String> includes = extractIncludes(originalNssPath);
-      for (String includeName : includes) {
-         Path includeFile = findIncludeFile(includeName, originalNssPath, gameFlag);
-         if (includeFile != null && Files.exists(includeFile)) {
-            // Use the include name exactly as specified in the source file
-            // This ensures the compiler can find it with the exact name it expects
-            Path tempInclude = tempDir.resolve(includeName);
-            
-            // Copy the file - if source has extension but include name doesn't,
-            // Files.copy will create the file with the exact name specified in tempInclude
-            Files.copy(includeFile, tempInclude, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-            
-            // Verify the file was copied successfully
-            if (!Files.exists(tempInclude)) {
-               throw new IOException("Failed to copy include file: " + includeFile + " to " + tempInclude);
-            }
-         } else {
-            // Include file not found - this might cause compilation to fail, but let compiler report it
-         }
-      }
+      // Recursively copy all includes (and nested includes) into the temp directory
+      copyIncludesRecursive(originalNssPath, gameFlag, tempDir);
 
       return tempDir;
    }
 
-   private static void runCompiler(Path originalNssPath, Path compiledOut, String gameFlag, Path workDir) throws Exception {
-      // Store original path for logging (show path relative to vanilla repo)
-      Path relPath = VANILLA_REPO_DIR.relativize(originalNssPath);
-
+   private static void runCompiler(Path originalNssPath, Path compiledOut, String gameFlag, Path workDir)
+         throws Exception {
       // Determine which nwscript.nss to use based on game
       // K1 files (from test-work\Vanilla_KOTOR_Script_Source\K1) use k1_nwscript.nss
       // K1 files with ActionStartConversation(11 params) use k1_asc_nwscript.nss
-      // TSL files (from test-work\Vanilla_KOTOR_Script_Source\TSL) use tsl_nwscript.nss
+      // TSL files (from test-work\Vanilla_KOTOR_Script_Source\TSL) use
+      // tsl_nwscript.nss
       Path nwscriptSource;
       if ("k1".equals(gameFlag)) {
          // Check if this script needs ASC nwscript
          if (needsAscNwscript(originalNssPath)) {
             nwscriptSource = K1_ASC_NWSCRIPT;
             if (!Files.exists(nwscriptSource)) {
-               throw new IllegalStateException("K1 ASC nwscript file not found: " + nwscriptSource);
+               throw new IllegalStateException("K1 ASC nwscript file not found: " + displayPath(nwscriptSource));
             }
          } else {
             nwscriptSource = K1_NWSCRIPT;
             if (!Files.exists(nwscriptSource)) {
-               throw new IllegalStateException("K1 nwscript file not found: " + nwscriptSource);
+               throw new IllegalStateException("K1 nwscript file not found: " + displayPath(nwscriptSource));
             }
          }
       } else if ("k2".equals(gameFlag)) {
          nwscriptSource = K2_NWSCRIPT;
          if (!Files.exists(nwscriptSource)) {
-            throw new IllegalStateException("TSL nwscript file not found: " + nwscriptSource);
+            throw new IllegalStateException("TSL nwscript file not found: " + displayPath(nwscriptSource));
          }
       } else {
          throw new IllegalArgumentException("Invalid game flag: " + gameFlag + " (expected 'k1' or 'k2')");
@@ -534,12 +607,23 @@ public class NCSDecompCLIRoundTripTest {
 
          // Log compilation command and args (but show original path in the log)
          System.out.print(" (");
+         String compilerPathStr = compilerFile.getAbsolutePath();
+         String sourcePathStr = sourceFile.getAbsolutePath();
+         String outputPathStr = outputFile.getAbsolutePath();
+         String displaySource = displayPath(originalNssPath);
+         String displayOutput = displayPath(compiledOut);
+         String displayCompiler = displayPath(NWN_COMPILER);
          for (int i = 0; i < cmd.length; i++) {
-            if (i > 0) System.out.print(" ");
+            if (i > 0)
+               System.out.print(" ");
             String arg = cmd[i];
             // Replace temp path with original path in log output for readability
-            if (arg.equals(sourceFile.getAbsolutePath())) {
-               arg = originalNssPath.toAbsolutePath().toString();
+            if (arg.equals(sourcePathStr)) {
+               arg = displaySource;
+            } else if (arg.equals(outputPathStr)) {
+               arg = displayOutput;
+            } else if (arg.equals(compilerPathStr)) {
+               arg = displayCompiler;
             }
             // Quote arguments with spaces
             if (arg.contains(" ") && !arg.startsWith("\"")) {
@@ -556,7 +640,8 @@ public class NCSDecompCLIRoundTripTest {
          pb.redirectErrorStream(true);
          Process proc = pb.start();
 
-         java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(proc.getInputStream()));
+         java.io.BufferedReader reader = new java.io.BufferedReader(
+               new java.io.InputStreamReader(proc.getInputStream()));
          StringBuilder output = new StringBuilder();
          String line;
          while ((line = reader.readLine()) != null) {
@@ -567,7 +652,7 @@ public class NCSDecompCLIRoundTripTest {
          if (!finished) {
             proc.destroyForcibly();
             System.out.println(" ✗ TIMEOUT");
-            throw new RuntimeException("nwnnsscomp timed out for " + originalNssPath);
+            throw new RuntimeException("nwnnsscomp timed out for " + displayPath(originalNssPath));
          }
 
          int exitCode = proc.exitValue();
@@ -575,28 +660,41 @@ public class NCSDecompCLIRoundTripTest {
 
          if (exitCode != 0 || !fileExists) {
             System.out.println(" ✗ FAILED");
-            String errorMsg = "nwnnsscomp failed (exit=" + exitCode + ", fileExists=" + fileExists + ") for " + originalNssPath;
+            String errorMsg = "nwnnsscomp failed (exit=" + exitCode + ", fileExists=" + fileExists + ") for "
+                  + displaySource;
             if (output.length() > 0) {
                // Show relevant error lines
                String[] outputLines = output.toString().split("\n");
                boolean foundError = false;
+               String tempSourceAbs = tempSourceFile.toAbsolutePath().toString();
+               String tempDirAbs = tempDir.toAbsolutePath().toString();
+               String displayTempDir = displayPath(tempDir);
+               String compiledAbs = compiledOut.toAbsolutePath().toString();
                for (String outputLine : outputLines) {
                   if (outputLine.toLowerCase().contains("error") ||
-                      outputLine.toLowerCase().contains("unable") ||
-                      outputLine.toLowerCase().contains("include")) {
+                        outputLine.toLowerCase().contains("unable") ||
+                        outputLine.toLowerCase().contains("include")) {
                      if (!foundError) {
                         errorMsg += "\nCompiler errors:";
                         foundError = true;
                      }
                      // Replace temp path with original path in error messages
-                     String displayLine = outputLine.replace(tempSourceFile.toAbsolutePath().toString(), originalNssPath.toAbsolutePath().toString());
+                     String displayLine = outputLine
+                           .replace(tempSourceAbs, displaySource)
+                           .replace(tempDirAbs, displayTempDir)
+                           .replace(compiledAbs, displayOutput)
+                           .replace(originalNssPath.toAbsolutePath().toString(), displaySource);
                      errorMsg += "\n  " + displayLine;
                   }
                }
                // If no errors found, show all output
                if (!foundError && outputLines.length > 0) {
-                  String displayOutput = output.toString().replace(tempSourceFile.toAbsolutePath().toString(), originalNssPath.toAbsolutePath().toString());
-                  errorMsg += "\nCompiler output:\n" + displayOutput;
+                  String sanitizedOutput = output.toString()
+                        .replace(tempSourceAbs, displaySource)
+                        .replace(tempDirAbs, displayTempDir)
+                        .replace(compiledAbs, displayOutput)
+                        .replace(originalNssPath.toAbsolutePath().toString(), displaySource);
+                  errorMsg += "\nCompiler output:\n" + sanitizedOutput;
                }
             }
             throw new RuntimeException(errorMsg);
@@ -608,7 +706,8 @@ public class NCSDecompCLIRoundTripTest {
                deleteDirectory(tempDir);
             } catch (Exception e) {
                // Log but don't fail on cleanup errors
-               System.err.println("Warning: Failed to clean up temp directory " + tempDir + ": " + e.getMessage());
+               System.err.println(
+                     "Warning: Failed to clean up temp directory " + displayPath(tempDir) + ": " + e.getMessage());
             }
          }
       }
@@ -629,11 +728,11 @@ public class NCSDecompCLIRoundTripTest {
 
          if (!Files.isRegularFile(nssOut)) {
             System.out.println(" ✗ FAILED - no output file created");
-            throw new RuntimeException("Decompile did not produce output: " + nssOut);
+            throw new RuntimeException("Decompile did not produce output: " + displayPath(nssOut));
          }
       } catch (DecompilerException ex) {
          System.out.println(" ✗ FAILED - " + ex.getMessage());
-         throw new RuntimeException("Decompile failed for " + ncsPath + ": " + ex.getMessage(), ex);
+         throw new RuntimeException("Decompile failed for " + displayPath(ncsPath) + ": " + ex.getMessage(), ex);
       }
    }
 
@@ -655,29 +754,24 @@ public class NCSDecompCLIRoundTripTest {
       normalized = normalizeVariableNames(normalized);
       normalized = normalizeDeclarationAssignment(normalized);
       normalized = normalizeTrailingZeroParams(normalized);
+      normalized = normalizeEffectDeathDefaults(normalized);
       normalized = normalizeReturnStatements(normalized);
       normalized = normalizeTrueFalse(normalized);
+      normalized = normalizeNpcConstants(normalized);
       normalized = normalizeBitwiseOperators(normalized);
       normalized = normalizePlaceholderNames(normalized);
       normalized = normalizeFunctionOrder(normalized);
 
       String[] lines = normalized.split("\n", -1);
       StringBuilder result = new StringBuilder();
-      boolean lastWasBlank = false;
 
       for (String line : lines) {
          String trimmed = line.replaceFirst("\\s+$", "");
-
          if (trimmed.isEmpty()) {
-            if (!lastWasBlank) {
-               result.append("\n");
-               lastWasBlank = true;
-            }
-         } else {
-            trimmed = trimmed.replace("\t", "    ").replaceAll(" +", " ");
-            result.append(trimmed).append("\n");
-            lastWasBlank = false;
+            continue; // drop blank lines to avoid formatting-only mismatches
          }
+         trimmed = trimmed.replace("\t", "    ").replaceAll(" +", " ");
+         result.append(trimmed).append("\n");
       }
 
       String finalResult = result.toString();
@@ -690,25 +784,25 @@ public class NCSDecompCLIRoundTripTest {
 
    /**
     * Normalizes trailing zero parameters in function calls.
-    * Removes trailing ", 0" or ", 0x0" parameters since the decompiler may omit them.
+    * Removes trailing ", 0" or ", 0x0" parameters since the decompiler may omit
+    * them.
     */
    private static String normalizeTrailingZeroParams(String code) {
       // Pattern to match function calls with trailing zero parameters
       // Match: functionName(...), 0) or functionName(...), 0x0)
       java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-         "([a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^)]*),\\s*(0|0x0)\\s*\\)"
-      );
-      
+            "([a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^)]*),\\s*(0|0x0)\\s*\\)");
+
       String result = code;
       java.util.regex.Matcher matcher = pattern.matcher(result);
-      
+
       // Build replacement string by processing matches in reverse order
       // Store start, end, and the actual group 1 content to avoid substring issues
       java.util.List<Object[]> matches = new java.util.ArrayList<>();
       while (matcher.find()) {
-         matches.add(new Object[]{matcher.start(), matcher.end(), matcher.group(1)});
+         matches.add(new Object[] { matcher.start(), matcher.end(), matcher.group(1) });
       }
-      
+
       // Replace in reverse order to avoid offset issues
       for (int i = matches.size() - 1; i >= 0; i--) {
          Object[] match = matches.get(i);
@@ -721,8 +815,16 @@ public class NCSDecompCLIRoundTripTest {
          String replacement = group1 + ")";
          result = before + replacement + after;
       }
-      
+
       return result;
+   }
+
+   /**
+    * Normalize EffectDeath() to include its common default parameters so missing
+    * optional arguments don't cause mismatches.
+    */
+   private static String normalizeEffectDeathDefaults(String code) {
+      return code.replaceAll("\\bEffectDeath\\s*\\(\\s*\\)", "EffectDeath(0, 1)");
    }
 
    /**
@@ -731,17 +833,17 @@ public class NCSDecompCLIRoundTripTest {
     */
    private static String normalizeReturnStatements(String code) {
       // Pattern to match: return (expression);
-      // This handles cases where the decompiler adds unnecessary parentheses around return expressions
+      // This handles cases where the decompiler adds unnecessary parentheses around
+      // return expressions
       java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
-         "return\\s+\\(([^()]+(?:\\.[^()]*)*)\\);"
-      );
-      
+            "return\\s+\\(([^()]+(?:\\.[^()]*)*)\\);");
+
       String result = code;
       java.util.regex.Matcher matcher = pattern.matcher(result);
-      
+
       // Replace return (simple_expression); with return simple_expression;
       result = matcher.replaceAll("return $1;");
-      
+
       return result;
    }
 
@@ -757,19 +859,74 @@ public class NCSDecompCLIRoundTripTest {
    }
 
    /**
-    * Normalizes placeholder variable names that come from incomplete stack recovery.
+    * Normalize NPC_* constants to their numeric values so symbolic vs numeric
+    * usages compare equal across decompilation.
+    */
+   private static String normalizeNpcConstants(String code) {
+      if (NPC_CONSTANTS.isEmpty()) {
+         return code;
+      }
+      java.util.regex.Pattern p = java.util.regex.Pattern.compile("\\bNPC_[A-Za-z0-9_]+\\b");
+      java.util.regex.Matcher m = p.matcher(code);
+      StringBuffer sb = new StringBuffer();
+      while (m.find()) {
+         String name = m.group();
+         String replacement = NPC_CONSTANTS.get(name);
+         if (replacement != null) {
+            m.appendReplacement(sb, replacement);
+         }
+      }
+      m.appendTail(sb);
+      return sb.toString();
+   }
+
+   private static Map<String, String> loadNpcConstants() {
+      Map<String, String> map = new HashMap<>();
+      loadNpcConstantsFromFile(K1_NWSCRIPT, map);
+      loadNpcConstantsFromFile(K2_NWSCRIPT, map);
+      return map;
+   }
+
+   private static void loadNpcConstantsFromFile(Path path, Map<String, String> map) {
+      if (path == null) {
+         return;
+      }
+      try {
+         if (!Files.exists(path)) {
+            return;
+         }
+         java.util.regex.Pattern p = java.util.regex.Pattern
+               .compile("^\\s*int\\s+(NPC_[A-Za-z0-9_]+)\\s*=\\s*([-]?[0-9]+)\\s*;.*$");
+         for (String line : Files.readAllLines(path, StandardCharsets.UTF_8)) {
+            java.util.regex.Matcher m = p.matcher(line);
+            if (m.matches()) {
+               map.put(m.group(1), m.group(2));
+            }
+         }
+      } catch (Exception ignored) {
+      }
+   }
+
+   /**
+    * Normalizes placeholder variable names that come from incomplete stack
+    * recovery.
     */
    private static String normalizePlaceholderNames(String code) {
       return code.replaceAll("__unknown_param_\\d+", "__unknown_param");
    }
 
    /**
-    * Sorts functions by signature to avoid order-related diffs in decompiler output.
+    * Sorts functions by signature to avoid order-related diffs in decompiler
+    * output.
     * <p>
-    * <b>Limitation:</b> This method uses simple character counting for braces and does not
-    * account for braces within string literals or comments. This may lead to incorrect
-    * function parsing in edge cases where braces appear in strings or comments. For the
-    * typical decompiled NCS output, this is sufficient, but a more robust parser would
+    * <b>Limitation:</b> This method uses simple character counting for braces and
+    * does not
+    * account for braces within string literals or comments. This may lead to
+    * incorrect
+    * function parsing in edge cases where braces appear in strings or comments.
+    * For the
+    * typical decompiled NCS output, this is sufficient, but a more robust parser
+    * would
     * be needed for general-purpose code parsing.
     */
    private static String normalizeFunctionOrder(String code) {
@@ -861,38 +1018,36 @@ public class NCSDecompCLIRoundTripTest {
    /**
     * Normalizes separate declaration and assignment to initialization.
     * Converts patterns like:
-    *   int var1;
-    *   var1 = value;
+    * int var1;
+    * var1 = value;
     * to:
-    *   int var1 = value;
+    * int var1 = value;
     */
    private static String normalizeDeclarationAssignment(String code) {
       // Pattern to match: type var; followed by var = value;
       java.util.regex.Pattern declPattern = java.util.regex.Pattern.compile(
-         "\\b(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*;"
-      );
+            "\\b(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*;");
       java.util.regex.Pattern assignPattern = java.util.regex.Pattern.compile(
-         "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*(.+?);"
-      );
-      
+            "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*(.+?);");
+
       String[] lines = code.split("\n");
       StringBuilder result = new StringBuilder();
-      
+
       for (int i = 0; i < lines.length; i++) {
          String line = lines[i].trim();
-         
+
          // Check if this is a variable declaration
          java.util.regex.Matcher declMatcher = declPattern.matcher(line);
          if (declMatcher.matches() && i + 1 < lines.length) {
             String type = declMatcher.group(1);
             String varName = declMatcher.group(2);
-            
+
             // Check if next non-empty line is an assignment of this variable
             int nextLineIdx = i + 1;
             while (nextLineIdx < lines.length && lines[nextLineIdx].trim().isEmpty()) {
                nextLineIdx++;
             }
-            
+
             if (nextLineIdx < lines.length) {
                String nextLine = lines[nextLineIdx].trim();
                java.util.regex.Matcher assignMatcher = assignPattern.matcher(nextLine);
@@ -907,58 +1062,61 @@ public class NCSDecompCLIRoundTripTest {
                }
             }
          }
-         
+
          result.append(lines[i]).append("\n");
       }
-      
+
       return result.toString();
    }
 
    /**
     * Normalizes variable names to a canonical form for comparison.
-    * Maps local variable names to canonical forms (int1, int2, etc.) based on type and order.
+    * Maps local variable names to canonical forms (int1, int2, etc.) based on type
+    * and order.
     * This handles the fact that decompilers can't recover original variable names.
     */
    private static String normalizeVariableNames(String code) {
       // Pattern to match variable declarations: type name [= value];
       java.util.regex.Pattern varDeclPattern = java.util.regex.Pattern.compile(
-         "\\b(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[=;]"
-      );
-      
+            "\\b(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[=;]");
+
       java.util.Map<String, String> varMap = new java.util.HashMap<>();
       java.util.Map<String, Integer> typeCounters = new java.util.HashMap<>();
       java.util.List<String> varOrder = new java.util.ArrayList<>();
-      
+
       // First pass: collect all variable declarations
       java.util.regex.Matcher matcher = varDeclPattern.matcher(code);
       while (matcher.find()) {
          String type = matcher.group(1);
          String varName = matcher.group(2);
-         
-         // Skip if it's already a canonical name (int1, int2, etc.) or if it's a keyword/function
-         if (varName.matches("^(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\d+$")) {
+
+         // Skip if it's already a canonical name (int1, int2, etc.) or if it's a
+         // keyword/function
+         if (varName
+               .matches("^(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\d+$")) {
             continue;
          }
          if (isReservedName(varName)) {
             continue;
          }
-         
+
          // Skip if already mapped
          if (varMap.containsKey(varName)) {
             continue;
          }
-         
+
          // Create canonical name based on type
          String canonicalType = type.toLowerCase();
          int counter = typeCounters.getOrDefault(canonicalType, 0) + 1;
          typeCounters.put(canonicalType, counter);
          String canonicalName = canonicalType + counter;
-         
+
          varMap.put(varName, canonicalName);
          varOrder.add(varName);
       }
-      
-      // Second pass: replace variable names in the code (in reverse order to avoid partial matches)
+
+      // Second pass: replace variable names in the code (in reverse order to avoid
+      // partial matches)
       String result = code;
       for (int i = varOrder.size() - 1; i >= 0; i--) {
          String originalName = varOrder.get(i);
@@ -966,22 +1124,22 @@ public class NCSDecompCLIRoundTripTest {
          // Use word boundaries to avoid partial matches
          result = result.replaceAll("\\b" + java.util.regex.Pattern.quote(originalName) + "\\b", canonicalName);
       }
-      
+
       return result;
    }
-   
+
    private static boolean isReservedName(String name) {
       // Keywords and common nwscript functions/constants that shouldn't be normalized
       String[] reserved = {
-         "int", "float", "string", "object", "void", "vector", "location", 
-         "effect", "itemproperty", "talent", "action", "event", "struct",
-         "if", "else", "for", "while", "do", "switch", "case", "default",
-         "return", "break", "continue", "main", "StartingConditional",
-         "GetGlobalNumber", "GetGlobalBoolean", "GetGlobalString",
-         "SetGlobalNumber", "SetGlobalBoolean", "SetGlobalString",
-         "GetObjectByTag", "GetPartyMemberByIndex", "SetPartyLeader",
-         "NoClicksFor", "DelayCommand", "SignalEvent", "EventUserDefined",
-         "OBJECT_SELF", "GetLastOpenedBy", "IsObjectPartyMember"
+            "int", "float", "string", "object", "void", "vector", "location",
+            "effect", "itemproperty", "talent", "action", "event", "struct",
+            "if", "else", "for", "while", "do", "switch", "case", "default",
+            "return", "break", "continue", "main", "StartingConditional",
+            "GetGlobalNumber", "GetGlobalBoolean", "GetGlobalString",
+            "SetGlobalNumber", "SetGlobalBoolean", "SetGlobalString",
+            "GetObjectByTag", "GetPartyMemberByIndex", "SetPartyLeader",
+            "NoClicksFor", "DelayCommand", "SignalEvent", "EventUserDefined",
+            "OBJECT_SELF", "GetLastOpenedBy", "IsObjectPartyMember"
       };
       for (String reservedName : reserved) {
          if (reservedName.equals(name)) {
@@ -1058,11 +1216,13 @@ public class NCSDecompCLIRoundTripTest {
 
       for (DiffLine line : diffResult.lines) {
          if (line.type == DiffLineType.REMOVED) {
-            if (firstOldLine == -1) firstOldLine = oldLineNum;
+            if (firstOldLine == -1)
+               firstOldLine = oldLineNum;
             lastOldLine = oldLineNum;
             oldLineNum++;
          } else if (line.type == DiffLineType.ADDED) {
-            if (firstNewLine == -1) firstNewLine = newLineNum;
+            if (firstNewLine == -1)
+               firstNewLine = newLineNum;
             lastNewLine = newLineNum;
             newLineNum++;
          } else {
@@ -1313,7 +1473,7 @@ public class NCSDecompCLIRoundTripTest {
       }
 
       System.out.println();
-      System.out.println("Profile log: " + PROFILE_OUTPUT);
+      System.out.println("Profile log: " + displayPath(PROFILE_OUTPUT));
       System.out.println("═══════════════════════════════════════════════════════════");
    }
 

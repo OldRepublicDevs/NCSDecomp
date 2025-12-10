@@ -61,21 +61,35 @@ public class AActionExp extends ScriptNode implements AExpression {
       if (this.actionsData != null) {
          try {
             List<String> defaults = this.actionsData.getDefaultValues(this.id);
-            // Find the last parameter that doesn't match its default value
-            int lastNonDefault = paramCount;
-            for (int i = paramCount - 1; i >= 0 && i < defaults.size(); i--) {
+            int requiredParams = this.actionsData.getRequiredParamCount(this.id);
+            int optionalCount = Math.max(0, defaults.size() - requiredParams);
+
+            // If any optional parameter differs from its default, keep the full argument list.
+            boolean hasNonDefaultOptional = false;
+            for (int i = requiredParams; i < Math.min(paramCount, defaults.size()); i++) {
                String defaultValue = defaults.get(i);
                if (defaultValue == null) {
+                  continue;
+               }
+               String normalizedParam = normalizeValue(this.params.get(i).toString());
+               String normalizedDefault = normalizeValue(defaultValue);
+               if (!normalizedParam.equals(normalizedDefault)) {
+                  hasNonDefaultOptional = true;
                   break;
                }
+            }
 
-               // Only consider trimming defaults that are commonly compiler-inserted sentinels.
-               if (!isLikelyCompilerInsertedDefault(defaultValue)) {
-                  break;
-               }
+            // Only trim when there are multiple optional parameters and all of them
+            // match their defaults (compiler-inserted boilerplate).
+            if (optionalCount > 1 && !hasNonDefaultOptional) {
+               int lastNonDefault = paramCount;
+               for (int i = paramCount - 1; i >= 0 && i < defaults.size(); i--) {
+                  String defaultValue = defaults.get(i);
+                  if (defaultValue == null) {
+                     break;
+                  }
 
                String paramStr = this.params.get(i).toString();
-               // Normalize comparison: handle TRUE/FALSE, 1.0f vs 1.0, etc.
                String normalizedParam = normalizeValue(paramStr);
                String normalizedDefault = normalizeValue(defaultValue);
                if (normalizedParam.equals(normalizedDefault)) {
@@ -83,8 +97,11 @@ public class AActionExp extends ScriptNode implements AExpression {
                } else {
                   break;
                }
+               }
+               paramCount = lastNonDefault;
+            } else {
+               paramCount = this.params.size();
             }
-            paramCount = lastNonDefault;
          } catch (Exception e) {
             // If there's any error, output all parameters
             paramCount = this.params.size();
@@ -100,13 +117,15 @@ public class AActionExp extends ScriptNode implements AExpression {
       return buff.toString();
    }
 
-   private boolean isLikelyCompilerInsertedDefault(String defaultValue) {
-      if (defaultValue == null) {
-         return false;
-      }
-      String v = defaultValue.trim();
-      return v.equalsIgnoreCase("FALSE") || v.equals("-1") || v.equals("0xFFFFFFFF") || v.equals("0xFFFFFFFFFFFFFFFF");
-   }
+   /**
+    * Heuristic to decide whether a trailing default argument was likely
+    * inserted by the compiler rather than written explicitly in source.
+    * <p>
+    * Keep boolean defaults (e.g., FALSE/0) because many game scripts pass
+    * them deliberately for clarity, and the compiled bytecode does not let
+    * us distinguish an omitted optional bool from an explicit one. Only
+    * trim sentinel values that are almost certainly compiler-generated.
+    */
 
    private String normalizeValue(String value) {
       if (value == null) {

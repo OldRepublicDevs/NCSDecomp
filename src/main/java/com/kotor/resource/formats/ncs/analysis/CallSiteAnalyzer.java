@@ -27,6 +27,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
 
+
 /**
  * Lightweight stack simulator that estimates parameter counts for JSR targets
  * based solely on call-site stack effects. It is conservative (prefers larger

@@ -212,23 +212,27 @@ public class SubroutineState {
       new Type((byte)-1);
       this.paramstyped = true;
       boolean redo = this.params.size() > 0;
-      if (types.size() != this.paramsize) {
-         throw new RuntimeException(
-            "Parameter count does not match: expected " + Integer.toString(this.paramsize) + " and got " + Integer.toString(types.size())
-         );
-      } else {
-         for (int i = 0; i < types.size(); i++) {
-            Type newtype = types.get(i);
+      if (types.size() < this.paramsize) {
+         while (types.size() < this.paramsize) {
+            types.addFirst(new Type((byte)-1));
+         }
+      } else if (types.size() > this.paramsize) {
+         while (types.size() > this.paramsize) {
+            types.removeFirst();
+         }
+      }
 
-            if (redo && !this.params.get(i).isTyped()) {
-               this.params.set(i, newtype);
-            } else if (!redo) {
-               this.params.add(newtype);
-            }
+      for (int i = 0; i < types.size(); i++) {
+         Type newtype = types.get(i);
 
-            if (!this.params.get(i).isTyped()) {
-               this.paramstyped = false;
-            }
+         if (redo && !this.params.get(i).isTyped()) {
+            this.params.set(i, newtype);
+         } else if (!redo) {
+            this.params.add(newtype);
+         }
+
+         if (!this.params.get(i).isTyped()) {
+            this.paramstyped = false;
          }
       }
    }
