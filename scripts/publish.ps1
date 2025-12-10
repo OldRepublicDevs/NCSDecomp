@@ -267,19 +267,22 @@ try {
     Add-Type -AssemblyName System.IO.Compression.FileSystem
     $compressionLevel = [System.IO.Compression.CompressionLevel]::Optimal
 
+    $publishDirResolved = (Resolve-Path $publishDir).Path
+    $zipPathResolved = Join-Path (Get-Location).Path $zipFileName
+
     # Create ZIP from publish directory
     [System.IO.Compression.ZipFile]::CreateFromDirectory(
-        (Resolve-Path $publishDir).Path,
-        (Resolve-Path $zipPath).Path,
+        $publishDirResolved,
+        $zipPathResolved,
         $compressionLevel,
         $false  # includeBaseDirectory = false (we want contents, not the publish folder itself)
     )
 
-    $zipSize = [math]::Round((Get-Item $zipPath).Length / 1MB, 2)
+    $zipSize = [math]::Round((Get-Item $zipPathResolved).Length / 1MB, 2)
     Write-Host "  - Created ZIP archive: $zipFileName ($zipSize MB)" -ForegroundColor Cyan
 } catch {
     Write-Host "  Error creating ZIP archive: $_" -ForegroundColor Red
-    Write-Host "  Falling back to manual ZIP creation..." -ForegroundColor Yellow
+    Write-Host "  Falling back to Compress-Archive..." -ForegroundColor Yellow
 
     # Fallback: Use Compress-Archive (PowerShell 5.0+)
     try {
