@@ -2067,10 +2067,11 @@ public class NCSDecompCLIRoundTripTest {
       normalized = stripComments(normalized);
       normalized = normalizeIncludes(normalized);
       normalized = normalizeDeclarationAssignment(normalized);
-      normalized = normalizeFunctionBraces(normalized);
       normalized = normalizeLeadingPlaceholders(normalized);
       normalized = normalizePlaceholderGlobals(normalized);
       normalized = normalizeVariableNames(normalized);
+      // Remove extra blocks AFTER variable name normalization to ensure declarations are preserved
+      normalized = normalizeFunctionBraces(normalized);
       normalized = normalizeTrailingZeroParams(normalized);
       normalized = normalizeTrailingDefaults(normalized);
       normalized = normalizeEffectDeathDefaults(normalized);
@@ -2325,16 +2326,20 @@ public class NCSDecompCLIRoundTripTest {
       // then match the closing brace before return and remove it
       
       // Use a more careful approach: find function signatures followed by double opening braces
-      // and remove the inner one, preserving all content
+      // Pattern matches: function() { followed by optional whitespace/newline/tabs and another {
+      // Replace with just: function() { (preserving the newline and ALL content after, including declarations)
+      // The key is to preserve everything after the function opening brace, including the first line
       java.util.regex.Pattern funcWithExtraBlock = java.util.regex.Pattern.compile(
-            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{)\\s*\\n?\\s*\\{",
+            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*[\\r\\n]+\\s*)\\{\\s*",
             java.util.regex.Pattern.MULTILINE);
       result = funcWithExtraBlock.matcher(result).replaceAll("$1");
       
       // Remove closing brace of extra block before return: } return; } -> return; }
-      // Be very careful to preserve content - match closing brace, whitespace, return, whitespace, closing brace
+      // Match: closing brace, optional whitespace/newlines, return statement,
+      // optional whitespace/newlines, closing brace of function
+      // Be careful to preserve the return statement and function closing brace
       java.util.regex.Pattern extraBlockClosePattern = java.util.regex.Pattern.compile(
-            "\\}\\s*\\n\\s*return\\s*;\\s*\\n\\s*\\}",
+            "\\}\\s*[\\r\\n]+\\s*return\\s*;\\s*[\\r\\n]+\\s*\\}",
             java.util.regex.Pattern.MULTILINE);
       result = extraBlockClosePattern.matcher(result).replaceAll("\nreturn; }");
       
