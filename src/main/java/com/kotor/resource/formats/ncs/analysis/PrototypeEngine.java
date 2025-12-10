@@ -114,7 +114,7 @@ public class PrototypeEngine {
                );
             }
             int pos = this.nodedata.getPos(sub);
-            int inferredParams = callsiteParams.getOrDefault(Integer.valueOf(pos), 0);
+            int inferredParams = callsiteParams.getOrDefault(pos, 0);
             if (inferredParams == 0) {
                inferredParams = Math.max(inferredParams, this.estimateParamsFromMovesp(sub));
             }
