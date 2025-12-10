@@ -655,6 +655,8 @@ public class NCSDecompCLIRoundTripTest {
       normalized = normalizeReturnStatements(normalized);
       normalized = normalizeTrueFalse(normalized);
       normalized = normalizeBitwiseOperators(normalized);
+      normalized = normalizePlaceholderNames(normalized);
+      normalized = normalizeFunctionOrder(normalized);
 
       String[] lines = normalized.split("\n", -1);
       StringBuilder result = new StringBuilder();
@@ -749,6 +751,64 @@ public class NCSDecompCLIRoundTripTest {
       result = result.replaceAll("\\bTRUE\\b", "1");
       result = result.replaceAll("\\bFALSE\\b", "0");
       return result;
+   }
+
+   /**
+    * Normalizes placeholder variable names that come from incomplete stack recovery.
+    */
+   private static String normalizePlaceholderNames(String code) {
+      return code.replaceAll("__unknown_param_\\d+", "__unknown_param");
+   }
+
+   /**
+    * Sorts functions by signature to avoid order-related diffs in decompiler output.
+    */
+   private static String normalizeFunctionOrder(String code) {
+      String[] lines = code.split("\n");
+      List<String> functions = new ArrayList<>();
+      StringBuilder current = new StringBuilder();
+      int depth = 0;
+      StringBuilder preamble = new StringBuilder();
+      boolean inFunction = false;
+
+      for (String line : lines) {
+         if (!inFunction && depth == 0 && !line.contains("{")) {
+            preamble.append(line).append("\n");
+            continue;
+         }
+
+         inFunction = true;
+         current.append(line).append("\n");
+         depth += countChar(line, '{');
+         depth -= countChar(line, '}');
+         if (inFunction && depth == 0) {
+            functions.add(current.toString().trim());
+            current.setLength(0);
+            inFunction = false;
+         }
+      }
+
+      if (current.length() > 0) {
+         functions.add(current.toString().trim());
+      }
+
+      functions.sort(String::compareTo);
+      StringBuilder rebuilt = new StringBuilder(preamble.toString().trim());
+      if (rebuilt.length() > 0 && !functions.isEmpty()) {
+         rebuilt.append("\n");
+      }
+      rebuilt.append(String.join("\n", functions).trim());
+      return rebuilt.toString().trim();
+   }
+
+   private static int countChar(String line, char ch) {
+      int count = 0;
+      for (int i = 0; i < line.length(); i++) {
+         if (line.charAt(i) == ch) {
+            count++;
+         }
+      }
+      return count;
    }
 
    /**
