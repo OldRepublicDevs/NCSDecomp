@@ -64,35 +64,17 @@ public class LocalTypeStack extends LocalStack<Type> {
    }
 
    public void remove(int count) {
-      int remaining = count;
-      while (remaining > 0) {
-         if (this.stack.isEmpty()) {
-            // consume the missing slot to keep stack math consistent
-            remaining--;
-            continue;
-         }
-
-         Type type = this.stack.removeFirst();
-         int size = Math.max(1, type.size());
-         remaining -= size;
+      int actualCount = Math.min(count, this.stack.size());
+      for (int i = 0; i < actualCount; i++) {
+         this.stack.removeFirst();
       }
    }
 
    public void removeParams(int count, SubroutineState state) {
       LinkedList<Type> params = new LinkedList<>();
 
-      int remaining = count;
-      while (remaining > 0) {
-         Type type;
-         if (this.stack.isEmpty()) {
-            // pad missing entries with unknown types to preserve arity
-            type = new Type((byte)-1);
-            remaining--;
-         } else {
-            type = this.stack.removeFirst();
-            remaining -= Math.max(1, type.size());
-         }
-
+      for (int i = 0; i < count; i++) {
+         Type type = this.stack.isEmpty() ? new Type((byte)-1) : this.stack.removeFirst();
          params.addFirst(type);
       }
 
