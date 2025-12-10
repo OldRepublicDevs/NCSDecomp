@@ -80,21 +80,21 @@ public class NCSDecompCLIRoundTripTest {
 
    // Paths relative to DeNCS directory
   private static final Path REPO_ROOT = Paths.get(".").toAbsolutePath().normalize();
-  
+
   /**
    * Finds the compiler executable by trying multiple filenames in multiple locations.
    * Tries in order:
    * 1. tools/ directory - all 3 filenames
    * 2. Current working directory - all 3 filenames
    * 3. NCSDecomp installation directory - all 3 filenames
-   * 
+   *
    * Filenames tried in order: nwnnsscomp.exe, nwnnsscomp_kscript.exe, nwnnsscomp_tslpatcher.exe
-   * 
+   *
    * @return Path to the found compiler, or default path if not found
    */
   private static Path findCompiler() {
      String[] compilerNames = {"nwnnsscomp.exe", "nwnnsscomp_kscript.exe", "nwnnsscomp_tslpatcher.exe"};
-     
+
      // 1. Try tools/ directory - all 3 filenames
      Path toolsDir = REPO_ROOT.resolve("tools");
      for (String name : compilerNames) {
@@ -103,7 +103,7 @@ public class NCSDecompCLIRoundTripTest {
            return candidate;
         }
      }
-     
+
      // 2. Try current working directory - all 3 filenames
      Path cwd = Paths.get(System.getProperty("user.dir"));
      for (String name : compilerNames) {
@@ -112,7 +112,7 @@ public class NCSDecompCLIRoundTripTest {
            return candidate;
         }
      }
-     
+
      // 3. Try NCSDecomp installation directory - all 3 filenames
      try {
         // Get the location of the test class (jar/exe location)
@@ -156,13 +156,13 @@ public class NCSDecompCLIRoundTripTest {
      } catch (Exception e) {
         // Fall through - couldn't determine jar location
      }
-     
+
      // Default fallback
      return REPO_ROOT.resolve("tools").resolve("nwnnsscomp.exe");
   }
-  
+
   private static final Path NWN_COMPILER;
-  
+
   static {
      NWN_COMPILER = findCompiler();
   }
@@ -545,11 +545,11 @@ public class NCSDecompCLIRoundTripTest {
          boolean isK2 = "k2".equals(gameFlag);
          String originalExpanded = expandIncludes(nssPath, gameFlag);
          String roundtripRaw = new String(Files.readAllBytes(decompiled), StandardCharsets.UTF_8);
-         
+
          // Filter out functions from included files that aren't in the decompiled output
          // This handles cases where includes have functions that aren't compiled into the NCS
          String originalExpandedFiltered = filterFunctionsNotInDecompiled(originalExpanded, roundtripRaw);
-         
+
          String original = normalizeNewlines(originalExpandedFiltered, isK2);
          String roundtrip = normalizeNewlines(roundtripRaw, isK2);
          long compareTime = System.nanoTime() - compareTextStart;
@@ -642,25 +642,25 @@ public class NCSDecompCLIRoundTripTest {
 
    /**
     * ⚠️ REMOVED: This function was fixing decompiler output, which is STRICTLY FORBIDDEN.
-    * 
+    *
     * Tests must NOT fix syntax errors, invalid expressions, or any decompiler output issues.
     * If the decompiler produces invalid expressions, that is a BUG in the decompiler source code
     * that must be fixed there, not worked around in tests.
-    * 
+    *
     * DO NOT re-implement this function or any similar "fixing" logic.
     * Fix the decompiler source code instead.
     */
-   
+
    /**
     * ⚠️ REMOVED: This function was declaring missing variables, which is STRICTLY FORBIDDEN.
-    * 
+    *
     * Tests must NOT fix decompiler output by adding variable declarations or any other fixes.
     * If the decompiler produces code with undeclared variables, that is a BUG in the decompiler
     * source code that must be fixed there. The decompiler should either:
     * 1. Declare variables itself
     * 2. Infer types properly
     * 3. Handle them in some other correct way
-    * 
+    *
     * DO NOT re-implement this function or any similar "fixing" logic.
     * Fix the decompiler source code instead.
     */
@@ -672,10 +672,10 @@ public class NCSDecompCLIRoundTripTest {
       throw new UnsupportedOperationException(
             "Variable declaration fixing is FORBIDDEN. Fix the decompiler source code instead.");
    }
-   
+
    /**
     * ⚠️ REMOVED: Original implementation that was fixing decompiler output.
-    * 
+    *
     * Original function body removed - it was declaring missing variables which is FORBIDDEN.
     * If you need variable declarations, fix the decompiler to produce them correctly.
     */
@@ -688,7 +688,7 @@ public class NCSDecompCLIRoundTripTest {
       while (unknownMatcher.find()) {
          unknownParams.add(unknownMatcher.group(0));
       }
-      
+
       // Find all variable declarations
       java.util.Set<String> declaredVars = new java.util.HashSet<>();
       java.util.regex.Pattern varDeclPattern = java.util.regex.Pattern.compile(
@@ -697,7 +697,7 @@ public class NCSDecompCLIRoundTripTest {
       while (declMatcher.find()) {
          declaredVars.add(declMatcher.group(2));
       }
-      
+
       // Find all function names (both user-defined and nwscript) to avoid declaring them as variables
       java.util.Set<String> functionNames = new java.util.HashSet<>();
       // Find user function definitions
@@ -719,7 +719,7 @@ public class NCSDecompCLIRoundTripTest {
             functionNames.add(funcName);
          }
       }
-      
+
       // Find all variable usages that aren't declared
       // Use a simpler, more aggressive approach: find all identifiers and filter
       java.util.Set<String> usedVars = new java.util.HashSet<>();
@@ -729,12 +729,12 @@ public class NCSDecompCLIRoundTripTest {
       while (usageMatcher.find()) {
          String varName = usageMatcher.group(1);
          int pos = usageMatcher.start();
-         
+
          // Skip if it's a reserved word, already declared, or a function name
          if (isReservedName(varName) || declaredVars.contains(varName) || functionNames.contains(varName)) {
             continue;
          }
-         
+
          // Skip known patterns
          if (varName.matches("^(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\d+$") ||
              varName.startsWith("intGLOB_") || varName.startsWith("objectGLOB_") ||
@@ -742,7 +742,7 @@ public class NCSDecompCLIRoundTripTest {
              varName.startsWith("__unknown_param_")) {
             continue;
          }
-         
+
          // Check if it's a function definition (type name varName(...))
          boolean isFunctionDef = false;
          if (pos > 5) {
@@ -751,11 +751,11 @@ public class NCSDecompCLIRoundTripTest {
                isFunctionDef = true;
             }
          }
-         
+
          if (isFunctionDef) {
             continue;
          }
-         
+
          // Check if it's followed by ( - could be a function call
          char after = pos + varName.length() < content.length() ? content.charAt(pos + varName.length()) : ' ';
          if (after == '(') {
@@ -775,7 +775,7 @@ public class NCSDecompCLIRoundTripTest {
             usedVars.add(varName);
          }
       }
-      
+
       // Find insertion point (after globals, before first function)
       String[] lines = content.split("\n", -1);
       int insertLine = -1;
@@ -786,22 +786,22 @@ public class NCSDecompCLIRoundTripTest {
             break;
          }
       }
-      
+
       if (insertLine == -1) {
          insertLine = lines.length;
       }
-      
+
       // Build fixed content with variable declarations
       StringBuilder fixed = new StringBuilder();
       for (int i = 0; i < insertLine; i++) {
          fixed.append(lines[i]).append("\n");
       }
-      
+
       // Add declarations for __unknown_param_* (as int, default to 0)
       for (String param : unknownParams) {
          fixed.append("\tint ").append(param).append(" = 0;\n");
       }
-      
+
       // Add declarations for used but undeclared variables
       for (String var : usedVars) {
          // Infer type from name
@@ -820,7 +820,7 @@ public class NCSDecompCLIRoundTripTest {
             fixed.append("\tint ").append(var).append(" = 0;\n");
          }
       }
-      
+
       // Add rest of content
       for (int i = insertLine; i < lines.length; i++) {
          fixed.append(lines[i]);
@@ -828,7 +828,7 @@ public class NCSDecompCLIRoundTripTest {
             fixed.append("\n");
          }
       }
-      
+
       return fixed.toString();
    }
 
@@ -872,11 +872,11 @@ public class NCSDecompCLIRoundTripTest {
     */
    /**
     * ⚠️ REMOVED: This function was fixing function signatures, which is STRICTLY FORBIDDEN.
-    * 
+    *
     * Tests must NOT fix function signatures, type mismatches, or any decompiler output issues.
     * If the decompiler produces incorrect function signatures, that is a BUG in the decompiler
     * source code that must be fixed there, not worked around in tests.
-    * 
+    *
     * DO NOT re-implement this function or any similar "fixing" logic.
     * Fix the decompiler source code instead.
     */
@@ -888,10 +888,10 @@ public class NCSDecompCLIRoundTripTest {
       throw new UnsupportedOperationException(
             "Function signature fixing is FORBIDDEN. Fix the decompiler source code instead.");
    }
-   
+
    /**
     * ⚠️ REMOVED: Original implementation that was fixing decompiler output.
-    * 
+    *
     * Original function body removed - it was fixing function signatures which is FORBIDDEN.
     * If you need correct function signatures, fix the decompiler to produce them correctly.
     */
@@ -899,22 +899,22 @@ public class NCSDecompCLIRoundTripTest {
    private static String fixFunctionSignaturesFromCallSites_REMOVED(String content, String gameFlag) {
       // Load nwscript signatures
       java.util.Map<String, String[]> nwscriptSigs = loadNwscriptSignatures(gameFlag);
-      
+
       // Find all function definitions (both prototypes and implementations)
       java.util.regex.Pattern funcDefPattern = java.util.regex.Pattern.compile(
             "(void|int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\(([^)]*)\\)");
-      
+
       // First pass: collect all function definitions and their bodies
       java.util.Map<String, String> funcBodies = new java.util.HashMap<>();
       java.util.Map<String, String> funcSignatures = new java.util.HashMap<>();
       java.util.regex.Matcher funcMatcher = funcDefPattern.matcher(content);
-      
+
       while (funcMatcher.find()) {
          String funcName = funcMatcher.group(2);
          String fullMatch = funcMatcher.group(0);
          int matchStart = funcMatcher.start();
          int matchEnd = funcMatcher.end();
-         
+
          // Check if this is an implementation (has body) or just a prototype
          int bracePos = content.indexOf('{', matchEnd);
          if (bracePos != -1 && (bracePos - matchEnd) < 50) { // Body starts soon after signature
@@ -925,7 +925,7 @@ public class NCSDecompCLIRoundTripTest {
             }
          }
       }
-      
+
       // Second pass: fix function signatures based on nwscript calls
       funcMatcher = funcDefPattern.matcher(content);
       StringBuffer result = new StringBuffer();
@@ -933,11 +933,11 @@ public class NCSDecompCLIRoundTripTest {
          String funcName = funcMatcher.group(2);
          String params = funcMatcher.group(3);
          String returnType = funcMatcher.group(1);
-         
+
          if (!params.trim().isEmpty()) {
             String[] paramDecls = params.split(",");
             java.util.Map<Integer, String> typeHints = new java.util.HashMap<>();
-            
+
             // Get function body if it exists
             String funcBody = funcBodies.get(funcName);
             if (funcBody != null) {
@@ -946,12 +946,12 @@ public class NCSDecompCLIRoundTripTest {
                for (int i = 0; i < paramDecls.length; i++) {
                   paramNames[i] = extractParamName(paramDecls[i].trim());
                }
-               
+
                // Check each nwscript function call in the body
                for (java.util.Map.Entry<String, String[]> nwscriptEntry : nwscriptSigs.entrySet()) {
                   String nwscriptFunc = nwscriptEntry.getKey();
                   String[] expectedTypes = nwscriptEntry.getValue();
-                  
+
                   // Find calls to this nwscript function in the body
                   java.util.regex.Pattern nwscriptCallPattern = java.util.regex.Pattern.compile(
                         java.util.regex.Pattern.quote(nwscriptFunc) + "\\s*\\(([^)]*)\\)");
@@ -976,12 +976,12 @@ public class NCSDecompCLIRoundTripTest {
                      if (currentArg.length() > 0) {
                         argList.add(currentArg.toString().trim());
                      }
-                     
+
                      // Match arguments to function parameters
                      for (int i = 0; i < argList.size() && i < expectedTypes.length; i++) {
                         String arg = argList.get(i);
                         String expectedType = expectedTypes[i];
-                        
+
                         // Check if this argument is a parameter (exact match or part of expression)
                         for (int j = 0; j < paramNames.length; j++) {
                            String paramName = paramNames[j];
@@ -993,10 +993,10 @@ public class NCSDecompCLIRoundTripTest {
                                     "\\b" + java.util.regex.Pattern.quote(paramName) + "\\b");
                               isParam = paramPattern.matcher(arg).find();
                            }
-                           
+
                            if (isParam) {
                               // This parameter is passed to nwscript function expecting expectedType
-                              if (expectedType != null && !expectedType.equals("int") && 
+                              if (expectedType != null && !expectedType.equals("int") &&
                                   paramDecls[j].trim().startsWith("int ")) {
                                  typeHints.put(j, expectedType);
                                  break; // Found match, move to next argument
@@ -1007,7 +1007,7 @@ public class NCSDecompCLIRoundTripTest {
                   }
                }
             }
-            
+
             // Also check direct call sites (when function is called with literals)
             java.util.regex.Pattern callPattern = java.util.regex.Pattern.compile(
                   java.util.regex.Pattern.quote(funcName) + "\\s*\\(([^)]*)\\)");
@@ -1029,7 +1029,7 @@ public class NCSDecompCLIRoundTripTest {
                   }
                }
             }
-            
+
             // Apply type hints
             if (!typeHints.isEmpty()) {
                StringBuilder newParams = new StringBuilder();
@@ -1050,22 +1050,22 @@ public class NCSDecompCLIRoundTripTest {
       }
       funcMatcher.appendTail(result);
       String fixedContent = result.toString();
-      
+
       // Third pass: fix function prototypes to match their definitions
       // Find all prototypes and definitions, ensure they match
       java.util.Map<String, String> funcDefs = new java.util.HashMap<>();
       java.util.Map<String, String> funcProtos = new java.util.HashMap<>();
-      
+
       funcMatcher = funcDefPattern.matcher(fixedContent);
       while (funcMatcher.find()) {
          String funcName = funcMatcher.group(2);
          String fullSig = funcMatcher.group(0);
          int matchEnd = funcMatcher.end();
-         
+
          // Check if this is a prototype (ends with ;) or definition (has {)
          int semicolonPos = fixedContent.indexOf(';', matchEnd);
          int bracePos = fixedContent.indexOf('{', matchEnd);
-         
+
          if (semicolonPos != -1 && (bracePos == -1 || semicolonPos < bracePos)) {
             // This is a prototype
             funcProtos.put(funcName, fullSig);
@@ -1074,23 +1074,23 @@ public class NCSDecompCLIRoundTripTest {
             funcDefs.put(funcName, fullSig);
          }
       }
-      
+
       // Update prototypes to match definitions
       for (java.util.Map.Entry<String, String> entry : funcDefs.entrySet()) {
          String funcName = entry.getKey();
          String defSig = entry.getValue();
          String protoSig = funcProtos.get(funcName);
-         
+
          if (protoSig != null && !protoSig.equals(defSig)) {
             // Replace prototype with definition signature (but keep the semicolon)
             String newProto = defSig + ";";
             fixedContent = fixedContent.replace(protoSig + ";", newProto);
          }
       }
-      
+
       return fixedContent;
    }
-   
+
    /**
     * Extracts parameter name from parameter declaration.
     */
@@ -1099,7 +1099,7 @@ public class NCSDecompCLIRoundTripTest {
       String[] parts = paramDecl.split("\\s+");
       return parts.length > 1 ? parts[parts.length - 1] : paramDecl;
    }
-   
+
    /**
     * Finds the body of a function starting at the given position.
     */
@@ -1109,7 +1109,7 @@ public class NCSDecompCLIRoundTripTest {
       if (bracePos == -1) {
          return null;
       }
-      
+
       int start = bracePos + 1;
       int depth = 1;
       int i = start;
@@ -1124,7 +1124,7 @@ public class NCSDecompCLIRoundTripTest {
       }
       return null;
    }
-   
+
    /**
     * Infers the type of a function argument from its value.
     */
@@ -1142,23 +1142,23 @@ public class NCSDecompCLIRoundTripTest {
 
    /**
     * ⚠️ REMOVED: This function previously "fixed" decompiler output, which is STRICTLY FORBIDDEN.
-    * 
+    *
     * Tests must NOT fix syntax errors, mangled code, or any decompiler output issues.
     * If the decompiler produces code that doesn't compile or has errors, that is a BUG
     * in the decompiler source code that must be fixed there, not worked around in tests.
-    * 
+    *
     * The decompiled code is now used as-is for recompilation. If it doesn't compile,
     * the test will fail, which is the correct behavior - it indicates the decompiler
     * needs to be fixed to produce correct, compilable output.
     */
-   
+
    /**
     * ⚠️ REMOVED: This function was fixing return type mismatches, which is STRICTLY FORBIDDEN.
-    * 
+    *
     * Tests must NOT fix return statements, type mismatches, or any decompiler output issues.
     * If the decompiler produces incorrect return statements, that is a BUG in the decompiler
     * source code that must be fixed there, not worked around in tests.
-    * 
+    *
     * DO NOT re-implement this function or any similar "fixing" logic.
     * Fix the decompiler source code instead.
     */
@@ -1170,10 +1170,10 @@ public class NCSDecompCLIRoundTripTest {
       throw new UnsupportedOperationException(
             "Return type mismatch fixing is FORBIDDEN. Fix the decompiler source code instead.");
    }
-   
+
    /**
     * ⚠️ REMOVED: Original implementation that was fixing decompiler output.
-    * 
+    *
     * Original function body removed - it was fixing return statements which is FORBIDDEN.
     * If you need correct return statements, fix the decompiler to produce them correctly.
     */
@@ -1182,27 +1182,27 @@ public class NCSDecompCLIRoundTripTest {
       // Find all void function definitions
       java.util.regex.Pattern voidFuncPattern = java.util.regex.Pattern.compile(
             "void\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*\\([^)]*\\)\\s*\\{");
-      
+
       StringBuffer result = new StringBuffer();
       java.util.regex.Matcher funcMatcher = voidFuncPattern.matcher(content);
       int lastPos = 0;
-      
+
       while (funcMatcher.find()) {
          int funcStart = funcMatcher.start();
          int funcEnd = funcMatcher.end();
-         
+
          // Safety check: ensure lastPos <= funcStart
          if (lastPos > funcStart) {
             // Skip this match if we've already passed it
             continue;
          }
-         
+
          // Add content before this function
          if (lastPos < funcStart) {
             result.append(content.substring(lastPos, funcStart));
          }
          result.append(funcMatcher.group(0)); // Function signature
-         
+
          // Find the function body
          String funcBody = findFunctionBody(content, funcStart);
          if (funcBody != null) {
@@ -1210,7 +1210,7 @@ public class NCSDecompCLIRoundTripTest {
             String fixedBody = funcBody.replaceAll("return\\s+[^;]+;", "return;");
             result.append(fixedBody);
             result.append("}");
-            
+
             // Update lastPos to after the function
             // funcEnd points to after the opening brace (pattern ends with {)
             // body starts at funcEnd, has length funcBody.length(), closing brace is after that
@@ -1219,7 +1219,7 @@ public class NCSDecompCLIRoundTripTest {
             lastPos = funcEnd;
          }
       }
-      
+
       // Add remaining content
       if (lastPos < content.length()) {
          result.append(content.substring(lastPos));
@@ -1334,7 +1334,7 @@ public class NCSDecompCLIRoundTripTest {
    /**
     * Filters out functions from the expanded original that aren't present in the decompiled output.
     * This handles cases where included files have functions that aren't compiled into the NCS bytecode.
-    * 
+    *
     * @param expandedOriginal The expanded original with all includes inlined
     * @param decompiledOutput The decompiled NSS output
     * @return The filtered original containing only functions present in the decompiled output
@@ -1342,19 +1342,21 @@ public class NCSDecompCLIRoundTripTest {
    private static String filterFunctionsNotInDecompiled(String expandedOriginal, String decompiledOutput) {
       // Extract function signatures from decompiled output
       Set<String> decompiledSignatures = extractFunctionSignatures(decompiledOutput);
-      
+
       // If decompiled output has no functions, return original as-is (will fail comparison but that's expected)
       if (decompiledSignatures.isEmpty()) {
          return expandedOriginal;
       }
-      
+
       // Parse and filter the expanded original
       return filterFunctionsBySignatures(expandedOriginal, decompiledSignatures);
    }
-   
+
    /**
-    * Extracts function signatures (name and parameter count) from code.
-    * Returns a set of normalized signatures like "functionName/paramCount"
+    * Extracts function signatures (parameter count and return type) from code.
+    * Returns a set of normalized signatures like "returnType/paramCount" to match
+    * functions regardless of their names (since decompiler may use generic names like sub1, sub2).
+    * Also tracks function order to help with matching.
     */
    private static Set<String> extractFunctionSignatures(String code) {
       Set<String> signatures = new HashSet<>();
@@ -1362,9 +1364,11 @@ public class NCSDecompCLIRoundTripTest {
       java.util.regex.Pattern funcPattern = java.util.regex.Pattern.compile(
             "^(\\s*)(\\w+)\\s+(\\w+)\\s*\\([^)]*\\)\\s*\\{",
             java.util.regex.Pattern.MULTILINE);
-      
+
       java.util.regex.Matcher matcher = funcPattern.matcher(code);
+      int functionIndex = 0;
       while (matcher.find()) {
+         String returnType = matcher.group(2);
          String funcName = matcher.group(3);
          String fullMatch = matcher.group(0);
          // Count parameters by counting commas + 1 (if not empty)
@@ -1377,13 +1381,17 @@ public class NCSDecompCLIRoundTripTest {
                paramCount = paramList.split(",").length;
             }
          }
-         // Normalize: functionName/paramCount
-         signatures.add(funcName.toLowerCase() + "/" + paramCount);
+         // Normalize: returnType/paramCount/index
+         // Include index to help distinguish functions with same signature
+         // But also add without index for flexible matching
+         signatures.add(returnType.toLowerCase() + "/" + paramCount);
+         signatures.add(returnType.toLowerCase() + "/" + paramCount + "/" + functionIndex);
+         functionIndex++;
       }
-      
+
       return signatures;
    }
-   
+
    /**
     * Filters functions from code, keeping only those whose signatures match the provided set.
     */
@@ -1395,17 +1403,18 @@ public class NCSDecompCLIRoundTripTest {
       int depth = 0;
       boolean keepFunction = false;
       String currentSignature = null;
-      
+
       // Pattern to match function signature
       java.util.regex.Pattern funcPattern = java.util.regex.Pattern.compile(
             "^(\\s*)(\\w+)\\s+(\\w+)\\s*\\([^)]*\\)\\s*\\{");
-      
+
       for (String line : lines) {
          java.util.regex.Matcher matcher = funcPattern.matcher(line);
          boolean isFunctionStart = matcher.find();
-         
+
          if (!inFunction && isFunctionStart) {
             // Starting a new function
+            String returnType = matcher.group(2);
             String funcName = matcher.group(3);
             String fullMatch = matcher.group(0);
             int paramCount = 0;
@@ -1417,19 +1426,21 @@ public class NCSDecompCLIRoundTripTest {
                   paramCount = paramList.split(",").length;
                }
             }
-            currentSignature = funcName.toLowerCase() + "/" + paramCount;
+            // Match by returnType/paramCount (ignoring function name)
+            // This allows matching generic names like "sub1" to actual names like "UT_DeterminesItemCost"
+            currentSignature = returnType.toLowerCase() + "/" + paramCount;
             keepFunction = allowedSignatures.contains(currentSignature);
             inFunction = true;
             depth = 0;
             currentFunction.setLength(0);
          }
-         
+
          if (inFunction) {
             currentFunction.append(line).append("\n");
             int openBraces = countChar(line, '{');
             int closeBraces = countChar(line, '}');
             depth += openBraces - closeBraces;
-            
+
             if (depth <= 0) {
                // Function ended
                if (keepFunction) {
@@ -1449,6 +1460,7 @@ public class NCSDecompCLIRoundTripTest {
                      "^(\\s*)(\\w+)\\s+(\\w+)\\s*\\([^)]*\\)\\s*;");
                java.util.regex.Matcher protoMatcher = protoPattern.matcher(line);
                if (protoMatcher.find()) {
+                  String returnType = protoMatcher.group(2);
                   String funcName = protoMatcher.group(3);
                   String fullMatch = protoMatcher.group(0);
                   int paramCount = 0;
@@ -1460,7 +1472,8 @@ public class NCSDecompCLIRoundTripTest {
                         paramCount = paramList.split(",").length;
                      }
                   }
-                  String protoSignature = funcName.toLowerCase() + "/" + paramCount;
+                  // Match by returnType/paramCount (ignoring function name)
+                  String protoSignature = returnType.toLowerCase() + "/" + paramCount;
                   if (allowedSignatures.contains(protoSignature)) {
                      result.add(line);
                   }
@@ -1471,12 +1484,12 @@ public class NCSDecompCLIRoundTripTest {
             result.add(line);
          }
       }
-      
+
       // Handle any remaining function
       if (inFunction && keepFunction) {
          result.add(currentFunction.toString());
       }
-      
+
       return String.join("\n", result);
    }
 
