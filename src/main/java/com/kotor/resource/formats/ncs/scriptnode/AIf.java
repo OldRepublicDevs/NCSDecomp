@@ -14,7 +14,8 @@ public class AIf extends AControlLoop {
    @Override
    public String toString() {
       StringBuffer buff = new StringBuffer();
-      buff.append(this.tabs + "if (" + this.condition.toString() + ") {" + this.newline);
+      String cond = this.formattedCondition();
+      buff.append(this.tabs + "if " + cond + " {" + this.newline);
 
       for (int i = 0; i < this.children.size(); i++) {
          buff.append(this.children.get(i).toString());

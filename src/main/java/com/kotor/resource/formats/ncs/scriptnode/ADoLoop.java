@@ -19,7 +19,7 @@ public class ADoLoop extends AControlLoop {
          buff.append(this.children.get(i).toString());
       }
 
-      buff.append(this.tabs + "} while (" + this.condition.toString() + ");" + this.newline);
+      buff.append(this.tabs + "} while " + this.formattedCondition() + ";" + this.newline);
       return buff.toString();
    }
 }

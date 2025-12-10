@@ -120,10 +120,6 @@ public class PrototypeEngine {
             if (inferredParams < 0) {
                inferredParams = 0;
             }
-            // Avoid collapsing call arguments; assume at least one param if nothing inferred.
-            if (inferredParams == 0) {
-               inferredParams = 1;
-            }
             state.startPrototyping();
             state.setParamCount(inferredParams);
             // Default to int return (bool-compatible) when unknown to preserve call usage.

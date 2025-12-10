@@ -24,6 +24,19 @@ public class AControlLoop extends ScriptRootNode {
       return this.condition;
    }
 
+   /**
+    * Returns the condition wrapped in a single pair of parentheses, adding them only when needed.
+    */
+   protected String formattedCondition() {
+      if (this.condition == null) {
+         return "()";
+      }
+
+      String cond = this.condition.toString().trim();
+      boolean wrapped = cond.startsWith("(") && cond.endsWith(")");
+      return wrapped ? cond : "(" + cond + ")";
+   }
+
    @Override
    public void close() {
       super.close();

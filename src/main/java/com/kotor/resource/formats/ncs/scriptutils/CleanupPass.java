@@ -112,22 +112,6 @@ public class CleanupPass {
                }
             }
 
-            if (AVarDecl.class.isInstance(node1) && it.hasNext()) {
-               ScriptNode node2 = (ScriptNode)it.next();
-               it.previous();
-               if (AExpressionStatement.class.isInstance(node2) && AModifyExp.class.isInstance(((AExpressionStatement)node2).exp())) {
-                  AModifyExp modexp = (AModifyExp)((AExpressionStatement)node2).exp();
-                  if (((AVarDecl)node1).var() == modexp.varRef().var()) {
-                     it.remove();
-                     node2.parent(null);
-                     ((AVarDecl)node1).initializeExp(modexp.expression());
-                  }
-               }
-
-               it.previous();
-               it.next();
-            }
-
             if (this.isDanglingExpression(node1)) {
                AExpressionStatement expstm = new AExpressionStatement((AExpression)node1);
                expstm.parent(rootnode);
