@@ -94,6 +94,20 @@ public class ActionsData {
       return this.actions.get(index).params();
    }
 
+   public List<String> getDefaultValues(int index) {
+      if (index < 0 || index >= this.actions.size()) {
+         throw new RuntimeException("Invalid action index: " + index + " (actions list size: " + this.actions.size() + ")");
+      }
+      return this.actions.get(index).defaultValues();
+   }
+
+   public int getRequiredParamCount(int index) {
+      if (index < 0 || index >= this.actions.size()) {
+         throw new RuntimeException("Invalid action index: " + index + " (actions list size: " + this.actions.size() + ")");
+      }
+      return this.actions.get(index).requiredParamCount();
+   }
+
    /**
     * Immutable record of a single action signature.
     */
@@ -102,6 +116,7 @@ public class ActionsData {
       private final Type returntype;
       private int paramsize;
       private final List<Type> paramlist;
+      private final List<String> defaultValues;
 
       /**
        * Parses a signature line such as {@code void ActionName(int param)}.
@@ -114,14 +129,17 @@ public class ActionsData {
          this.name = name;
          this.returntype = Type.parseType(type);
          this.paramlist = new ArrayList<>();
+         this.defaultValues = new ArrayList<>();
          this.paramsize = 0;
-         Pattern p = Pattern.compile("\\s*(\\w+)\\s+\\w+(\\s*=\\s*\\S+)?\\s*");
+         Pattern p = Pattern.compile("\\s*(\\w+)\\s+\\w+(\\s*=\\s*(\\S+))?\\s*");
          String[] tokens = params.split(",");
 
          for (int i = 0; i < tokens.length; i++) {
             Matcher m = p.matcher(tokens[i]);
             if (m.matches()) {
                this.paramlist.add(new Type(m.group(1)));
+               String defaultValue = m.group(3);
+               this.defaultValues.add(defaultValue != null ? defaultValue.trim() : null);
                this.paramsize = this.paramsize + Type.typeSize(m.group(1));
             }
          }
@@ -150,6 +168,22 @@ public class ActionsData {
       /** Action name. */
       public String name() {
          return this.name;
+      }
+
+      /** Default parameter values in declaration order (null if no default). */
+      public List<String> defaultValues() {
+         return this.defaultValues;
+      }
+
+      /** Returns the number of required parameters (parameters without defaults). */
+      public int requiredParamCount() {
+         int count = 0;
+         for (int i = 0; i < this.defaultValues.size(); i++) {
+            if (this.defaultValues.get(i) == null) {
+               count = i + 1;
+            }
+         }
+         return count;
       }
    }
 }

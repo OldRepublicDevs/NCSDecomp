@@ -543,7 +543,7 @@ public class SubScriptState {
    public void transformAction(AActionCommand node) {
       this.checkStart(node);
       List<AExpression> params = this.removeActionParams(node);
-      AActionExp act = new AActionExp(NodeUtils.getActionName(node, this.actions), NodeUtils.getActionId(node), params);
+      AActionExp act = new AActionExp(NodeUtils.getActionName(node, this.actions), NodeUtils.getActionId(node), params, this.actions);
       Type type = NodeUtils.getReturnType(node, this.actions);
       if (!type.equals((byte) 0)) {
          Variable var = (Variable) this.stack.get(1);

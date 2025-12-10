@@ -4,6 +4,7 @@
 
 package com.kotor.resource.formats.ncs.scriptnode;
 
+import com.kotor.resource.formats.ncs.ActionsData;
 import com.kotor.resource.formats.ncs.stack.StackEntry;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,10 +19,16 @@ public class AActionExp extends ScriptNode implements AExpression {
    private String action;
    private StackEntry stackentry;
    private int id;
+   private ActionsData actionsData;
 
    public AActionExp(String action, int id, List<AExpression> params) {
+      this(action, id, params, null);
+   }
+
+   public AActionExp(String action, int id, List<AExpression> params, ActionsData actionsData) {
       this.action = action;
       this.params = new ArrayList<>();
+      this.actionsData = actionsData;
 
       for (int i = 0; i < params.size(); i++) {
          this.addParam(params.get(i));
@@ -50,13 +57,71 @@ public class AActionExp extends ScriptNode implements AExpression {
       buff.append(this.action + "(");
       String prefix = "";
 
-      for (int i = 0; i < this.params.size(); i++) {
+      int paramCount = this.params.size();
+      if (this.actionsData != null) {
+         try {
+            List<String> defaults = this.actionsData.getDefaultValues(this.id);
+            // Find the last parameter that doesn't match its default value
+            int lastNonDefault = paramCount;
+            for (int i = paramCount - 1; i >= 0 && i < defaults.size(); i--) {
+               String defaultValue = defaults.get(i);
+               if (defaultValue != null) {
+                  String paramStr = this.params.get(i).toString();
+                  // Normalize comparison: handle TRUE/FALSE, 1.0f vs 1.0, etc.
+                  String normalizedParam = normalizeValue(paramStr);
+                  String normalizedDefault = normalizeValue(defaultValue);
+                  if (normalizedParam.equals(normalizedDefault)) {
+                     lastNonDefault = i;
+                  } else {
+                     break;
+                  }
+               } else {
+                  // No default for this parameter, so we must include it and all before it
+                  break;
+               }
+            }
+            paramCount = lastNonDefault;
+         } catch (Exception e) {
+            // If there's any error, output all parameters
+            paramCount = this.params.size();
+         }
+      }
+
+      for (int i = 0; i < paramCount; i++) {
          buff.append(prefix + this.params.get(i).toString());
          prefix = ", ";
       }
 
       buff.append(")");
       return buff.toString();
+   }
+
+   private String normalizeValue(String value) {
+      if (value == null) {
+         return "";
+      }
+      value = value.trim();
+      // Handle TRUE/FALSE constants
+      if (value.equals("TRUE") || value.equals("1")) {
+         return "1";
+      }
+      if (value.equals("FALSE") || value.equals("0")) {
+         return "0";
+      }
+      // Normalize float literals (1.0f -> 1.0, 0.0f -> 0.0)
+      if (value.endsWith("f") || value.endsWith("F")) {
+         value = value.substring(0, value.length() - 1);
+      }
+      // Handle hex values (0xFFFFFFFF -> 4294967295, but we'll compare as hex)
+      if (value.startsWith("0x") || value.startsWith("0X")) {
+         try {
+            long hexVal = Long.parseLong(value.substring(2), 16);
+            return Long.toString(hexVal);
+         } catch (NumberFormatException e) {
+            // Not a valid hex number, return as-is
+         }
+      }
+      return value;
    }
 
    @Override
