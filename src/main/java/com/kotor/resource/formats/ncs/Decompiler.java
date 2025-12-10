@@ -6,6 +6,7 @@ package com.kotor.resource.formats.ncs;
 
 import com.kotor.resource.formats.ncs.stack.Variable;
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.Font;
@@ -61,6 +62,7 @@ import javax.swing.JToolBar;
 import javax.swing.JTextArea;
 import javax.swing.JTree;
 import javax.swing.KeyStroke;
+import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 import javax.swing.event.CaretEvent;
@@ -131,6 +133,10 @@ public class Decompiler
    private JToolBar commandBar;
    private JTextField treeFilterField;
    private JLabel statusBarLabel;
+   private JPanel workspaceCards;
+   private JLabel emptyStateLabel;
+   private static final String CARD_EMPTY = "empty";
+   private static final String CARD_TABS = "tabs";
    private static final String PROJECT_URL = "https://bolabaden.org";
    private static final String GITHUB_URL = "https://github.com/bolabaden";
    private static final String SPONSOR_URL = "https://github.com/sponsors/th3w1zard1";
@@ -193,7 +199,20 @@ public class Decompiler
       this.jTB.setPreferredSize(new Dimension(900, 720));
       this.dropTarget = new DropTarget(this.jTB, this);
 
-      this.upperJSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, this.leftPanel, this.jTB);
+      // Workspace cards to show empty state when no files are open
+      this.workspaceCards = new JPanel(new CardLayout());
+      this.emptyStateLabel = new JLabel(
+         "<html><div style='text-align:center;'><h2>Drop .ncs files here</h2><div>Or use File → Open to start decompiling</div></div></html>",
+         SwingConstants.CENTER
+      );
+      this.emptyStateLabel.setBorder(new EmptyBorder(32, 16, 32, 16));
+      JPanel emptyPanel = new JPanel(new BorderLayout());
+      emptyPanel.add(this.emptyStateLabel, BorderLayout.CENTER);
+      this.workspaceCards.add(emptyPanel, CARD_EMPTY);
+      this.workspaceCards.add(this.jTB, CARD_TABS);
+      this.dropTarget = new DropTarget(this.workspaceCards, this);
+
+      this.upperJSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, this.leftPanel, this.workspaceCards);
       this.upperJSplitPane.setDividerLocation(260);
       this.upperJSplitPane.setResizeWeight(0.2);
       this.upperJSplitPane.setDividerSize(6);
@@ -234,6 +253,7 @@ public class Decompiler
       this.setSize(new Dimension(1200, 820));
       this.setLocationRelativeTo(null);
       this.addWindowListener(this);
+      this.updateWorkspaceCard();
       this.setVisible(true);
    }
 
@@ -320,6 +340,7 @@ public class Decompiler
 
    private JButton createToolbarButton(String action) {
       JButton button = new JButton(action);
+      button.setActionCommand(action);
       button.setFocusable(false);
       button.addActionListener(this);
       button.putClientProperty("action", action);
@@ -358,6 +379,31 @@ public class Decompiler
       for (int i = 0; i < childCount; i++) {
          Object child = model.getChild(node, i);
          collectMatchingPaths(model, path.pathByAddingChild(child), query, matches);
+      }
+   }
+
+   private void updateWorkspaceCard() {
+      CardLayout cl = (CardLayout)this.workspaceCards.getLayout();
+      if (this.jTB.getTabCount() == 0) {
+         cl.show(this.workspaceCards, CARD_EMPTY);
+      } else {
+         cl.show(this.workspaceCards, CARD_TABS);
+      }
+   }
+
+   private void updateTabLabel(JPanel tabPanel, boolean unsaved) {
+      if (tabPanel == null || tabPanel.getComponentCount() == 0) {
+         return;
+      }
+      java.awt.Component center = tabPanel.getComponent(0);
+      if (center instanceof JLabel) {
+         JLabel label = (JLabel)center;
+         String text = label.getText();
+         if (text == null) {
+            return;
+         }
+         String clean = text.endsWith(" *") ? text.substring(0, text.length() - 2) : text;
+         label.setText(unsaved ? clean + " *" : clean);
       }
    }
 
@@ -477,6 +523,7 @@ public class Decompiler
             }
          } else if (arg0.getSource() instanceof JTextArea) {
             unsavedFiles.add(this.hash_TabComponent2File.get((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex())));
+            this.updateTabLabel((JPanel)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), true);
          }
       }
    }
@@ -689,6 +736,7 @@ public class Decompiler
       this.jTB.setTabComponentAt(index, panel);
       this.jTB.putClientProperty(panel, tabComponents);
       this.jTB.setSelectedIndex(index);
+      this.updateWorkspaceCard();
       return tabComponents;
    }
 
@@ -728,6 +776,7 @@ public class Decompiler
             this.hash_TabComponent2Func2VarVec.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.hash_Func2VarVec);
             this.hash_TabComponent2TreeModel.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
             this.status.append("success\n");
+            this.updateTabLabel((JPanel)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), false);
             break;
          case 2:
             this.panels = this.newNCSTab(file.getName().substring(0, file.getName().length() - 4));
@@ -743,6 +792,7 @@ public class Decompiler
             this.hash_TabComponent2TreeModel.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
             this.setTabComponentPanel(1);
             this.status.append("partial-could not recompile\n");
+            this.updateTabLabel((JPanel)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), false);
             break;
          case 3:
             this.panels = this.newNCSTab(file.getName().substring(0, file.getName().length() - 4));
@@ -765,7 +815,9 @@ public class Decompiler
             this.hash_TabComponent2TreeModel.put((JComponent)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), this.jTree.getModel());
             this.setTabComponentPanel(1);
             this.status.append("partial-byte code does not match\n");
+            this.updateTabLabel((JPanel)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), false);
       }
+      this.updateWorkspaceCard();
    }
 
    public static void exit() {
@@ -918,6 +970,7 @@ public class Decompiler
       }
 
       this.panel = null;
+      this.updateWorkspaceCard();
    }
 
    private void closeAll() {
@@ -1008,6 +1061,7 @@ public class Decompiler
          }
 
          unsavedFiles.remove(this.file);
+         this.updateTabLabel((JPanel)this.jTB.getTabComponentAt(this.jTB.getSelectedIndex()), false);
          newFile = null;
       }
    }
@@ -1033,6 +1087,7 @@ public class Decompiler
                newFile.renameTo(new File(this.getShortName(newFile) + "_failed.nss"));
                break;
             case 1:
+               this.updateTabLabel((JPanel)this.jTB.getTabComponentAt(i), false);
                break;
             case 2:
                newFile.renameTo(new File(this.getShortName(newFile) + "_compile_fails.nss"));
@@ -1044,6 +1099,7 @@ public class Decompiler
                break;
          }
       }
+      this.updateWorkspaceCard();
    }
 
    private String getShortName(File in) {
