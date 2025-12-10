@@ -452,8 +452,18 @@ public class NCSDecompCLIRoundTripTest {
       for (String includeName : includes) {
          Path includeFile = findIncludeFile(includeName, originalNssPath, gameFlag);
          if (includeFile != null && Files.exists(includeFile)) {
+            // Use the include name exactly as specified in the source file
+            // This ensures the compiler can find it with the exact name it expects
             Path tempInclude = tempDir.resolve(includeName);
+            
+            // Copy the file - if source has extension but include name doesn't,
+            // Files.copy will create the file with the exact name specified in tempInclude
             Files.copy(includeFile, tempInclude, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            
+            // Verify the file was copied successfully
+            if (!Files.exists(tempInclude)) {
+               throw new IOException("Failed to copy include file: " + includeFile + " to " + tempInclude);
+            }
          } else {
             // Include file not found - this might cause compilation to fail, but let compiler report it
          }
@@ -515,7 +525,9 @@ public class NCSDecompCLIRoundTripTest {
          boolean isK2 = "k2".equals(gameFlag);
 
          NwnnsscompConfig config = new NwnnsscompConfig(compilerFile, sourceFile, outputFile, isK2);
-         String[] cmd = config.getCompileArgs(compilerFile.getAbsolutePath());
+         // Pass temp directory as include directory so compiler can find includes
+         java.util.List<File> includeDirs = java.util.Collections.singletonList(tempDir.toFile());
+         String[] cmd = config.getCompileArgs(compilerFile.getAbsolutePath(), includeDirs);
 
          // Log compilation command and args (but show original path in the log)
          System.out.print(" (");
