@@ -195,8 +195,8 @@ public class Settings extends Properties implements ActionListener {
       }
       
       // Apply nwnnsscomp path to FileDecompiler
-      String nwnnsscompPath = this.nwnnsscompPathField.getText().trim();
-      FileDecompiler.nwnnsscompPath = nwnnsscompPath.isEmpty() ? null : nwnnsscompPath;
+      String nwnnsscompPathValue = this.nwnnsscompPathField.getText().trim();
+      FileDecompiler.nwnnsscompPath = nwnnsscompPathValue.isEmpty() ? null : nwnnsscompPathValue;
       
       // Decompilation Options
       this.setProperty("Prefer Switches", String.valueOf(this.preferSwitchesCheckBox.isSelected()));
