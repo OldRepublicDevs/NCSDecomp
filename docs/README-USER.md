@@ -236,7 +236,7 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 **Solution**:
 
 - For `NCSDecompCLI.exe`: The files should be automatically in the `app` subdirectory. If you get this error, ensure the executable folder structure is intact and the `app` folder contains the nwscript files.
-- For JAR version: Make sure `k1_nwscript.nss` or `tsl_nwscript.nss` is in your current working directory.
+- For JAR version: Make sure `k1_nwscript.nss` or `tsl_nwscript.nss` is in the `tools/` directory (or current working directory for legacy support).
 - You can also use `--nwscript <path>` to specify the exact location of the nwscript file.
 
 ### "No .ncs files found"

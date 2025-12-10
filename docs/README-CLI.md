@@ -137,7 +137,7 @@ The `nwscript.nss` files are automatically included in the `app` subdirectory. T
 
 ### JAR Version
 
-You need to have either `k1_nwscript.nss` or `tsl_nwscript.nss` in your current working directory when you run the JAR. You can also use the `--nwscript <path>` option to specify the exact location.
+You need to have either `k1_nwscript.nss` or `tsl_nwscript.nss` in the `tools/` directory (or current working directory for legacy support) when you run the JAR. You can also use the `--nwscript <path>` option to specify the exact location.
 
 ## Examples
 
@@ -219,7 +219,7 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 
 **For executable version:** The nwscript files should be automatically in the `app` subdirectory. If you get this error, ensure the executable folder structure is intact.
 
-**For JAR version:** Make sure `k1_nwscript.nss` or `tsl_nwscript.nss` is in your current working directory, or use `--nwscript <path>` to specify the exact location.
+**For JAR version:** Make sure `k1_nwscript.nss` or `tsl_nwscript.nss` is in the `tools/` directory (or current working directory for legacy support), or use `--nwscript <path>` to specify the exact location.
 
 ### "No .ncs files found"
 

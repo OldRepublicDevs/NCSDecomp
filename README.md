@@ -121,7 +121,7 @@ java -jar NCSDecomp-CLI.jar [arguments]
 java -jar target/ncsdecomp-CLI-1.0.0.jar [arguments]
 ```
 
-**Note:** When using the JAR file, ensure `k1_nwscript.nss` or `tsl_nwscript.nss` is in your current working directory, or use the `--nwscript <path>` option to specify the location.
+**Note:** When using the JAR file, ensure `k1_nwscript.nss` or `tsl_nwscript.nss` is in the `tools/` directory (or current working directory for legacy support), or use the `--nwscript <path>` option to specify the location.
 
 ## Usage
 
