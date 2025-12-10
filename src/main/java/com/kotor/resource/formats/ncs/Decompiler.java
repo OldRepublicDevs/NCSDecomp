@@ -6,6 +6,7 @@ package com.kotor.resource.formats.ncs;
 
 import com.kotor.resource.formats.ncs.stack.Variable;
 import java.awt.BorderLayout;
+import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.HeadlessException;
@@ -39,6 +40,7 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.Vector;
+import java.net.URI;
 import javax.swing.JButton;
 import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JComponent;
@@ -129,6 +131,9 @@ public class Decompiler
    private JToolBar commandBar;
    private JTextField treeFilterField;
    private JLabel statusBarLabel;
+   private static final String PROJECT_URL = "https://bolabaden.org";
+   private static final String GITHUB_URL = "https://github.com/bolabaden";
+   private static final String SPONSOR_URL = "https://github.com/sponsors/th3w1zard1";
 
    static {
       settings.load();
@@ -279,6 +284,13 @@ public class Decompiler
       optionsMenu.add(this.menuItem("Settings", KeyEvent.VK_P, true));
       menuBar.add(optionsMenu);
 
+      JMenu helpMenu = new JMenu("Help");
+      helpMenu.setMnemonic(KeyEvent.VK_H);
+      helpMenu.add(this.menuItem("Project Website", KeyEvent.VK_F1, false));
+      helpMenu.add(this.menuItem("GitHub Repo", KeyEvent.VK_F2, false));
+      helpMenu.add(this.menuItem("Sponsor NCSDecomp", KeyEvent.VK_F3, false));
+      menuBar.add(helpMenu);
+
       return menuBar;
    }
 
@@ -304,6 +316,9 @@ public class Decompiler
       bar.add(this.createToolbarButton("Link Scroll Bars"));
       bar.addSeparator();
       bar.add(this.createToolbarButton("Settings"));
+      bar.add(this.createToolbarButton("Project Website"));
+      bar.add(this.createToolbarButton("GitHub Repo"));
+      bar.add(this.createToolbarButton("Sponsor NCSDecomp"));
       bar.add(this.createToolbarButton("Exit"));
       return bar;
    }
@@ -348,6 +363,25 @@ public class Decompiler
       for (int i = 0; i < childCount; i++) {
          Object child = model.getChild(node, i);
          collectMatchingPaths(model, path.pathByAddingChild(child), query, matches);
+      }
+   }
+
+   private void openLink(String url, String statusMessage) {
+      try {
+         if (Desktop.isDesktopSupported()) {
+            Desktop.getDesktop().browse(new URI(url));
+            this.setStatus(statusMessage);
+         } else {
+            this.setStatus("Desktop browsing not supported on this platform.");
+         }
+      } catch (Exception ex) {
+         this.setStatus("Unable to open link: " + url);
+      }
+   }
+
+   private void setStatus(String message) {
+      if (this.statusBarLabel != null) {
+         this.statusBarLabel.setText(message);
       }
    }
 
@@ -492,6 +526,12 @@ public class Decompiler
          this.setTabComponentPanel(0);
       } else if (cmd.equals("Link Scroll Bars")) {
          this.toggleLinkScrollBars();
+      } else if (cmd.equals("Project Website")) {
+         this.openLink(PROJECT_URL, "Opening project website");
+      } else if (cmd.equals("GitHub Repo")) {
+         this.openLink(GITHUB_URL, "Opening GitHub repository");
+      } else if (cmd.equals("Sponsor NCSDecomp")) {
+         this.openLink(SPONSOR_URL, "Opening sponsor page");
       }
    }
 
