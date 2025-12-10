@@ -95,6 +95,9 @@ public class LocalVarStack extends LocalStack<StackEntry> {
    }
 
    public StackEntry remove() {
+      if (this.stack == null || this.stack.isEmpty()) {
+         throw new RuntimeException("Attempted to remove from empty stack");
+      }
       StackEntry entry = this.stack.removeFirst();
       entry.removedFromStack(this);
       return entry;
@@ -106,6 +109,9 @@ public class LocalVarStack extends LocalStack<StackEntry> {
          this.structify(removesize - (savestart + savesize) + 1, savesize, subdata);
       }
 
+      if (this.stack == null || this.stack.isEmpty()) {
+         throw new IllegalStateException("Stack is empty in destruct()");
+      }
       StackEntry firstEntry = this.stack.getFirst();
       if (!(firstEntry instanceof Variable)) {
          throw new IllegalStateException("Expected Variable but got: " + firstEntry.getClass().getName());
