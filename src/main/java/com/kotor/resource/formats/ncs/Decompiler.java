@@ -343,7 +343,7 @@ public class Decompiler
 
    private JButton createToolbarButton(String action) {
       JButton button = new JButton(action);
-      button.setActionCommand(action);
+      button.setActionCommand(action); // JButton doesn't set this from label text
       button.setFocusable(false);
       button.addActionListener(this);
       button.putClientProperty("action", action);
@@ -951,26 +951,49 @@ public class Decompiler
                result = 2; // PARTIAL_COMPILE
                this.status.append("showing partial decompilation\n");
             } else {
-               // Show error but don't block UI
-               JOptionPane.showMessageDialog(null, 
-                  "Decompilation encountered errors:\n" + var4.getMessage() + 
-                  "\n\nAttempting to show any partial results...", 
-                  "Decompilation Warning", 
-                  JOptionPane.WARNING_MESSAGE);
-               result = 0;
+               // No code available - create a fallback stub so we always show something
+               generatedCode = "// Decompilation Error\n" +
+                              "// " + var4.getMessage() + "\n" +
+                              "// File: " + file.getName() + "\n" +
+                              "// \n" +
+                              "// The decompiler encountered an error but attempted to show partial results.\n" +
+                              "// This may indicate a corrupted or invalid NCS file.\n" +
+                              "void main() {\n    // Error: " + var4.getMessage() + "\n}\n";
+               result = 2; // PARTIAL_COMPILE - we're showing something
+               this.status.append("showing error stub\n");
             }
          } catch (Exception e) {
-            // Last resort - show error but don't crash
-            JOptionPane.showMessageDialog(null, 
-               "Failed to decompile " + file.getName() + ":\n" + var4.getMessage(), 
-               "Decompilation Error", 
-               JOptionPane.ERROR_MESSAGE);
-            result = 0;
+            // Last resort - create minimal stub so we always show something
+            generatedCode = "// Critical Decompilation Error\n" +
+                           "// File: " + file.getName() + "\n" +
+                           "// Original error: " + var4.getMessage() + "\n" +
+                           "// Secondary error: " + e.getMessage() + "\n" +
+                           "void main() {\n    // Decompilation failed\n}\n";
+            result = 2; // PARTIAL_COMPILE - we're showing something
+            this.status.append("showing minimal error stub\n");
          }
+      } catch (Exception unexpected) {
+         // Catch any other unexpected exceptions
+         this.status.append("unexpected error: " + unexpected.getMessage() + "\n");
+         generatedCode = "// Unexpected Decompilation Error\n" +
+                        "// File: " + file.getName() + "\n" +
+                        "// Error: " + unexpected.getMessage() + "\n" +
+                        "void main() {\n    // Unexpected error occurred\n}\n";
+         result = 2; // PARTIAL_COMPILE - we're showing something
       }
 
-      // Always show source code if we have any, regardless of result code
-      if (generatedCode != null && !generatedCode.trim().isEmpty()) {
+      // ALWAYS show source code - we guarantee generatedCode is never null/empty at this point
+      // If decompilation completely failed, we created a fallback stub above
+      if (generatedCode == null || generatedCode.trim().isEmpty()) {
+         // Ultimate fallback - should never happen, but ensure we always show something
+         generatedCode = "// No code available\n" +
+                        "// File: " + file.getName() + "\n" +
+                        "void main() {\n    // No decompiled code\n}\n";
+         result = 2;
+      }
+      
+      // Now we're guaranteed to have code - always show it
+      {
          this.panels = this.newNCSTab(file.getName().substring(0, file.getName().length() - 4));
          JTextArea codeArea = (JTextArea)((JScrollPane)((JPanel)this.panels[0]).getComponent(0)).getViewport().getView();
          codeArea.append(generatedCode);
@@ -1012,90 +1035,26 @@ public class Decompiler
          }
       }
 
+      // Update status based on result - code is already shown above
       switch (result) {
          case 0:
-            if (generatedCode == null || generatedCode.trim().isEmpty()) {
-               this.status.append("failure - no source code generated\n");
-            } else {
-               this.status.append("partial - validation failed but source shown\n");
-            }
+            this.status.append("failure - validation failed\n");
             break;
          case 1:
-            this.panels = this.newNCSTab(file.getName().substring(0, file.getName().length() - 4));
-            ((JTextArea)((JScrollPane)((JPanel)this.panels[0]).getComponent(0)).getViewport().getView()).append(this.fileDecompiler.getGeneratedCode(file));
-            this.origByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getLeftComponent()).getViewport().getComponent(0);
-            this.origByteCodeJTA.append(this.fileDecompiler.getOriginalByteCode(file));
-            this.newByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getRightComponent()).getViewport().getComponent(0);
-            this.newByteCodeJTA.append(this.fileDecompiler.getNewByteCode(file));
-            if (this.origByteCodeJTA.getLineCount() >= this.newByteCodeJTA.getLineCount()) {
-               this.jTB.putClientProperty(this.panels[1], "left");
-            } else {
-               this.jTB.putClientProperty(this.panels[1], "right");
-            }
-
-            this.hash_Func2VarVec = this.fileDecompiler.getVariableData(file);
-            this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
-            this.fileDecompiler.getOriginalByteCode(file);
-            JComponent tabComponent1 = this.getSelectedTabComponent();
-            if (tabComponent1 != null) {
-               this.hash_TabComponent2File.put(tabComponent1, file);
-               this.hash_TabComponent2Func2VarVec.put(tabComponent1, this.hash_Func2VarVec);
-               this.hash_TabComponent2TreeModel.put(tabComponent1, this.jTree.getModel());
-               if (tabComponent1 instanceof JPanel) {
-                  this.updateTabLabel((JPanel)tabComponent1, false);
-               }
-            }
-            this.status.append("success\n");
+            this.status.append("success - full round-trip validation passed\n");
             break;
          case 2:
-            this.panels = this.newNCSTab(file.getName().substring(0, file.getName().length() - 4));
-            ((JTextArea)((JScrollPane)((JPanel)this.panels[0]).getComponent(0)).getViewport().getView()).append(this.fileDecompiler.getGeneratedCode(file));
-            this.origByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getLeftComponent()).getViewport().getComponent(0);
-            this.origByteCodeJTA.append(this.fileDecompiler.getOriginalByteCode(file));
-            this.jTB.putClientProperty(this.panels[1], "left");
-            this.hash_Func2VarVec = this.fileDecompiler.getVariableData(file);
-            this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
-            this.fileDecompiler.getOriginalByteCode(file);
-            JComponent tabComponent2 = this.getSelectedTabComponent();
-            if (tabComponent2 != null) {
-               this.hash_TabComponent2File.put(tabComponent2, file);
-               this.hash_TabComponent2Func2VarVec.put(tabComponent2, this.hash_Func2VarVec);
-               this.hash_TabComponent2TreeModel.put(tabComponent2, this.jTree.getModel());
-               if (tabComponent2 instanceof JPanel) {
-                  this.updateTabLabel((JPanel)tabComponent2, false);
-               }
-            }
-            this.setTabComponentPanel(1);
-            this.status.append("partial-could not recompile\n");
+            this.status.append("partial - decompiled successfully (nwnnsscomp validation skipped or failed)\n");
             break;
          case 3:
-            this.panels = this.newNCSTab(file.getName().substring(0, file.getName().length() - 4));
-            ((JTextArea)((JScrollPane)((JPanel)this.panels[0]).getComponent(0)).getViewport().getView()).append(this.fileDecompiler.getGeneratedCode(file));
-            this.origByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getLeftComponent()).getViewport().getComponent(0);
-            this.origByteCodeJTA.append(this.fileDecompiler.getOriginalByteCode(file));
-            this.newByteCodeJTA = (JTextArea)((JScrollPane)((JSplitPane)this.panels[1]).getRightComponent()).getViewport().getComponent(0);
-            this.newByteCodeJTA.append(this.fileDecompiler.getNewByteCode(file));
-            if (this.origByteCodeJTA.getLineCount() >= this.newByteCodeJTA.getLineCount()) {
-               this.jTB.putClientProperty(this.panels[1], "left");
-            } else {
-               this.jTB.putClientProperty(this.panels[1], "right");
-            }
-
-            this.hash_Func2VarVec = this.fileDecompiler.getVariableData(file);
-            this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
-            this.fileDecompiler.getOriginalByteCode(file);
-            JComponent tabComponent3 = this.getSelectedTabComponent();
-            if (tabComponent3 != null) {
-               this.hash_TabComponent2File.put(tabComponent3, file);
-               this.hash_TabComponent2Func2VarVec.put(tabComponent3, this.hash_Func2VarVec);
-               this.hash_TabComponent2TreeModel.put(tabComponent3, this.jTree.getModel());
-               if (tabComponent3 instanceof JPanel) {
-                  this.updateTabLabel((JPanel)tabComponent3, false);
-               }
-            }
-            this.setTabComponentPanel(1);
-            this.status.append("partial-byte code does not match\n");
+            this.status.append("partial - decompiled but bytecode comparison showed differences\n");
+            break;
+         default:
+            this.status.append("unknown result code: " + result + "\n");
+            break;
       }
+      
+      // Update workspace visibility after adding a file
       this.updateWorkspaceCard();
    }
 

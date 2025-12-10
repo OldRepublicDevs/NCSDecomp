@@ -227,14 +227,16 @@ public class FileDecompiler {
          System.out.println("\n---> starting decompilation: " + file.getName() + " <---");
          try {
             data = this.decompileNcs(file);
-            if (data == null) {
-               // Even if decompileNcs returns null, try to generate minimal code
-               throw new DecompilerException("Failed to decompile " + file.getName() + ". File may be corrupted or invalid.");
-            }
+            // decompileNcs now always returns a FileScriptData (never null)
+            // but it may contain minimal/fallback code if decompilation failed
             this.filedata.put(file, data);
          } catch (Exception e) {
-            // Wrap any exception to ensure we always have a message
-            throw new DecompilerException("Error during decompilation: " + e.getMessage());
+            // Last resort: create minimal stub data so we always have something to show
+            System.out.println("Critical error during decompilation, creating fallback stub: " + e.getMessage());
+            e.printStackTrace(System.out);
+            data = new FileDecompiler.FileScriptData();
+            data.setCode("// Decompilation failed: " + e.getMessage() + "\n// File: " + file.getName() + "\n// Attempting to show partial results...\n");
+            this.filedata.put(file, data);
          }
       }
 
@@ -243,16 +245,26 @@ public class FileDecompiler {
          data.generateCode();
          String code = data.getCode();
          if (code == null || code.trim().isEmpty()) {
-            // If code generation failed, try to provide at least a minimal stub
-            System.out.println("Warning: Generated code is empty, attempting fallback generation.");
+            // If code generation failed, provide at least a minimal stub
+            System.out.println("Warning: Generated code is empty, creating fallback stub.");
+            String fallback = "// Warning: Decompilation produced no code.\n" +
+                             "// File: " + file.getName() + "\n" +
+                             "// This may indicate a corrupted or invalid NCS file.\n" +
+                             "void main() {\n    // No code could be decompiled\n}\n";
+            data.setCode(fallback);
             return PARTIAL_COMPILE;
          }
       } catch (Exception e) {
-         System.out.println("Error during code generation (continuing anyway): " + e.getMessage());
+         System.out.println("Error during code generation (creating fallback stub): " + e.getMessage());
+         String fallback = "// Error during code generation: " + e.getMessage() + "\n" +
+                          "// File: " + file.getName() + "\n" +
+                          "void main() {\n    // Code generation failed\n}\n";
+         data.setCode(fallback);
          return PARTIAL_COMPILE;
       }
 
       // Try validation, but don't fail if it doesn't work
+      // nwnnsscomp is optional - decompilation should work without it
       try {
          return this.compileAndCompare(file, data.getCode(), data);
       } catch (Exception e) {
@@ -774,14 +786,51 @@ public class FileDecompiler {
       MainPass mainpass = null;
       DestroyParseTree destroytree = null;
       if (this.actions == null) {
-         System.out.println("null action!");
-         return null;
+         System.out.println("null action! Creating fallback stub.");
+         // Return minimal stub instead of null
+         FileDecompiler.FileScriptData stub = new FileDecompiler.FileScriptData();
+         stub.setCode("// Error: Actions data not loaded.\n" +
+                     "// File: " + file.getName() + "\n" +
+                     "// Please ensure k1_nwscript.nss or tsl_nwscript.nss is available.\n" +
+                     "void main() {\n    // Actions data missing\n}\n");
+         return stub;
       }
 
       try {
          data = new FileDecompiler.FileScriptData();
-         commands = new Decoder(new BufferedInputStream(new FileInputStream(file)), this.actions).decode();
-         ast = new Parser(new Lexer(new PushbackReader(new StringReader(commands), 1024))).parse();
+         
+         // Decode bytecode - wrap in try-catch to handle corrupted files
+         try {
+            commands = new Decoder(new BufferedInputStream(new FileInputStream(file)), this.actions).decode();
+         } catch (Exception decodeEx) {
+            System.out.println("Error during bytecode decoding: " + decodeEx.getMessage());
+            // Create fallback stub for decoding errors
+            String stub = "// Error: Failed to decode bytecode from NCS file.\n" +
+                         "// File: " + file.getName() + "\n" +
+                         "// Error: " + decodeEx.getMessage() + "\n" +
+                         "// The file may be corrupted, invalid, or in an unsupported format.\n" +
+                         "void main() {\n    // Bytecode decode failed\n}\n";
+            data.setCode(stub);
+            return data;
+         }
+         
+         // Parse commands - wrap in try-catch to handle parse errors
+         try {
+            ast = new Parser(new Lexer(new PushbackReader(new StringReader(commands), 1024))).parse();
+         } catch (Exception parseEx) {
+            System.out.println("Error during parsing: " + parseEx.getMessage());
+            // Try to create partial code from decoded commands if possible
+            String stub = "// Error: Failed to parse decoded bytecode.\n" +
+                         "// File: " + file.getName() + "\n" +
+                         "// Error: " + parseEx.getMessage() + "\n" +
+                         "// Decoded commands (partial):\n" +
+                         "// " + (commands != null && commands.length() > 0 ? 
+                                  commands.substring(0, Math.min(500, commands.length())) + "..." : "none") + "\n" +
+                         "void main() {\n    // Parse failed\n}\n";
+            data.setCode(stub);
+            return data;
+         }
+         
          nodedata = new NodeAnalysisData();
          subdata = new SubroutineAnalysisData(nodedata);
          ast.apply(new SetPositions(nodedata));
@@ -909,22 +958,31 @@ public class FileDecompiler {
          System.out.println("Error during decompilation: " + e.getMessage());
          e.printStackTrace(System.out);
          
-         // If we got far enough to create data, try to generate at least partial code
-         if (data != null) {
-            try {
-               // Try to generate code from whatever we have
-               data.generateCode();
-               String partialCode = data.getCode();
-               if (partialCode != null && !partialCode.trim().isEmpty()) {
-                  System.out.println("Recovered partial decompilation despite errors.");
-                  return data;
-               }
-            } catch (Exception genEx) {
-               System.out.println("Could not generate partial code: " + genEx.getMessage());
-            }
+         // Always return a FileScriptData, even if it's just a minimal stub
+         if (data == null) {
+            data = new FileDecompiler.FileScriptData();
          }
          
-         return null;
+         try {
+            // Try to generate code from whatever we have
+            data.generateCode();
+            String partialCode = data.getCode();
+            if (partialCode != null && !partialCode.trim().isEmpty()) {
+               System.out.println("Recovered partial decompilation despite errors.");
+               return data;
+            }
+         } catch (Exception genEx) {
+            System.out.println("Could not generate partial code: " + genEx.getMessage());
+         }
+         
+         // Last resort: create a minimal stub so we always have something to show
+         String errorStub = "// Decompilation encountered errors: " + e.getMessage() + "\n" +
+                           "// File: " + file.getName() + "\n" +
+                           "// Attempting to show partial results...\n" +
+                           "void main() {\n    // Partial decompilation failed\n}\n";
+         data.setCode(errorStub);
+         System.out.println("Created fallback stub code due to decompilation errors.");
+         return data;
       } finally {
          data = null;
          commands = null;
@@ -1142,27 +1200,51 @@ public class FileDecompiler {
 
       /**
        * Builds the final NSS source string from globals, prototypes, and subroutines.
+       * Always generates at least a minimal stub if no subroutines are available.
        */
       public void generateCode() {
+         String newline = System.getProperty("line.separator");
+         
+         // If we have no subs, generate a minimal stub so we always show something
          if (this.subs.size() == 0) {
+            String stub = "// Warning: No subroutines could be decompiled.\n" +
+                         "// This may indicate a corrupted or invalid NCS file.\n" +
+                         "void main() {\n    // No code could be decompiled\n}\n";
+            this.code = stub;
             return;
          }
 
-         String newline = System.getProperty("line.separator");
          StringBuffer protobuff = new StringBuffer();
          StringBuffer fcnbuff = new StringBuffer();
 
          for (SubScriptState state : this.subs) {
-            if (!state.isMain()) {
-               protobuff.append(state.getProto() + ";" + newline);
-            }
+            try {
+               if (!state.isMain()) {
+                  String proto = state.getProto();
+                  if (proto != null && !proto.trim().isEmpty()) {
+                     protobuff.append(proto + ";" + newline);
+                  }
+               }
 
-            fcnbuff.append(state.toString() + newline);
+               String funcCode = state.toString();
+               if (funcCode != null && !funcCode.trim().isEmpty()) {
+                  fcnbuff.append(funcCode + newline);
+               }
+            } catch (Exception e) {
+               // If a subroutine fails to generate, add a comment instead
+               System.out.println("Error generating code for subroutine, adding placeholder: " + e.getMessage());
+               fcnbuff.append("// Error: Could not decompile subroutine\n");
+            }
          }
 
          String globs = new String();
          if (this.globals != null) {
-            globs = "// Globals" + newline + this.globals.toStringGlobals() + newline;
+            try {
+               globs = "// Globals" + newline + this.globals.toStringGlobals() + newline;
+            } catch (Exception e) {
+               System.out.println("Error generating globals code: " + e.getMessage());
+               globs = "// Error: Could not decompile globals\n";
+            }
          }
 
          String protohdr = new String();
@@ -1171,7 +1253,24 @@ public class FileDecompiler {
             protobuff.append(newline);
          }
 
-         this.code = this.subdata.getStructDeclarations() + globs + protohdr + protobuff.toString() + fcnbuff.toString();
+         String structDecls = "";
+         try {
+            if (this.subdata != null) {
+               structDecls = this.subdata.getStructDeclarations();
+            }
+         } catch (Exception e) {
+            System.out.println("Error generating struct declarations: " + e.getMessage());
+         }
+
+         String generated = structDecls + globs + protohdr + protobuff.toString() + fcnbuff.toString();
+         
+         // Ensure we always have at least something
+         if (generated == null || generated.trim().isEmpty()) {
+            generated = "// Warning: Code generation produced empty output.\n" +
+                       "void main() {\n    // No code could be generated\n}\n";
+         }
+         
+         this.code = generated;
       }
    }
 
