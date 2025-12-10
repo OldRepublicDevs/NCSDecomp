@@ -259,7 +259,7 @@ public class FileDecompiler {
          String stubCode = this.generateComprehensiveFallbackStub(file, "Actions data loading", e,
             "The actions data table (nwscript.nss) is required to decompile NCS files.\n" +
             "Expected file: " + expectedFile + "\n" +
-            "Please ensure the appropriate nwscript.nss file is available in the working directory or configured path.");
+            "Please ensure the appropriate nwscript.nss file is available in tools/ directory, working directory, or configured path.");
          errorData.setCode(stubCode);
          this.filedata.put(file, errorData);
          return PARTIAL_COMPILE;
@@ -1070,7 +1070,7 @@ public class FileDecompiler {
          String stubCode = this.generateComprehensiveFallbackStub(file, "Actions data loading", null,
             "The actions data table (nwscript.nss) is required to decompile NCS files.\n" +
             "Expected file: " + expectedFile + "\n" +
-            "Please ensure the appropriate nwscript.nss file is available in the working directory or configured path.");
+            "Please ensure the appropriate nwscript.nss file is available in tools/ directory, working directory, or configured path.");
          stub.setCode(stubCode);
          return stub;
       }
