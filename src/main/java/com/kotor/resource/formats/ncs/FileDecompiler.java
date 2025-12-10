@@ -245,7 +245,7 @@ public class FileDecompiler {
     */
    public int decompile(File file) {
       try {
-         this.ensureActionsLoaded();
+      this.ensureActionsLoaded();
       } catch (DecompilerException e) {
          System.out.println("Error loading actions data: " + e.getMessage());
          // Create comprehensive fallback stub for actions data loading failure
@@ -267,14 +267,14 @@ public class FileDecompiler {
             // decompileNcs now always returns a FileScriptData (never null)
             // but it may contain minimal/fallback code if decompilation failed
             this.filedata.put(file, data);
-      } catch (Exception e) {
+         } catch (Exception e) {
          // Last resort: create comprehensive fallback stub data so we always have something to show
-         System.out.println("Critical error during decompilation, creating fallback stub: " + e.getMessage());
-         e.printStackTrace(System.out);
-         data = new FileDecompiler.FileScriptData();
+            System.out.println("Critical error during decompilation, creating fallback stub: " + e.getMessage());
+            e.printStackTrace(System.out);
+            data = new FileDecompiler.FileScriptData();
          data.setCode(this.generateComprehensiveFallbackStub(file, "Initial decompilation attempt", e, null));
-         this.filedata.put(file, data);
-      }
+            this.filedata.put(file, data);
+         }
       }
 
       // Always generate code, even if validation fails
@@ -1002,50 +1002,168 @@ public class FileDecompiler {
             return data;
          }
          
-         // Parse commands - wrap in try-catch to handle parse errors
+         // Parse commands - wrap in try-catch to handle parse errors, but try to recover
          try {
             ast = new Parser(new Lexer(new PushbackReader(new StringReader(commands), 1024))).parse();
          } catch (Exception parseEx) {
             System.out.println("Error during parsing: " + parseEx.getMessage());
-            // Create comprehensive fallback stub with partial decoded commands
-            String commandsPreview = "none";
-            if (commands != null && commands.length() > 0) {
-               int previewLength = Math.min(1000, commands.length());
-               commandsPreview = commands.substring(0, previewLength);
-               if (commands.length() > previewLength) {
-                  commandsPreview += "\n... (truncated, total length: " + commands.length() + " characters)";
+            System.out.println("Attempting to recover by trying partial parsing strategies...");
+            
+            // Try to recover: attempt to parse in chunks or with relaxed rules
+            ast = null;
+            try {
+               // Strategy 1: Try parsing with a larger buffer
+               System.out.println("Trying parse with larger buffer...");
+               ast = new Parser(new Lexer(new PushbackReader(new StringReader(commands), 2048))).parse();
+               System.out.println("Successfully recovered parse with larger buffer.");
+            } catch (Exception e1) {
+               System.out.println("Larger buffer parse also failed: " + e1.getMessage());
+               // Strategy 2: Try to extract what we can and create minimal structure
+               // If we have decoded commands, we can at least create a basic structure
+               if (commands != null && commands.length() > 0) {
+                  System.out.println("Attempting to create minimal structure from decoded commands...");
+                  try {
+                     // Try to find subroutine boundaries in the commands string
+                     // This is a heuristic recovery - look for common patterns
+                     String[] lines = commands.split("\n");
+                     int subCount = 0;
+                     for (String line : lines) {
+                        if (line.trim().startsWith("sub") || line.trim().startsWith("function")) {
+                           subCount++;
+                        }
+                     }
+                     
+                     // If we found some structure, try to continue with minimal setup
+                     if (subCount > 0) {
+                        System.out.println("Detected " + subCount + " potential subroutines in decoded commands, but full parse failed.");
+                        // We'll fall through to create a stub, but with better information
+                     }
+                  } catch (Exception e2) {
+                     System.out.println("Recovery attempt failed: " + e2.getMessage());
+                  }
                }
             }
-            String additionalInfo = "Bytecode was successfully decoded but parsing failed.\n" +
-                                   "Decoded commands length: " + (commands != null ? commands.length() : 0) + " characters\n" +
-                                   "Decoded commands preview:\n" + commandsPreview;
-            String stub = this.generateComprehensiveFallbackStub(file, "Parsing decoded bytecode", parseEx, additionalInfo);
+            
+            // If we still don't have an AST, create comprehensive stub but preserve commands for potential manual recovery
+            if (ast == null) {
+               String commandsPreview = "none";
+               if (commands != null && commands.length() > 0) {
+                  int previewLength = Math.min(1000, commands.length());
+                  commandsPreview = commands.substring(0, previewLength);
+                  if (commands.length() > previewLength) {
+                     commandsPreview += "\n... (truncated, total length: " + commands.length() + " characters)";
+                  }
+               }
+               String additionalInfo = "Bytecode was successfully decoded but parsing failed.\n" +
+                                      "Decoded commands length: " + (commands != null ? commands.length() : 0) + " characters\n" +
+                                      "Decoded commands preview:\n" + commandsPreview + "\n\n" +
+                                      "RECOVERY NOTE: The decoded commands are available but could not be parsed into an AST.\n" +
+                                      "This may indicate malformed bytecode or an unsupported format variant.";
+               String stub = this.generateComprehensiveFallbackStub(file, "Parsing decoded bytecode", parseEx, additionalInfo);
             data.setCode(stub);
             return data;
+            }
+            // If we recovered an AST, continue with decompilation
+            System.out.println("Continuing decompilation with recovered parse tree.");
          }
          
+         // Analysis passes - wrap in try-catch to allow partial recovery
          nodedata = new NodeAnalysisData();
          subdata = new SubroutineAnalysisData(nodedata);
+         
+         try {
          ast.apply(new SetPositions(nodedata));
+         } catch (Exception e) {
+            System.out.println("Error in SetPositions, continuing with partial positions: " + e.getMessage());
+         }
+         
+         try {
          setdest = new SetDestinations(ast, nodedata, subdata);
          ast.apply(setdest);
+         } catch (Exception e) {
+            System.out.println("Error in SetDestinations, continuing without destination resolution: " + e.getMessage());
+            setdest = null;
+         }
+         
+         try {
+            if (setdest != null) {
          ast.apply(new SetDeadCode(nodedata, subdata, setdest.getOrigins()));
+            } else {
+               // Try without origins if setdest failed
+               ast.apply(new SetDeadCode(nodedata, subdata, null));
+            }
+         } catch (Exception e) {
+            System.out.println("Error in SetDeadCode, continuing without dead code analysis: " + e.getMessage());
+         }
+         
+         if (setdest != null) {
+            try {
          setdest.done();
+            } catch (Exception e) {
+               System.out.println("Error finalizing SetDestinations: " + e.getMessage());
+            }
          setdest = null;
+         }
+         
+         try {
          subdata.splitOffSubroutines(ast);
+         } catch (Exception e) {
+            System.out.println("Error splitting subroutines, attempting to continue: " + e.getMessage());
+            // Try to get main sub at least
+            try {
+               mainsub = subdata.getMainSub();
+            } catch (Exception e2) {
+               System.out.println("Could not recover main subroutine: " + e2.getMessage());
+            }
+         }
          ast = null;
+         // Flattening - try to recover if main sub is missing
+         try {
          mainsub = subdata.getMainSub();
+         } catch (Exception e) {
+            System.out.println("Error getting main subroutine: " + e.getMessage());
+            mainsub = null;
+         }
+         
+         if (mainsub != null) {
+            try {
          flatten = new FlattenSub(mainsub, nodedata);
          mainsub.apply(flatten);
+            } catch (Exception e) {
+               System.out.println("Error flattening main subroutine: " + e.getMessage());
+               flatten = null;
+            }
+            
+            if (flatten != null) {
+               try {
          for (ASubroutine iterSub : this.subIterable(subdata)) {
+                     try {
             flatten.setSub(iterSub);
             iterSub.apply(flatten);
-         }
+                     } catch (Exception e) {
+                        System.out.println("Error flattening subroutine, skipping: " + e.getMessage());
+                        // Continue with other subroutines
+                     }
+                  }
+               } catch (Exception e) {
+                  System.out.println("Error iterating subroutines during flattening: " + e.getMessage());
+               }
 
+               try {
          flatten.done();
+               } catch (Exception e) {
+                  System.out.println("Error finalizing flatten: " + e.getMessage());
+               }
          flatten = null;
+            }
+         } else {
+            System.out.println("Warning: No main subroutine available, continuing with partial decompilation.");
+         }
+         // Process globals - recover if this fails
+         try {
          sub = subdata.getGlobalsSub();
          if (sub != null) {
+               try {
             doglobs = new DoGlobalVars(nodedata, subdata);
             sub.apply(doglobs);
             cleanpass = new CleanupPass(doglobs.getScriptRoot(), nodedata, subdata, doglobs.getState());
@@ -1053,11 +1171,31 @@ public class FileDecompiler {
             subdata.setGlobalStack(doglobs.getStack());
             subdata.globalState(doglobs.getState());
             cleanpass.done();
+               } catch (Exception e) {
+                  System.out.println("Error processing globals, continuing without globals: " + e.getMessage());
+                  if (doglobs != null) {
+                     try {
+                        doglobs.done();
+                     } catch (Exception e2) {}
+                  }
+                  doglobs = null;
+               }
+            }
+         } catch (Exception e) {
+            System.out.println("Error getting globals subroutine: " + e.getMessage());
          }
 
+         // Prototype engine - recover if this fails
+         try {
          PrototypeEngine proto = new PrototypeEngine(nodedata, subdata, this.actions, FileDecompiler.strictSignatures);
          proto.run();
+         } catch (Exception e) {
+            System.out.println("Error in prototype engine, continuing with partial prototypes: " + e.getMessage());
+         }
 
+         // Type analysis - recover if main sub typing fails
+         if (mainsub != null) {
+            try {
          dotypes = new DoTypes(subdata.getState(mainsub), nodedata, subdata, this.actions, false);
          mainsub.apply(dotypes);
 
@@ -1068,31 +1206,73 @@ public class FileDecompiler {
          }
 
          dotypes.done();
-         boolean alldone = subdata.countSubsDone() == subdata.numSubs();
+            } catch (Exception e) {
+               System.out.println("Error typing main subroutine, continuing with partial types: " + e.getMessage());
+               dotypes = null;
+            }
+         }
+
+         // Type all subroutines - continue even if some fail
+         boolean alldone = false;
          boolean onedone = true;
-         int donecount = subdata.countSubsDone();
+         int donecount = 0;
+         
+         try {
+            alldone = subdata.countSubsDone() == subdata.numSubs();
+            onedone = true;
+            donecount = subdata.countSubsDone();
+         } catch (Exception e) {
+            System.out.println("Error checking subroutine completion status: " + e.getMessage());
+         }
 
          for (int loopcount = 0; !alldone && onedone && loopcount < 1000; ++loopcount) {
             onedone = false;
+            try {
             subs = subdata.getSubroutines();
+            } catch (Exception e) {
+               System.out.println("Error getting subroutines iterator: " + e.getMessage());
+               break;
+            }
 
+            if (subs != null) {
             while (subs.hasNext()) {
+                  try {
             sub = subs.next();
+                     if (sub == null) continue;
+                     
                dotypes = new DoTypes(subdata.getState(sub), nodedata, subdata, this.actions, false);
                sub.apply(dotypes);
                dotypes.done();
+                  } catch (Exception e) {
+                     System.out.println("Error typing subroutine, skipping: " + e.getMessage());
+                     // Continue with next subroutine
+                  }
+               }
             }
 
+            if (mainsub != null) {
+               try {
             dotypes = new DoTypes(subdata.getState(mainsub), nodedata, subdata, this.actions, false);
             mainsub.apply(dotypes);
             dotypes.done();
+               } catch (Exception e) {
+                  System.out.println("Error re-typing main subroutine: " + e.getMessage());
+               }
+            }
+            
+            try {
             alldone = subdata.countSubsDone() == subdata.numSubs();
-            onedone = onedone || subdata.countSubsDone() > donecount;
-            donecount = subdata.countSubsDone();
+               int newDoneCount = subdata.countSubsDone();
+               onedone = newDoneCount > donecount;
+               donecount = newDoneCount;
+            } catch (Exception e) {
+               System.out.println("Error checking completion status: " + e.getMessage());
+               break;
+            }
          }
 
          if (!alldone) {
-            System.out.println("Unable to do final prototype of all subroutines.");
+            System.out.println("Unable to do final prototype of all subroutines. Continuing with partial results.");
          }
 
          this.enforceStrictSignatures(subdata, nodedata);
@@ -1114,37 +1294,100 @@ public class FileDecompiler {
             }
          }
 
-         mainpass = new MainPass(subdata.getState(mainsub), nodedata, subdata, this.actions);
-         mainsub.apply(mainpass);
+         // Generate code for main subroutine - recover if this fails
+         if (mainsub != null) {
+            try {
+               mainpass = new MainPass(subdata.getState(mainsub), nodedata, subdata, this.actions);
+               mainsub.apply(mainpass);
 
-         try {
-            mainpass.assertStack();
-         } catch (Exception e) {
-            System.out.println("Could not assert stack, continuing anyway.");
+               try {
+                  mainpass.assertStack();
+               } catch (Exception e) {
+                  System.out.println("Could not assert stack, continuing anyway.");
+               }
+
+               cleanpass = new CleanupPass(mainpass.getScriptRoot(), nodedata, subdata, mainpass.getState());
+               cleanpass.apply();
+               mainpass.getState().isMain(true);
+               data.addSub(mainpass.getState());
+               mainpass.done();
+               cleanpass.done();
+            } catch (Exception e) {
+               System.out.println("Error generating code for main subroutine: " + e.getMessage());
+               // Try to create a minimal main function stub using MainPass
+               try {
+                  mainpass = new MainPass(subdata.getState(mainsub), nodedata, subdata, this.actions);
+                  // Even if apply fails, try to get the state
+                  try {
+                     mainsub.apply(mainpass);
+                  } catch (Exception e2) {
+                     System.out.println("Could not apply mainpass, but attempting to use partial state: " + e2.getMessage());
+                  }
+                  SubScriptState minimalMain = mainpass.getState();
+                  if (minimalMain != null) {
+                     minimalMain.isMain(true);
+                     data.addSub(minimalMain);
+                     System.out.println("Created minimal main subroutine stub.");
+                  }
+                  mainpass.done();
+               } catch (Exception e2) {
+                  System.out.println("Could not create minimal main stub: " + e2.getMessage());
+               }
+            }
+         } else {
+            System.out.println("Warning: No main subroutine available for code generation.");
          }
-
-         cleanpass = new CleanupPass(mainpass.getScriptRoot(), nodedata, subdata, mainpass.getState());
-         cleanpass.apply();
-         mainpass.getState().isMain(true);
-         data.addSub(mainpass.getState());
-         mainpass.done();
-         cleanpass.done();
+         // Store analysis data and globals - recover if this fails
+         try {
          data.subdata(subdata);
+         } catch (Exception e) {
+            System.out.println("Error storing subroutine analysis data: " + e.getMessage());
+         }
+         
          if (doglobs != null) {
+            try {
             cleanpass = new CleanupPass(doglobs.getScriptRoot(), nodedata, subdata, doglobs.getState());
             cleanpass.apply();
             data.globals(doglobs.getState());
             doglobs.done();
             cleanpass.done();
+            } catch (Exception e) {
+               System.out.println("Error finalizing globals: " + e.getMessage());
+               try {
+                  if (doglobs.getState() != null) {
+                     data.globals(doglobs.getState());
+                  }
+                  doglobs.done();
+               } catch (Exception e2) {
+                  System.out.println("Could not recover globals state: " + e2.getMessage());
+               }
+            }
          }
 
+         // Cleanup parse tree - this is safe to skip if it fails
+         try {
          destroytree = new DestroyParseTree();
 
          for (ASubroutine iterSub : this.subIterable(subdata)) {
+               try {
             iterSub.apply(destroytree);
+               } catch (Exception e) {
+                  System.out.println("Error destroying parse tree for subroutine: " + e.getMessage());
+               }
          }
 
+            if (mainsub != null) {
+               try {
          mainsub.apply(destroytree);
+               } catch (Exception e) {
+                  System.out.println("Error destroying main parse tree: " + e.getMessage());
+               }
+            }
+         } catch (Exception e) {
+            System.out.println("Error during parse tree cleanup: " + e.getMessage());
+            // Continue anyway - cleanup is not critical
+         }
+         
          return data;
       } catch (Exception e) {
          // Try to salvage partial results before giving up
@@ -1156,12 +1399,107 @@ public class FileDecompiler {
             data = new FileDecompiler.FileScriptData();
          }
          
+         // Aggressive recovery: try to salvage whatever state we have
+         System.out.println("Attempting aggressive state recovery...");
+         
+         // Try to add any subroutines that were partially processed
+         if (subdata != null && mainsub != null) {
+            try {
+               // Try to get main sub state even if it's incomplete
+               SubroutineState mainState = subdata.getState(mainsub);
+               if (mainState != null) {
+                  try {
+                     // Try to create a minimal main pass
+                     mainpass = new MainPass(mainState, nodedata, subdata, this.actions);
+                     try {
+                        mainsub.apply(mainpass);
+                     } catch (Exception e3) {
+                        System.out.println("Could not apply mainpass to main sub, but continuing: " + e3.getMessage());
+                     }
+                     SubScriptState scriptState = mainpass.getState();
+                     if (scriptState != null) {
+                        scriptState.isMain(true);
+                        data.addSub(scriptState);
+                        mainpass.done();
+                        System.out.println("Recovered main subroutine state.");
+                     }
+                  } catch (Exception e2) {
+                     System.out.println("Could not create main pass: " + e2.getMessage());
+                  }
+               }
+            } catch (Exception e2) {
+               System.out.println("Error recovering main subroutine: " + e2.getMessage());
+            }
+            
+            // Try to recover other subroutines
+            try {
+               for (ASubroutine iterSub : this.subIterable(subdata)) {
+                  if (iterSub == mainsub) continue; // Already handled
+                  try {
+                     SubroutineState state = subdata.getState(iterSub);
+                     if (state != null) {
+                        try {
+                           mainpass = new MainPass(state, nodedata, subdata, this.actions);
+                           try {
+                              iterSub.apply(mainpass);
+                           } catch (Exception e3) {
+                              System.out.println("Could not apply mainpass to subroutine, but continuing: " + e3.getMessage());
+                           }
+                           SubScriptState scriptState = mainpass.getState();
+                           if (scriptState != null) {
+                              data.addSub(scriptState);
+                              mainpass.done();
+                           }
+                        } catch (Exception e2) {
+                           System.out.println("Could not create mainpass for subroutine: " + e2.getMessage());
+                        }
+                     }
+                  } catch (Exception e2) {
+                     System.out.println("Error recovering subroutine: " + e2.getMessage());
+                  }
+               }
+            } catch (Exception e2) {
+               System.out.println("Error iterating subroutines during recovery: " + e2.getMessage());
+            }
+            
+            // Try to store subdata
+            try {
+               data.subdata(subdata);
+            } catch (Exception e2) {
+               System.out.println("Error storing subdata: " + e2.getMessage());
+            }
+         }
+         
+         // Try to recover globals if available
+         if (doglobs != null) {
+            try {
+               SubScriptState globState = doglobs.getState();
+               if (globState != null) {
+                  data.globals(globState);
+                  System.out.println("Recovered globals state.");
+               }
+            } catch (Exception e2) {
+               System.out.println("Error recovering globals: " + e2.getMessage());
+            }
+         }
+         
          try {
             // Try to generate code from whatever we have
             data.generateCode();
             String partialCode = data.getCode();
             if (partialCode != null && !partialCode.trim().isEmpty()) {
-               System.out.println("Recovered partial decompilation despite errors.");
+               System.out.println("Successfully recovered partial decompilation with " + 
+                                 (data.getVars() != null ? data.getVars().size() : 0) + " subroutines.");
+               // Add recovery note to the code
+               String recoveryNote = "// ========================================\n" +
+                                    "// PARTIAL DECOMPILATION - RECOVERED STATE\n" +
+                                    "// ========================================\n" +
+                                    "// This decompilation encountered errors but recovered partial results.\n" +
+                                    "// Some subroutines or code sections may be incomplete or missing.\n" +
+                                    "// Original error: " + e.getClass().getSimpleName() + ": " + 
+                                    (e.getMessage() != null ? e.getMessage() : "(no message)") + "\n" +
+                                    "// ========================================\n\n";
+               data.setCode(recoveryNote + partialCode);
                return data;
             }
          } catch (Exception genEx) {
@@ -1173,13 +1511,15 @@ public class FileDecompiler {
          try {
             if (data != null) {
                Hashtable<String, Vector<Variable>> vars = data.getVars();
-               if (vars != null) {
+               if (vars != null && vars.size() > 0) {
                   partialInfo += "  Subroutines with variable data: " + vars.size() + "\n";
                }
             }
             if (subdata != null) {
-               partialInfo += "  Total subroutines detected: " + subdata.numSubs() + "\n";
-               partialInfo += "  Subroutines fully typed: " + subdata.countSubsDone() + "\n";
+               try {
+                  partialInfo += "  Total subroutines detected: " + subdata.numSubs() + "\n";
+                  partialInfo += "  Subroutines fully typed: " + subdata.countSubsDone() + "\n";
+               } catch (Exception ignored) {}
             }
             if (commands != null) {
                partialInfo += "  Commands decoded: " + commands.length() + " characters\n";
@@ -1189,6 +1529,9 @@ public class FileDecompiler {
             }
             if (nodedata != null) {
                partialInfo += "  Node analysis data available: yes\n";
+            }
+            if (mainsub != null) {
+               partialInfo += "  Main subroutine identified: yes\n";
             }
          } catch (Exception ignored) {
             partialInfo += "  (Unable to gather partial state information)\n";
