@@ -10,6 +10,8 @@
 
 **This is NOT optional.** Do NOT summarize changes without committing them. Do NOT skip this step. Every code change, file modification, or configuration update MUST be committed before you consider the task complete.
 
+**NEVER use `git add .` or `git add -A` to stage changes.** Always stage files individually. This is because we may have multiple agents working on multiple files simultaneously.
+
 **Commit message format**: Use conventional commits format:
 
 - `fix:` for bug fixes
