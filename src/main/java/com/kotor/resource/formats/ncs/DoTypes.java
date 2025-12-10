@@ -148,7 +148,13 @@ public class DoTypes extends PrunedDepthFirstAdapter {
    public void outAActionCommand(AActionCommand node) {
       if (!this.protoskipping && !this.skipdeadcode) {
          int remove = NodeUtils.actionRemoveElementCount(node, this.actions);
-         Type type = NodeUtils.getReturnType(node, this.actions);
+         Type type;
+         try {
+            type = NodeUtils.getReturnType(node, this.actions);
+         } catch (RuntimeException e) {
+            // Action metadata missing or invalid - assume void return
+            type = new Type((byte)0);
+         }
          int add = NodeUtils.stackSizeToPos(type.typeSize());
          this.stack.remove(remove);
 

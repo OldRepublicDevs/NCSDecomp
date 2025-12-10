@@ -594,8 +594,21 @@ public class SubScriptState {
    public void transformAction(AActionCommand node) {
       this.checkStart(node);
       List<AExpression> params = this.removeActionParams(node);
-      AActionExp act = new AActionExp(NodeUtils.getActionName(node, this.actions), NodeUtils.getActionId(node), params, this.actions);
-      Type type = NodeUtils.getReturnType(node, this.actions);
+      String actionName;
+      try {
+         actionName = NodeUtils.getActionName(node, this.actions);
+      } catch (RuntimeException e) {
+         // Action metadata missing - use placeholder name
+         actionName = "UnknownAction" + NodeUtils.getActionId(node);
+      }
+      AActionExp act = new AActionExp(actionName, NodeUtils.getActionId(node), params, this.actions);
+      Type type;
+      try {
+         type = NodeUtils.getReturnType(node, this.actions);
+      } catch (RuntimeException e) {
+         // Action metadata missing or invalid - assume void return
+         type = new Type((byte) 0);
+      }
       if (!type.equals((byte) 0)) {
          Variable var = (Variable) this.stack.get(1);
          if (type.equals((byte) -16)) {
@@ -1290,24 +1303,45 @@ public class SubScriptState {
 
    private List<AExpression> removeActionParams(AActionCommand node) {
       ArrayList<AExpression> params = new ArrayList<>();
-      List<Type> paramtypes = NodeUtils.getActionParamTypes(node, this.actions);
+      List<Type> paramtypes;
+      try {
+         paramtypes = NodeUtils.getActionParamTypes(node, this.actions);
+      } catch (RuntimeException e) {
+         // Action metadata missing or invalid - use placeholder params based on arg count
+         int paramcount = NodeUtils.getActionParamCount(node);
+         for (int i = 0; i < paramcount; i++) {
+            try {
+               AExpression exp = this.removeLastExp(false);
+               params.add(exp);
+            } catch (RuntimeException expEx) {
+               // Stack doesn't have enough entries - use placeholder
+               params.add(this.buildPlaceholderParam(i + 1));
+            }
+         }
+         return params;
+      }
       int paramcount = Math.min(NodeUtils.getActionParamCount(node), paramtypes.size());
 
       for (int i = 0; i < paramcount; i++) {
          Type paramtype = paramtypes.get(i);
          AExpression exp;
-         if (paramtype.equals((byte) -16)) {
-            exp = this.getLastExp();
-            if (!exp.stackentry().type().equals((byte) -16) && !exp.stackentry().type().equals((byte) -15)) {
-               exp = new AVectorConstExp(
-                     this.removeLastExp(false),
-                     this.removeLastExp(false),
-                     this.removeLastExp(false));
+         try {
+            if (paramtype.equals((byte) -16)) {
+               exp = this.getLastExp();
+               if (!exp.stackentry().type().equals((byte) -16) && !exp.stackentry().type().equals((byte) -15)) {
+                  exp = new AVectorConstExp(
+                        this.removeLastExp(false),
+                        this.removeLastExp(false),
+                        this.removeLastExp(false));
+               } else {
+                  exp = this.removeLastExp(false);
+               }
             } else {
                exp = this.removeLastExp(false);
             }
-         } else {
-            exp = this.removeLastExp(false);
+         } catch (RuntimeException expEx) {
+            // Stack doesn't have enough entries - use placeholder
+            exp = this.buildPlaceholderParam(i + 1);
          }
 
          params.add(exp);

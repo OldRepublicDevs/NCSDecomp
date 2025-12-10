@@ -219,7 +219,13 @@ public class MainPass extends PrunedDepthFirstAdapter {
                i += entry.size();
             }
 
-            Type type = NodeUtils.getReturnType(node, this.actions);
+            Type type;
+            try {
+               type = NodeUtils.getReturnType(node, this.actions);
+            } catch (RuntimeException e) {
+               // Action metadata missing or invalid - assume void return
+               type = new Type((byte)0);
+            }
             if (!type.equals((byte)-16)) {
                if (!type.equals((byte)0)) {
                   Variable var = new Variable(type);

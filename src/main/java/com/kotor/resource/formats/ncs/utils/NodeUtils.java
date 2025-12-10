@@ -384,15 +384,22 @@ public final class NodeUtils {
    }
 
    public static int actionRemoveElementCount(AActionCommand node, ActionsData actions) {
-      List<Type> types = getActionParamTypes(node, actions);
-      int count = Math.min(getActionParamCount(node), types.size());
-      int remove = 0;
+      try {
+         List<Type> types = getActionParamTypes(node, actions);
+         int count = Math.min(getActionParamCount(node), types.size());
+         int remove = 0;
 
-      for (int i = 0; i < count; i++) {
-         remove += types.get(i).typeSize();
+         for (int i = 0; i < count; i++) {
+            remove += types.get(i).typeSize();
+         }
+
+         return stackSizeToPos(remove);
+      } catch (RuntimeException e) {
+         // Action metadata missing or invalid - estimate based on arg count
+         // Assume all params are int (size 1) as a safe default
+         int paramcount = getActionParamCount(node);
+         return paramcount;
       }
-
-      return stackSizeToPos(remove);
    }
 
    public static int stackOffsetToPos(TIntegerConstant offset) {
