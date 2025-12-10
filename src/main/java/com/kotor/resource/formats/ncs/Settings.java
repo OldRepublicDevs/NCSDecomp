@@ -55,6 +55,8 @@ public class Settings extends Properties implements ActionListener {
    private JButton browseOutputDirButton;
    private JTextField openDirectoryField;
    private JButton browseOpenDirButton;
+   private JTextField nwnnsscompPathField;
+   private JButton browseNwnnsscompButton;
    private JTextField k1NwscriptPathField;
    private JButton browseK1NwscriptButton;
    private JTextField k2NwscriptPathField;
@@ -139,6 +141,24 @@ public class Settings extends Properties implements ActionListener {
          if (chooser.showOpenDialog(this.frame) == JFileChooser.APPROVE_OPTION) {
             this.k2NwscriptPathField.setText(chooser.getSelectedFile().getAbsolutePath());
          }
+      } else if (src == this.browseNwnnsscompButton) {
+         JFileChooser chooser = new JFileChooser();
+         chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+         chooser.setDialogTitle("Select nwnnsscomp.exe");
+         chooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
+            @Override
+            public boolean accept(File f) {
+               return f.isDirectory() || f.getName().toLowerCase().endsWith(".exe");
+            }
+            
+            @Override
+            public String getDescription() {
+               return "Executable Files (*.exe)";
+            }
+         });
+         if (chooser.showOpenDialog(this.frame) == JFileChooser.APPROVE_OPTION) {
+            this.nwnnsscompPathField.setText(chooser.getSelectedFile().getAbsolutePath());
+         }
       }
    }
    
@@ -146,6 +166,12 @@ public class Settings extends Properties implements ActionListener {
       // File/Directory Settings
       this.setProperty("Output Directory", this.outputDirectoryField.getText());
       this.setProperty("Open Directory", this.openDirectoryField.getText());
+      String nwnnsscompPath = this.nwnnsscompPathField.getText().trim();
+      if (nwnnsscompPath.isEmpty()) {
+         this.remove("nwnnsscomp Path");
+      } else {
+         this.setProperty("nwnnsscomp Path", nwnnsscompPath);
+      }
       String k1NwscriptPath = this.k1NwscriptPathField.getText().trim();
       if (k1NwscriptPath.isEmpty()) {
          this.remove("K1 nwscript Path");
@@ -167,6 +193,10 @@ public class Settings extends Properties implements ActionListener {
          this.setProperty("Game Variant", "k2");
          FileDecompiler.isK2Selected = true;
       }
+      
+      // Apply nwnnsscomp path to FileDecompiler
+      String nwnnsscompPath = this.nwnnsscompPathField.getText().trim();
+      FileDecompiler.nwnnsscompPath = nwnnsscompPath.isEmpty() ? null : nwnnsscompPath;
       
       // Decompilation Options
       this.setProperty("Prefer Switches", String.valueOf(this.preferSwitchesCheckBox.isSelected()));
@@ -191,6 +221,10 @@ public class Settings extends Properties implements ActionListener {
       String defaultOutputDir = new File(System.getProperty("user.dir"), "ncsdecomp_converted").getAbsolutePath();
       this.outputDirectoryField.setText(this.getProperty("Output Directory", defaultOutputDir));
       this.openDirectoryField.setText(this.getProperty("Open Directory", System.getProperty("user.dir")));
+      
+      // Default nwnnsscomp path: tools/ directory + filename
+      String defaultNwnnsscompPath = new File(new File(System.getProperty("user.dir"), "tools"), "nwnnsscomp.exe").getAbsolutePath();
+      this.nwnnsscompPathField.setText(this.getProperty("nwnnsscomp Path", defaultNwnnsscompPath));
       
       // Default nwscript paths: tools/ directory + filename
       String defaultK1Path = new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss").getAbsolutePath();
@@ -286,6 +320,8 @@ public class Settings extends Properties implements ActionListener {
       String defaultOutputDir = new File(System.getProperty("user.dir"), "ncsdecomp_converted").getAbsolutePath();
       this.setProperty("Output Directory", defaultOutputDir);
       this.setProperty("Open Directory", System.getProperty("user.dir"));
+      String defaultNwnnsscompPath = new File(new File(System.getProperty("user.dir"), "tools"), "nwnnsscomp.exe").getAbsolutePath();
+      this.setProperty("nwnnsscomp Path", defaultNwnnsscompPath);
       String defaultK1Path = new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss").getAbsolutePath();
       String defaultK2Path = new File(new File(System.getProperty("user.dir"), "tools"), "tsl_nwscript.nss").getAbsolutePath();
       this.setProperty("K1 nwscript Path", defaultK1Path);
@@ -392,9 +428,25 @@ public class Settings extends Properties implements ActionListener {
       this.browseOpenDirButton.addActionListener(this);
       panel.add(this.browseOpenDirButton, gbc);
       
-      // K1 nwscript Path
+      // nwnnsscomp Path
       gbc.gridx = 0;
       gbc.gridy = 2;
+      gbc.weightx = 0.0;
+      panel.add(new JLabel("nwnnsscomp.exe:"), gbc);
+      gbc.gridx = 1;
+      gbc.weightx = 1.0;
+      this.nwnnsscompPathField = new JTextField(30);
+      this.nwnnsscompPathField.setToolTipText("Path to nwnnsscomp.exe for bytecode validation and round-trip testing");
+      panel.add(this.nwnnsscompPathField, gbc);
+      gbc.gridx = 2;
+      gbc.weightx = 0.0;
+      this.browseNwnnsscompButton = new JButton("Browse...");
+      this.browseNwnnsscompButton.addActionListener(this);
+      panel.add(this.browseNwnnsscompButton, gbc);
+      
+      // K1 nwscript Path
+      gbc.gridx = 0;
+      gbc.gridy = 3;
       gbc.weightx = 0.0;
       panel.add(new JLabel("KotOR 1 nwscript.nss:"), gbc);
       gbc.gridx = 1;
@@ -410,7 +462,7 @@ public class Settings extends Properties implements ActionListener {
       
       // K2 nwscript Path
       gbc.gridx = 0;
-      gbc.gridy = 3;
+      gbc.gridy = 4;
       gbc.weightx = 0.0;
       panel.add(new JLabel("KotOR 2 nwscript.nss:"), gbc);
       gbc.gridx = 1;

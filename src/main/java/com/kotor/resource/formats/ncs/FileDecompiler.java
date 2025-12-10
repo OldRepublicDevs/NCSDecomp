@@ -75,6 +75,8 @@ public class FileDecompiler {
    public static boolean preferSwitches = false;
    /** Whether to abort when any signature stays partially inferred. */
    public static boolean strictSignatures = false;
+   /** Path to nwnnsscomp.exe, null means use default (tools/nwnnsscomp.exe or current directory) */
+   public static String nwnnsscompPath = null;
 
    /**
     * Builds a decompiler configured for the current working directory.
@@ -719,9 +721,25 @@ public class FileDecompiler {
    }
 
    /**
-    * Returns the expected nwnnsscomp executable location (current working directory).
+    * Returns the expected nwnnsscomp executable location.
+    * Checks configured path first, then tools/ directory, then current working directory.
     */
    private File getCompilerFile() {
+      // Use configured path if set
+      if (nwnnsscompPath != null && !nwnnsscompPath.trim().isEmpty()) {
+         File configured = new File(nwnnsscompPath);
+         if (configured.exists()) {
+            return configured;
+         }
+      }
+      
+      // Try tools/ directory (default location)
+      File toolsPath = new File(new File(System.getProperty("user.dir"), "tools"), "nwnnsscomp.exe");
+      if (toolsPath.exists()) {
+         return toolsPath;
+      }
+      
+      // Fall back to current working directory (legacy support)
       return new File("nwnnsscomp.exe");
    }
 
