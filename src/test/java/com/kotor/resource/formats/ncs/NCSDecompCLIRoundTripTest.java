@@ -525,9 +525,9 @@ public class NCSDecompCLIRoundTripTest {
          boolean isK2 = "k2".equals(gameFlag);
 
          NwnnsscompConfig config = new NwnnsscompConfig(compilerFile, sourceFile, outputFile, isK2);
-         // Pass temp directory as include directory so compiler can find includes
-         java.util.List<File> includeDirs = java.util.Collections.singletonList(tempDir.toFile());
-         String[] cmd = config.getCompileArgs(compilerFile.getAbsolutePath(), includeDirs);
+         // Don't use -i flag - compiler expects includes in same directory as source
+         // All includes are already copied to tempDir alongside the source file
+         String[] cmd = config.getCompileArgs(compilerFile.getAbsolutePath());
 
          // Log compilation command and args (but show original path in the log)
          System.out.print(" (");
