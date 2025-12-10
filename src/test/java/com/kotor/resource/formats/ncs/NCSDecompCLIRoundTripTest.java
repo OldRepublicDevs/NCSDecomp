@@ -1054,8 +1054,16 @@ public class NCSDecompCLIRoundTripTest {
          int funcStart = funcMatcher.start();
          int funcEnd = funcMatcher.end();
          
+         // Safety check: ensure lastPos <= funcStart
+         if (lastPos > funcStart) {
+            // Skip this match if we've already passed it
+            continue;
+         }
+         
          // Add content before this function
-         result.append(content.substring(lastPos, funcStart));
+         if (lastPos < funcStart) {
+            result.append(content.substring(lastPos, funcStart));
+         }
          result.append(funcMatcher.group(0)); // Function signature
          
          // Find the function body
@@ -1068,12 +1076,20 @@ public class NCSDecompCLIRoundTripTest {
             
             // Update lastPos to after the function
             int bracePos = content.indexOf('{', funcEnd);
-            lastPos = bracePos + 1 + funcBody.length() + 1; // +1 for closing brace
+            if (bracePos != -1) {
+               lastPos = Math.min(content.length(), bracePos + 1 + funcBody.length() + 1); // +1 for closing brace
+            } else {
+               lastPos = funcEnd;
+            }
          } else {
             lastPos = funcEnd;
          }
       }
-      result.append(content.substring(lastPos));
+      
+      // Add remaining content
+      if (lastPos < content.length()) {
+         result.append(content.substring(lastPos));
+      }
       return result.toString();
    }
 
