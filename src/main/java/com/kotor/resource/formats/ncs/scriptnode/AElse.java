@@ -12,6 +12,14 @@ public class AElse extends ScriptRootNode {
    @Override
    public String toString() {
       StringBuffer buff = new StringBuffer();
+
+      // Collapse trivial "else { if (...) { ... } }" into "else if (...) { ... }"
+      if (this.children.size() == 1 && this.children.get(0) instanceof AIf) {
+         String ifStr = this.children.get(0).toString().trim();
+         buff.append(this.tabs).append("else ").append(ifStr).append(this.newline);
+         return buff.toString();
+      }
+
       buff.append(this.tabs + "else {" + this.newline);
 
       for (int i = 0; i < this.children.size(); i++) {
