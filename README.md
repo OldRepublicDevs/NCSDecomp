@@ -157,7 +157,7 @@ Dependencies are managed through Maven. Add new dependencies to `pom.xml` in the
 mvn test
 
 # Run a specific test class
-mvn test -Dtest=KNCSDecompCLIRoundTripTest
+mvn test -Dtest=NCSDecompCLIRoundTripTest
 ```
 
 ## License
