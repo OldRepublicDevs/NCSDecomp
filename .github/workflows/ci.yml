@@ -50,13 +50,17 @@ jobs:
           sudo dpkg --add-architecture i386
           sudo apt-get update
           sudo apt-get install -y wine wine32 wine64
+          wine --version  # Verify installation
 
       - name: Install Wine (macOS)
         if: runner.os == 'macOS'
         run: |
-          brew install --cask --no-quarantine wine-stable || true
-          # Fallback to winehq if wine-stable fails
-          brew install wine || true
+          # Try wine-stable cask first
+          if ! brew install --cask --no-quarantine wine-stable; then
+            # Fallback to wine formula if cask fails
+            brew install wine
+          fi
+          wine --version  # Verify installation
 
       - name: Make tools executable
         if: runner.os != 'Windows'

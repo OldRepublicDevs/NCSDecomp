@@ -136,7 +136,7 @@ public class NwnnsscompConfig {
 
       // Check if we're running on a non-Windows platform
       String osName = System.getProperty("os.name").toLowerCase();
-      boolean isWindows = osName.contains("win");
+      boolean isWindows = osName.startsWith("windows");
       
       if (!isWindows && executable.toLowerCase().endsWith(".exe")) {
          // Use Wine to run .exe on non-Windows platforms
