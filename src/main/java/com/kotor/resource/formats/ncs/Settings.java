@@ -17,7 +17,10 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.time.format.DateTimeFormatter;
 import java.util.Properties;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.BorderFactory;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
@@ -57,6 +60,7 @@ public class Settings extends Properties implements ActionListener {
    private JButton browseOpenDirButton;
    private JTextField nwnnsscompPathField;
    private JButton browseNwnnsscompButton;
+   private JLabel nwnnsscompInfoLabel;
    private JTextField k1NwscriptPathField;
    private JButton browseK1NwscriptButton;
    private JTextField k2NwscriptPathField;
@@ -158,6 +162,7 @@ public class Settings extends Properties implements ActionListener {
          });
          if (chooser.showOpenDialog(this.frame) == JFileChooser.APPROVE_OPTION) {
             this.nwnnsscompPathField.setText(chooser.getSelectedFile().getAbsolutePath());
+            updateCompilerInfo();
          }
       }
    }
@@ -225,6 +230,8 @@ public class Settings extends Properties implements ActionListener {
       // Default nwnnsscomp path: tools/ directory + filename
       String defaultNwnnsscompPath = new File(new File(System.getProperty("user.dir"), "tools"), "nwnnsscomp.exe").getAbsolutePath();
       this.nwnnsscompPathField.setText(this.getProperty("nwnnsscomp Path", defaultNwnnsscompPath));
+      // Update compiler info after setting the path
+      updateCompilerInfo();
       
       // Default nwscript paths: tools/ directory + filename
       String defaultK1Path = new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss").getAbsolutePath();
@@ -439,12 +446,33 @@ public class Settings extends Properties implements ActionListener {
       gbc.weightx = 1.0;
       this.nwnnsscompPathField = new JTextField(30);
       this.nwnnsscompPathField.setToolTipText("Path to nwnnsscomp.exe for bytecode validation and round-trip testing");
+      // Add document listener to update compiler info when path changes
+      this.nwnnsscompPathField.getDocument().addDocumentListener(new DocumentListener() {
+         @Override
+         public void insertUpdate(DocumentEvent e) {
+            updateCompilerInfo();
+         }
+         @Override
+         public void removeUpdate(DocumentEvent e) {
+            updateCompilerInfo();
+         }
+         @Override
+         public void changedUpdate(DocumentEvent e) {
+            updateCompilerInfo();
+         }
+      });
       panel.add(this.nwnnsscompPathField, gbc);
       gbc.gridx = 2;
       gbc.weightx = 0.0;
       this.browseNwnnsscompButton = new JButton("Browse...");
       this.browseNwnnsscompButton.addActionListener(this);
       panel.add(this.browseNwnnsscompButton, gbc);
+      // Compiler info indicator with emoji
+      gbc.gridx = 3;
+      gbc.weightx = 0.0;
+      this.nwnnsscompInfoLabel = new JLabel("");
+      this.nwnnsscompInfoLabel.setToolTipText("Compiler information will appear here");
+      panel.add(this.nwnnsscompInfoLabel, gbc);
       
       // K1 nwscript Path
       gbc.gridx = 0;
@@ -660,6 +688,107 @@ public class Settings extends Properties implements ActionListener {
       panel.add(new JLabel(), gbc);
       
       return panel;
+   }
+   
+   /**
+    * Updates the compiler info indicator based on the current nwnnsscomp path.
+    * Detects the compiler version by SHA256 hash and displays metadata.
+    */
+   private void updateCompilerInfo() {
+      String path = this.nwnnsscompPathField.getText().trim();
+      
+      if (path.isEmpty()) {
+         this.nwnnsscompInfoLabel.setText("");
+         this.nwnnsscompInfoLabel.setToolTipText("No compiler path specified");
+         return;
+      }
+      
+      File compilerFile = new File(path);
+      
+      if (!compilerFile.exists()) {
+         this.nwnnsscompInfoLabel.setText("❓");
+         this.nwnnsscompInfoLabel.setToolTipText("Compiler file not found: " + path);
+         return;
+      }
+      
+      if (!compilerFile.isFile()) {
+         this.nwnnsscompInfoLabel.setText("❌");
+         this.nwnnsscompInfoLabel.setToolTipText("Path is not a file: " + path);
+         return;
+      }
+      
+      try {
+         // Calculate SHA256 hash
+         String sha256 = HashUtil.calculateSHA256(compilerFile);
+         
+         // Look up compiler
+         KnownExternalCompilers compiler = KnownExternalCompilers.fromSha256(sha256);
+         
+         if (compiler != null) {
+            // Format tooltip with metadata
+            StringBuilder tooltip = new StringBuilder();
+            tooltip.append("<html><b>").append(compiler.getName()).append("</b><br>");
+            tooltip.append("Author: ").append(compiler.getAuthor()).append("<br>");
+            tooltip.append("Release Date: ").append(compiler.getReleaseDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))).append("<br>");
+            tooltip.append("SHA256: ").append(sha256.substring(0, 16)).append("...<br>");
+            tooltip.append("<br><b>Compile Args:</b><br>");
+            String[] compileArgs = compiler.getCompileArgs();
+            if (compileArgs.length > 0) {
+               tooltip.append(String.join(" ", compileArgs));
+            } else {
+               tooltip.append("(not supported)");
+            }
+            tooltip.append("<br><br><b>Decompile Args:</b><br>");
+            if (compiler.supportsDecompilation()) {
+               tooltip.append(String.join(" ", compiler.getDecompileArgs()));
+            } else {
+               tooltip.append("(not supported)");
+            }
+            tooltip.append("</html>");
+            
+            // Choose emoji based on compiler type
+            String emoji = getCompilerEmoji(compiler);
+            
+            this.nwnnsscompInfoLabel.setText(emoji + " " + compiler.getName());
+            this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
+         } else {
+            // Unknown compiler
+            this.nwnnsscompInfoLabel.setText("⚠️ Unknown");
+            StringBuilder tooltip = new StringBuilder();
+            tooltip.append("<html><b>Unknown Compiler</b><br>");
+            tooltip.append("SHA256: ").append(sha256).append("<br>");
+            tooltip.append("This compiler version is not recognized.<br>");
+            tooltip.append("It may not be fully supported.</html>");
+            this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
+         }
+      } catch (IOException e) {
+         this.nwnnsscompInfoLabel.setText("❌");
+         this.nwnnsscompInfoLabel.setToolTipText("Error reading compiler file: " + e.getMessage());
+      }
+   }
+   
+   /**
+    * Returns an emoji representing the compiler type.
+    */
+   private String getCompilerEmoji(KnownExternalCompilers compiler) {
+      switch (compiler) {
+         case TSLPATCHER:
+            return "🔧";
+         case KOTOR_TOOL:
+            return "🛠️";
+         case V1:
+            return "📦";
+         case KOTOR_SCRIPTING_TOOL:
+            return "⚙️";
+         case DENCS:
+            return "🔨";
+         case XOREOS:
+            return "🌐";
+         case KNSSCOMP:
+            return "✨";
+         default:
+            return "📄";
+      }
    }
 }
 
