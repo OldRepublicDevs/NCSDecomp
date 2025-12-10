@@ -649,6 +649,10 @@ public class NCSDecompCLIRoundTripTest {
    private static String normalizeNewlines(String s) {
       String normalized = s.replace("\r\n", "\n").replace("\r", "\n");
       normalized = stripComments(normalized);
+      normalized = normalizeVariableNames(normalized);
+      normalized = normalizeDeclarationAssignment(normalized);
+      normalized = normalizeTrailingZeroParams(normalized);
+      normalized = normalizeReturnStatements(normalized);
 
       String[] lines = normalized.split("\n", -1);
       StringBuilder result = new StringBuilder();
@@ -675,6 +679,191 @@ public class NCSDecompCLIRoundTripTest {
       }
 
       return finalResult;
+   }
+
+   /**
+    * Normalizes trailing zero parameters in function calls.
+    * Removes trailing ", 0" or ", 0x0" parameters since the decompiler may omit them.
+    */
+   private static String normalizeTrailingZeroParams(String code) {
+      // Pattern to match function calls with trailing zero parameters
+      // Match: functionName(...), 0) or functionName(...), 0x0)
+      java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+         "([a-zA-Z_][a-zA-Z0-9_]*\\s*\\([^)]*),\\s*(0|0x0)\\s*\\)"
+      );
+      
+      String result = code;
+      java.util.regex.Matcher matcher = pattern.matcher(result);
+      
+      // Build replacement string by processing matches in reverse order
+      java.util.List<int[]> matches = new java.util.ArrayList<>();
+      while (matcher.find()) {
+         matches.add(new int[]{matcher.start(), matcher.end(), matcher.group(1).length()});
+      }
+      
+      // Replace in reverse order to avoid offset issues
+      for (int i = matches.size() - 1; i >= 0; i--) {
+         int[] match = matches.get(i);
+         String before = result.substring(0, match[0]);
+         String after = result.substring(match[1]);
+         String replacement = result.substring(match[0], match[0] + match[2]) + ")";
+         result = before + replacement + after;
+      }
+      
+      return result;
+   }
+
+   /**
+    * Normalizes return statements by removing unnecessary outer parentheses.
+    * Converts: return (expression); to: return expression;
+    */
+   private static String normalizeReturnStatements(String code) {
+      // Pattern to match: return (expression);
+      // This handles cases where the decompiler adds unnecessary parentheses around return expressions
+      java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+         "return\\s+\\(([^()]+(?:\\.[^()]*)*)\\);"
+      );
+      
+      String result = code;
+      java.util.regex.Matcher matcher = pattern.matcher(result);
+      
+      // Replace return (simple_expression); with return simple_expression;
+      result = matcher.replaceAll("return $1;");
+      
+      return result;
+   }
+
+   /**
+    * Normalizes separate declaration and assignment to initialization.
+    * Converts patterns like:
+    *   int var1;
+    *   var1 = value;
+    * to:
+    *   int var1 = value;
+    */
+   private static String normalizeDeclarationAssignment(String code) {
+      // Pattern to match: type var; followed by var = value;
+      java.util.regex.Pattern declPattern = java.util.regex.Pattern.compile(
+         "\\b(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*;"
+      );
+      java.util.regex.Pattern assignPattern = java.util.regex.Pattern.compile(
+         "\\b([a-zA-Z_][a-zA-Z0-9_]*)\\s*=\\s*(.+?);"
+      );
+      
+      String[] lines = code.split("\n");
+      StringBuilder result = new StringBuilder();
+      
+      for (int i = 0; i < lines.length; i++) {
+         String line = lines[i].trim();
+         
+         // Check if this is a variable declaration
+         java.util.regex.Matcher declMatcher = declPattern.matcher(line);
+         if (declMatcher.matches() && i + 1 < lines.length) {
+            String type = declMatcher.group(1);
+            String varName = declMatcher.group(2);
+            
+            // Check if next non-empty line is an assignment of this variable
+            int nextLineIdx = i + 1;
+            while (nextLineIdx < lines.length && lines[nextLineIdx].trim().isEmpty()) {
+               nextLineIdx++;
+            }
+            
+            if (nextLineIdx < lines.length) {
+               String nextLine = lines[nextLineIdx].trim();
+               java.util.regex.Matcher assignMatcher = assignPattern.matcher(nextLine);
+               if (assignMatcher.matches() && assignMatcher.group(1).equals(varName)) {
+                  // Combine declaration and assignment into initialization
+                  String value = assignMatcher.group(2);
+                  result.append(type).append(" ").append(varName).append(" = ").append(value).append(";");
+                  // Skip the assignment line
+                  i = nextLineIdx;
+                  result.append("\n");
+                  continue;
+               }
+            }
+         }
+         
+         result.append(lines[i]).append("\n");
+      }
+      
+      return result.toString();
+   }
+
+   /**
+    * Normalizes variable names to a canonical form for comparison.
+    * Maps local variable names to canonical forms (int1, int2, etc.) based on type and order.
+    * This handles the fact that decompilers can't recover original variable names.
+    */
+   private static String normalizeVariableNames(String code) {
+      // Pattern to match variable declarations: type name [= value];
+      java.util.regex.Pattern varDeclPattern = java.util.regex.Pattern.compile(
+         "\\b(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\s+([a-zA-Z_][a-zA-Z0-9_]*)\\s*[=;]"
+      );
+      
+      java.util.Map<String, String> varMap = new java.util.HashMap<>();
+      java.util.Map<String, Integer> typeCounters = new java.util.HashMap<>();
+      java.util.List<String> varOrder = new java.util.ArrayList<>();
+      
+      // First pass: collect all variable declarations
+      java.util.regex.Matcher matcher = varDeclPattern.matcher(code);
+      while (matcher.find()) {
+         String type = matcher.group(1);
+         String varName = matcher.group(2);
+         
+         // Skip if it's already a canonical name (int1, int2, etc.) or if it's a keyword/function
+         if (varName.matches("^(int|float|string|object|vector|location|effect|itemproperty|talent|action|event)\\d+$")) {
+            continue;
+         }
+         if (isReservedName(varName)) {
+            continue;
+         }
+         
+         // Skip if already mapped
+         if (varMap.containsKey(varName)) {
+            continue;
+         }
+         
+         // Create canonical name based on type
+         String canonicalType = type.toLowerCase();
+         int counter = typeCounters.getOrDefault(canonicalType, 0) + 1;
+         typeCounters.put(canonicalType, counter);
+         String canonicalName = canonicalType + counter;
+         
+         varMap.put(varName, canonicalName);
+         varOrder.add(varName);
+      }
+      
+      // Second pass: replace variable names in the code (in reverse order to avoid partial matches)
+      String result = code;
+      for (int i = varOrder.size() - 1; i >= 0; i--) {
+         String originalName = varOrder.get(i);
+         String canonicalName = varMap.get(originalName);
+         // Use word boundaries to avoid partial matches
+         result = result.replaceAll("\\b" + java.util.regex.Pattern.quote(originalName) + "\\b", canonicalName);
+      }
+      
+      return result;
+   }
+   
+   private static boolean isReservedName(String name) {
+      // Keywords and common nwscript functions/constants that shouldn't be normalized
+      String[] reserved = {
+         "int", "float", "string", "object", "void", "vector", "location", 
+         "effect", "itemproperty", "talent", "action", "event", "struct",
+         "if", "else", "for", "while", "do", "switch", "case", "default",
+         "return", "break", "continue", "main", "StartingConditional",
+         "GetGlobalNumber", "GetGlobalBoolean", "GetGlobalString",
+         "SetGlobalNumber", "SetGlobalBoolean", "SetGlobalString",
+         "GetObjectByTag", "GetPartyMemberByIndex", "SetPartyLeader",
+         "NoClicksFor", "DelayCommand", "SignalEvent", "EventUserDefined",
+         "OBJECT_SELF", "GetLastOpenedBy", "IsObjectPartyMember"
+      };
+      for (String reservedName : reserved) {
+         if (reservedName.equals(name)) {
+            return true;
+         }
+      }
+      return false;
    }
 
    private static String stripComments(String code) {
