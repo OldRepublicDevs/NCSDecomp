@@ -698,17 +698,22 @@ public class NCSDecompCLIRoundTripTest {
       java.util.regex.Matcher matcher = pattern.matcher(result);
       
       // Build replacement string by processing matches in reverse order
-      java.util.List<int[]> matches = new java.util.ArrayList<>();
+      // Store start, end, and the actual group 1 content to avoid substring issues
+      java.util.List<Object[]> matches = new java.util.ArrayList<>();
       while (matcher.find()) {
-         matches.add(new int[]{matcher.start(), matcher.end(), matcher.group(1).length()});
+         matches.add(new Object[]{matcher.start(), matcher.end(), matcher.group(1)});
       }
       
       // Replace in reverse order to avoid offset issues
       for (int i = matches.size() - 1; i >= 0; i--) {
-         int[] match = matches.get(i);
-         String before = result.substring(0, match[0]);
-         String after = result.substring(match[1]);
-         String replacement = result.substring(match[0], match[0] + match[2]) + ")";
+         Object[] match = matches.get(i);
+         int start = (Integer) match[0];
+         int end = (Integer) match[1];
+         String group1 = (String) match[2];
+         String before = result.substring(0, start);
+         String after = result.substring(end);
+         // Use the captured group 1 content directly, then append closing paren
+         String replacement = group1 + ")";
          result = before + replacement + after;
       }
       
