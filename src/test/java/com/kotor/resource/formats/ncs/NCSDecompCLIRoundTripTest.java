@@ -2324,20 +2324,24 @@ public class NCSDecompCLIRoundTripTest {
       // We need to match the opening brace after function signature and remove it,
       // then match the closing brace before return and remove it
       
-      // First, remove opening brace of extra block: function() { { -> function() {
-      // Be careful to preserve newlines and content
-      java.util.regex.Pattern extraBlockOpenPattern = java.util.regex.Pattern.compile(
-            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\n?\\s*)\\{\\s*",
+      // Use a more careful approach: find function signatures followed by double opening braces
+      // and remove the inner one, preserving all content
+      java.util.regex.Pattern funcWithExtraBlock = java.util.regex.Pattern.compile(
+            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{)\\s*\\n?\\s*\\{",
             java.util.regex.Pattern.MULTILINE);
-      result = extraBlockOpenPattern.matcher(result).replaceAll("$1");
+      result = funcWithExtraBlock.matcher(result).replaceAll("$1");
       
-      // Then, remove closing brace of extra block before return: } return; } -> return; }
-      // Match: closing brace of inner block, optional whitespace/newlines, return statement, 
-      // optional whitespace/newlines, closing brace of function
+      // Remove closing brace of extra block before return: } return; } -> return; }
+      // Be very careful to preserve content - match closing brace, whitespace, return, whitespace, closing brace
       java.util.regex.Pattern extraBlockClosePattern = java.util.regex.Pattern.compile(
-            "\\}\\s*\\n?\\s*return\\s*;\\s*\\n?\\s*\\}",
+            "\\}\\s*\\n\\s*return\\s*;\\s*\\n\\s*\\}",
             java.util.regex.Pattern.MULTILINE);
-      result = extraBlockClosePattern.matcher(result).replaceAll("return; }");
+      result = extraBlockClosePattern.matcher(result).replaceAll("\nreturn; }");
+      
+      // Also handle case where return is on same line: } return; } -> return; }
+      java.util.regex.Pattern extraBlockCloseSameLine = java.util.regex.Pattern.compile(
+            "\\}\\s+return\\s*;\\s*\\}");
+      result = extraBlockCloseSameLine.matcher(result).replaceAll("return; }");
       
       return result;
    }
