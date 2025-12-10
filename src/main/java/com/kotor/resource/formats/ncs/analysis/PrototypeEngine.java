@@ -120,9 +120,9 @@ public class PrototypeEngine {
             }
             state.startPrototyping();
             state.setParamCount(inferredParams);
-            // Default to void return unless already typed
-            if (!state.type().isTyped()) {
-               state.setReturnType(new Type((byte)0), 0);
+            // Default to void return unless already set to a non-void type
+            if (!state.type().isTyped() || state.type().byteValue() == Type.VT_NONE) {
+               state.setReturnType(new Type(Type.VT_NONE), 0);
             }
             state.ensureParamPlaceholders();
             state.stopPrototyping(true);
