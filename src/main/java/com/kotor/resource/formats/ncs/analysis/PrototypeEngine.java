@@ -128,7 +128,8 @@ public class PrototypeEngine {
             state.setParamCount(inferredParams);
             // Default to int return (bool-compatible) when unknown to preserve call usage.
             if (!state.type().isTyped() || state.type().byteValue() == Type.VT_NONE) {
-               state.setReturnType(new Type(Type.VT_INTEGER), 0);
+               // Prefer void when nothing is known to avoid introducing bogus return values.
+               state.setReturnType(new Type(Type.VT_NONE), 0);
             }
             state.ensureParamPlaceholders();
             state.stopPrototyping(true);

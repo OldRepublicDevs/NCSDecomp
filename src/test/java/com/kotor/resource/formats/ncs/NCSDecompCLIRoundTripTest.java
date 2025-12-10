@@ -54,7 +54,8 @@ public class NCSDecompCLIRoundTripTest {
    private static final Path K1_ASC_NWSCRIPT = REPO_ROOT.resolve("k1_asc_nwscript.nss");
    private static final Path K2_NWSCRIPT = REPO_ROOT.resolve("src").resolve("main").resolve("resources")
          .resolve("tsl_nwscript.nss");
-   private static final Map<String, String> NPC_CONSTANTS = loadNpcConstants();
+   private static final Map<String, String> NPC_CONSTANTS_K1 = loadNpcConstantsForGame(K1_NWSCRIPT);
+   private static final Map<String, String> NPC_CONSTANTS_K2 = loadNpcConstantsForGame(K2_NWSCRIPT);
 
    private static String displayPath(Path path) {
       Path abs = path.toAbsolutePath().normalize();
@@ -346,8 +347,9 @@ public class NCSDecompCLIRoundTripTest {
       // Compare
       long compareStart = System.nanoTime();
       try {
-         String original = normalizeNewlines(new String(Files.readAllBytes(nssPath), StandardCharsets.UTF_8));
-         String roundtrip = normalizeNewlines(new String(Files.readAllBytes(decompiled), StandardCharsets.UTF_8));
+         boolean isK2 = "k2".equals(gameFlag);
+         String original = normalizeNewlines(new String(Files.readAllBytes(nssPath), StandardCharsets.UTF_8), isK2);
+         String roundtrip = normalizeNewlines(new String(Files.readAllBytes(decompiled), StandardCharsets.UTF_8), isK2);
          long compareTime = System.nanoTime() - compareStart;
          operationTimes.merge("compare", compareTime, Long::sum);
 
@@ -765,7 +767,7 @@ public class NCSDecompCLIRoundTripTest {
       return dot == -1 ? name : name.substring(0, dot);
    }
 
-   private static String normalizeNewlines(String s) {
+   private static String normalizeNewlines(String s, boolean isK2) {
       String normalized = s.replace("\r\n", "\n").replace("\r", "\n");
       normalized = stripComments(normalized);
       normalized = normalizeIncludes(normalized);
@@ -774,10 +776,11 @@ public class NCSDecompCLIRoundTripTest {
       normalized = normalizeVariableNames(normalized);
       normalized = normalizeDeclarationAssignment(normalized);
       normalized = normalizeTrailingZeroParams(normalized);
+      normalized = normalizeTrailingDefaults(normalized);
       normalized = normalizeEffectDeathDefaults(normalized);
       normalized = normalizeReturnStatements(normalized);
       normalized = normalizeTrueFalse(normalized);
-      normalized = normalizeNpcConstants(normalized);
+      normalized = normalizeNpcConstants(normalized, isK2 ? NPC_CONSTANTS_K2 : NPC_CONSTANTS_K1);
       normalized = normalizeBitwiseOperators(normalized);
       normalized = normalizePlaceholderNames(normalized);
       normalized = normalizeFunctionOrder(normalized);
@@ -800,6 +803,43 @@ public class NCSDecompCLIRoundTripTest {
       }
 
       return finalResult;
+   }
+
+   /**
+    * Normalizes trailing parameters that are equivalent to default values.
+    * <p>
+    * Decompiler may emit optional parameters explicitly (e.g., TRUE/1). Strip
+    * these when they match known defaults so calls with/without the optional
+    * argument compare equal.
+    */
+   private static String normalizeTrailingDefaults(String code) {
+      // Defaults to strip when they appear as the last argument
+      java.util.Map<String, String> trailingDefaults = new java.util.HashMap<>();
+      trailingDefaults.put("ActionJumpToObject", "(1|TRUE)");
+
+      String result = code;
+      for (java.util.Map.Entry<String, String> entry : trailingDefaults.entrySet()) {
+         String func = entry.getKey();
+         String defaultValue = entry.getValue();
+         java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+               "(" + java.util.regex.Pattern.quote(func) + "\\s*\\([^)]*),\\s*" + defaultValue + "\\s*\\)");
+
+         java.util.regex.Matcher matcher = pattern.matcher(result);
+         java.util.List<Object[]> matches = new java.util.ArrayList<>();
+         while (matcher.find()) {
+            matches.add(new Object[] { matcher.start(), matcher.end(), matcher.group(1) });
+         }
+
+         for (int i = matches.size() - 1; i >= 0; i--) {
+            Object[] match = matches.get(i);
+            int start = (Integer) match[0];
+            int end = (Integer) match[1];
+            String group1 = (String) match[2];
+            result = result.substring(0, start) + group1 + ")" + result.substring(end);
+         }
+      }
+
+      return result;
    }
 
    /**
@@ -929,8 +969,8 @@ public class NCSDecompCLIRoundTripTest {
     * Normalize NPC_* constants to their numeric values so symbolic vs numeric
     * usages compare equal across decompilation.
     */
-   private static String normalizeNpcConstants(String code) {
-      if (NPC_CONSTANTS.isEmpty()) {
+   private static String normalizeNpcConstants(String code, Map<String, String> npcConstants) {
+      if (npcConstants == null || npcConstants.isEmpty()) {
          return code;
       }
       java.util.regex.Pattern p = java.util.regex.Pattern.compile("\\bNPC_[A-Za-z0-9_]+\\b");
@@ -938,7 +978,7 @@ public class NCSDecompCLIRoundTripTest {
       StringBuffer sb = new StringBuffer();
       while (m.find()) {
          String name = m.group();
-         String replacement = NPC_CONSTANTS.get(name);
+         String replacement = npcConstants.get(name);
          if (replacement != null) {
             m.appendReplacement(sb, replacement);
          }
@@ -947,10 +987,9 @@ public class NCSDecompCLIRoundTripTest {
       return sb.toString();
    }
 
-   private static Map<String, String> loadNpcConstants() {
+   private static Map<String, String> loadNpcConstantsForGame(Path path) {
       Map<String, String> map = new HashMap<>();
-      loadNpcConstantsFromFile(K1_NWSCRIPT, map);
-      loadNpcConstantsFromFile(K2_NWSCRIPT, map);
+      loadNpcConstantsFromFile(path, map);
       return map;
    }
 

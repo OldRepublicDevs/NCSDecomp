@@ -682,15 +682,21 @@ public class SubScriptState {
       if (this.state == 1) {
          ScriptNode last = this.current.getLastChild();
          if (!AReturnStatement.class.isInstance(last)) {
-            if (!AModifyExp.class.isInstance(last)) {
-               System.out
-                     .println("uh-oh... not a modify exp at " + this.nodedata.getPos(node) + ", " + last);
+            AExpression expr = null;
+            if (AModifyExp.class.isInstance(last)) {
+               expr = (AModifyExp) this.removeLastExp(true);
+            } else if (AUnaryModExp.class.isInstance(last) || AExpression.class.isInstance(last)) {
+               // Gracefully handle postfix/prefix inc/dec and other loose expressions.
+               expr = (AExpression) this.removeLastExp(true);
+            } else {
+               System.out.println("uh-oh... not a modify exp at " + this.nodedata.getPos(node) + ", " + last);
             }
 
-            AModifyExp modexp = (AModifyExp) this.removeLastExp(true);
-            AExpressionStatement stmt = new AExpressionStatement(modexp);
-            this.current.addChild(stmt);
-            stmt.parent(this.current);
+            if (expr != null) {
+               AExpressionStatement stmt = new AExpressionStatement(expr);
+               this.current.addChild(stmt);
+               stmt.parent(this.current);
+            }
          }
 
          this.state = 0;
