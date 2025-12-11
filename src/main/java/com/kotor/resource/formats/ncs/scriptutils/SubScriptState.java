@@ -741,7 +741,22 @@ public class SubScriptState {
                expr = (AModifyExp) this.removeLastExp(true);
             } else if (AUnaryModExp.class.isInstance(last) || AExpression.class.isInstance(last)) {
                // Gracefully handle postfix/prefix inc/dec and other loose expressions.
+               // However, don't extract function calls (AActionExp) as standalone statements
+               // when in assignment context, as they're almost always part of a larger expression
+               // (e.g., GetGlobalNumber("X") == value, or function calls in binary operations).
+               // In assignment context, function calls should remain as part of the expression tree
+               // until the full expression is built (e.g., by EQUAL, ADD, etc. operations).
                expr = (AExpression) this.removeLastExp(true);
+               // Don't extract function calls as statements in assignment context
+               // They're almost always part of a larger expression being built.
+               // In assignment context (state == 1), function calls should remain as part of the expression tree
+               // until the full expression is built (e.g., by EQUAL, ADD, etc. operations).
+               if (AActionExp.class.isInstance(expr)) {
+                  // Put the function call back - it's part of a larger expression
+                  // Function calls in assignment context are almost never standalone statements
+                  this.current.addChild((ScriptNode) expr);
+                  expr = null; // Don't extract as statement
+               }
             } else if (AVarDecl.class.isInstance(last) && ((AVarDecl) last).isFcnReturn() && ((AVarDecl) last).exp() != null) {
                // Function return value - extract the expression and convert to statement
                expr = ((AVarDecl) last).removeExp();
