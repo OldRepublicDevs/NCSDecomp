@@ -2360,11 +2360,13 @@ public class NCSDecompCLIRoundTripTest {
       result = funcWithExtraBlockMixed.matcher(result).replaceAll("$1$2");
 
       // Remove closing brace of extra block before return: } return; } -> return; }
-      // Match: closing brace, optional whitespace/newlines, return statement,
+      // Match: closing brace of extra block, optional whitespace/newlines, return statement,
       // optional whitespace/newlines, closing brace of function
       // Be careful to preserve the return statement and function closing brace
+      // CRITICAL: This pattern should NOT match if there's content between the braces
+      // We only want to match: } followed by return; followed by }
       java.util.regex.Pattern extraBlockClosePattern = java.util.regex.Pattern.compile(
-            "\\}\\s*[\\r\\n]+\\s*return\\s*;\\s*[\\r\\n]+\\s*\\}",
+            "\\}\\s*\\n\\s*return\\s*;\\s*\\n\\s*\\}",
             java.util.regex.Pattern.MULTILINE);
       result = extraBlockClosePattern.matcher(result).replaceAll("\nreturn; }");
 
