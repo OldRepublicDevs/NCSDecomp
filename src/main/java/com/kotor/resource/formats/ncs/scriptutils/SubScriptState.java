@@ -1071,12 +1071,22 @@ public class SubScriptState {
             if (AExpression.class.isInstance(anode)) {
                break;
             }
-            if (!forceOneOnly && AVarDecl.class.isInstance(anode) && ((AVarDecl) anode).exp() != null) {
-               AExpression exp = ((AVarDecl) anode).removeExp();
-               for (int i = trailingErrors.size() - 1; i >= 0; i--) {
-                  this.current.addChild(trailingErrors.get(i));
+            if (AVarDecl.class.isInstance(anode)) {
+               if (((AVarDecl) anode).isFcnReturn() && ((AVarDecl) anode).exp() != null) {
+                  // Function return value - extract the expression
+                  AExpression exp = ((AVarDecl) anode).exp();
+                  for (int i = trailingErrors.size() - 1; i >= 0; i--) {
+                     this.current.addChild(trailingErrors.get(i));
+                  }
+                  return exp;
+               } else if (!forceOneOnly && ((AVarDecl) anode).exp() != null) {
+                  // Regular variable declaration with initializer
+                  AExpression exp = ((AVarDecl) anode).removeExp();
+                  for (int i = trailingErrors.size() - 1; i >= 0; i--) {
+                     this.current.addChild(trailingErrors.get(i));
+                  }
+                  return exp;
                }
-               return exp;
             }
             // Skip non-expression nodes and keep searching.
             anode = null;
