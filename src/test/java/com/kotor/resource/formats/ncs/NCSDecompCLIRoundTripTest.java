@@ -2336,10 +2336,13 @@ public class NCSDecompCLIRoundTripTest {
       // Pattern: function() { followed by optional whitespace, newline, then tabs/spaces, then extra {
       // Replace with: function() { followed by newline and tabs/spaces (preserving declaration)
       // Use \\R to match any line break (\\n, \\r\\n, or \\r) and capture indentation separately
-      // Group 1: function signature + opening brace + whitespace + line break + indentation
-      // Group 2: indentation before extra brace (captured separately to preserve it)
-      // Replace with: function signature + opening brace + whitespace + line break + indentation
-      // This preserves the declaration line that comes after the indentation
+      // CRITICAL: Must match function signature + opening brace + newline + tabs/spaces + extra {
+      // and replace with function signature + opening brace + newline + tabs/spaces
+      // This preserves ALL content after, including the declaration line
+      // The key insight: we need to match the exact structure and preserve everything after the extra {
+      // Pattern matches: function() { + whitespace + line break + indentation + extra {
+      // Replace with: function() { + whitespace + line break + indentation
+      // This preserves the declaration line that comes immediately after
       java.util.regex.Pattern funcWithExtraBlock = java.util.regex.Pattern.compile(
             "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\R)([\\t ]*)\\{\\s*",
             java.util.regex.Pattern.MULTILINE);
