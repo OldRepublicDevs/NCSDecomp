@@ -742,6 +742,10 @@ public class SubScriptState {
             } else if (AUnaryModExp.class.isInstance(last) || AExpression.class.isInstance(last)) {
                // Gracefully handle postfix/prefix inc/dec and other loose expressions.
                expr = (AExpression) this.removeLastExp(true);
+            } else if (AVarDecl.class.isInstance(last) && ((AVarDecl) last).isFcnReturn() && ((AVarDecl) last).exp() != null) {
+               // Function return value - extract the expression and convert to statement
+               expr = ((AVarDecl) last).removeExp();
+               this.current.removeLastChild(); // Remove the AVarDecl
             } else {
                System.out.println("uh-oh... not a modify exp at " + this.nodedata.getPos(node) + ", " + last);
             }
@@ -1076,9 +1080,8 @@ public class SubScriptState {
                if (vardecl.isFcnReturn() && vardecl.exp() != null) {
                   // Function return value - extract the expression
                   // The AVarDecl has already been removed from children, so we just extract the expression
-                  AExpression exp = vardecl.exp();
-                  // Clear the parent relationship since we're extracting it
-                  ((ScriptNode) exp).parent(null);
+                  // Use removeExp() to properly clear the parent relationship and remove from AVarDecl
+                  AExpression exp = vardecl.removeExp();
                   for (int i = trailingErrors.size() - 1; i >= 0; i--) {
                      this.current.addChild(trailingErrors.get(i));
                   }
