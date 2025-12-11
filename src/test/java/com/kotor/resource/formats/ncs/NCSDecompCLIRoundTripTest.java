@@ -2348,13 +2348,13 @@ public class NCSDecompCLIRoundTripTest {
             "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\n)([\\t]+)\\{\\s*",
             java.util.regex.Pattern.MULTILINE);
       result = funcWithExtraBlock.matcher(result).replaceAll("$1$2");
-      
+
       // Also handle case with spaces instead of tabs
       java.util.regex.Pattern funcWithExtraBlockSpaces = java.util.regex.Pattern.compile(
             "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\n)([ ]+)\\{\\s*",
             java.util.regex.Pattern.MULTILINE);
       result = funcWithExtraBlockSpaces.matcher(result).replaceAll("$1$2");
-      
+
       // Also handle case with mixed tabs/spaces or optional whitespace
       // This is a fallback pattern that should match if the above two don't
       java.util.regex.Pattern funcWithExtraBlockMixed = java.util.regex.Pattern.compile(
