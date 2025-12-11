@@ -2087,10 +2087,10 @@ public class NCSDecompCLIRoundTripTest {
       normalized = normalizeFunctionSignaturesByArity(normalized);
       normalized = normalizeComparisonParens(normalized);
       normalized = normalizeTrueFalse(normalized);
-         normalized = normalizeConstants(normalized, isK2 ? NPC_CONSTANTS_K2 : NPC_CONSTANTS_K1);
-         normalized = normalizeConstants(normalized, isK2 ? ABILITY_CONSTANTS_K2 : ABILITY_CONSTANTS_K1);
-         normalized = normalizeConstants(normalized, isK2 ? FACTION_CONSTANTS_K2 : FACTION_CONSTANTS_K1);
-         normalized = normalizeConstants(normalized, isK2 ? ANIMATION_CONSTANTS_K2 : ANIMATION_CONSTANTS_K1);
+      normalized = normalizeConstants(normalized, isK2 ? NPC_CONSTANTS_K2 : NPC_CONSTANTS_K1);
+      normalized = normalizeConstants(normalized, isK2 ? ABILITY_CONSTANTS_K2 : ABILITY_CONSTANTS_K1);
+      normalized = normalizeConstants(normalized, isK2 ? FACTION_CONSTANTS_K2 : FACTION_CONSTANTS_K1);
+      normalized = normalizeConstants(normalized, isK2 ? ANIMATION_CONSTANTS_K2 : ANIMATION_CONSTANTS_K1);
       normalized = normalizeBitwiseOperators(normalized);
       normalized = normalizeControlFlowConditions(normalized);
       normalized = normalizeCommaSpacing(normalized);
@@ -2352,7 +2352,7 @@ public class NCSDecompCLIRoundTripTest {
       // This preserves the declaration line that comes after
       // Try multiple patterns to handle different line break and whitespace scenarios
       // IMPORTANT: Apply patterns in order from most specific to least specific to avoid conflicts
-      
+
       // Pattern 1: function() { + line break + tabs + extra {
       java.util.regex.Pattern funcWithExtraBlock = java.util.regex.Pattern.compile(
             "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\R)([\\t]+)\\{\\s*",
@@ -2373,10 +2373,14 @@ public class NCSDecompCLIRoundTripTest {
 
       // Pattern 4: function() { + line break + optional tabs/spaces + extra {
       // This is a fallback pattern that should match if the above don't
-      java.util.regex.Pattern funcWithExtraBlockMixed = java.util.regex.Pattern.compile(
-            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\R)([\\t ]*)\\{\\s*",
-            java.util.regex.Pattern.MULTILINE);
-      result = funcWithExtraBlockMixed.matcher(result).replaceAll("$1$2");
+      // CRITICAL: Only apply this if the previous patterns didn't match (to avoid double-processing)
+      // We check if the result still contains the pattern before applying
+      if (result.contains("{\n\t{") || result.contains("{\r\n\t{")) {
+         java.util.regex.Pattern funcWithExtraBlockMixed = java.util.regex.Pattern.compile(
+               "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\R)([\\t ]*)\\{\\s*",
+               java.util.regex.Pattern.MULTILINE);
+         result = funcWithExtraBlockMixed.matcher(result).replaceAll("$1$2");
+      }
 
       // Remove closing brace of extra block before return: } return; } -> return; }
       // Match: closing brace of extra block, optional whitespace/newlines, return statement,
