@@ -2344,21 +2344,28 @@ public class NCSDecompCLIRoundTripTest {
       // Use explicit \\n and be very specific about matching tabs
       // IMPORTANT: The pattern must NOT consume any content after the extra { - we use \\s* to match
       // only whitespace, not the actual declaration line
+      // Try matching with \\R first (any line break), then fallback to explicit \\n
       java.util.regex.Pattern funcWithExtraBlock = java.util.regex.Pattern.compile(
-            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\n)([\\t]+)\\{\\s*",
+            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\R)([\\t]+)\\{\\s*",
             java.util.regex.Pattern.MULTILINE);
       result = funcWithExtraBlock.matcher(result).replaceAll("$1$2");
 
+      // Also handle case with explicit \\n
+      java.util.regex.Pattern funcWithExtraBlockNewline = java.util.regex.Pattern.compile(
+            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\n)([\\t]+)\\{\\s*",
+            java.util.regex.Pattern.MULTILINE);
+      result = funcWithExtraBlockNewline.matcher(result).replaceAll("$1$2");
+
       // Also handle case with spaces instead of tabs
       java.util.regex.Pattern funcWithExtraBlockSpaces = java.util.regex.Pattern.compile(
-            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\n)([ ]+)\\{\\s*",
+            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\R)([ ]+)\\{\\s*",
             java.util.regex.Pattern.MULTILINE);
       result = funcWithExtraBlockSpaces.matcher(result).replaceAll("$1$2");
 
       // Also handle case with mixed tabs/spaces or optional whitespace
-      // This is a fallback pattern that should match if the above two don't
+      // This is a fallback pattern that should match if the above don't
       java.util.regex.Pattern funcWithExtraBlockMixed = java.util.regex.Pattern.compile(
-            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\n)([\\t ]*)\\{\\s*",
+            "(\\w+\\s+\\w+\\s*\\([^)]*\\)\\s*\\{\\s*\\R)([\\t ]*)\\{\\s*",
             java.util.regex.Pattern.MULTILINE);
       result = funcWithExtraBlockMixed.matcher(result).replaceAll("$1$2");
 
