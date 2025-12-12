@@ -1732,7 +1732,8 @@ public class Decompiler
       // Map the file to the tab component
       JComponent tabComponent = this.getSelectedTabComponent();
       if (tabComponent != null) {
-         this.hash_TabComponent2File.put(tabComponent, file);
+         // Store file as absolute path to ensure correct directory resolution in save dialog
+         this.hash_TabComponent2File.put(tabComponent, file != null ? file.getAbsoluteFile() : null);
          this.hash_TabComponent2Func2VarVec.put(tabComponent, this.hash_Func2VarVec);
          this.hash_TabComponent2TreeModel.put(tabComponent, this.jTree.getModel());
          if (tabComponent instanceof JPanel) {
@@ -1929,7 +1930,8 @@ public class Decompiler
          }
          JComponent tabComponent = this.getSelectedTabComponent();
          if (tabComponent != null) {
-            this.hash_TabComponent2File.put(tabComponent, file);
+            // Store file as absolute path to ensure correct directory resolution in save dialog
+            this.hash_TabComponent2File.put(tabComponent, file.getAbsoluteFile());
             this.hash_TabComponent2Func2VarVec.put(tabComponent, this.hash_Func2VarVec);
             this.hash_TabComponent2TreeModel.put(tabComponent, this.jTree.getModel());
             if (tabComponent instanceof JPanel) {
@@ -2307,7 +2309,9 @@ public class Decompiler
          fileName = fileName.substring(0, lastDot);
       }
 
-      this.file = this.hash_TabComponent2File.get(tabComponent);
+      File originalFile = this.hash_TabComponent2File.get(tabComponent);
+      // Ensure we use absolute path for the file
+      this.file = originalFile != null ? originalFile.getAbsoluteFile() : null;
 
       // Show file chooser dialog starting in the NCS file's directory
       File newFile;
@@ -2319,17 +2323,20 @@ public class Decompiler
       if (this.file != null && this.file.exists()) {
          File parentDir = this.file.getParentFile();
          if (parentDir != null && parentDir.exists()) {
-            initialDir = parentDir;
+            initialDir = parentDir.getAbsoluteFile();
          }
       }
       if (initialDir == null) {
          String outputDir = settings.getProperty("Output Directory");
          if (outputDir != null && !outputDir.isEmpty()) {
-            initialDir = new File(outputDir);
+            File outputDirFile = new File(outputDir);
+            if (outputDirFile.exists()) {
+               initialDir = outputDirFile.getAbsoluteFile();
+            }
          }
       }
       if (initialDir == null) {
-         initialDir = new File(System.getProperty("user.dir"));
+         initialDir = new File(System.getProperty("user.dir")).getAbsoluteFile();
       }
       fileChooser.setCurrentDirectory(initialDir);
 
@@ -2361,7 +2368,7 @@ public class Decompiler
 
       // If file was null or didn't exist, update the mapping to point to the newly saved file
       if (this.file == null || !this.file.exists()) {
-         this.file = newFile;
+         this.file = newFile.getAbsoluteFile();
          this.hash_TabComponent2File.put(tabComponent, this.file);
          // File was created from scratch - just mark as saved (no round-trip validation needed)
          unsavedFiles.remove(this.file);
@@ -2722,7 +2729,7 @@ public class Decompiler
 
          // If file was null or didn't exist, update the mapping
          if (file == null || !file.exists()) {
-            file = newFile;
+            file = newFile.getAbsoluteFile();
             this.hash_TabComponent2File.put(tabComponent, file);
          }
 
