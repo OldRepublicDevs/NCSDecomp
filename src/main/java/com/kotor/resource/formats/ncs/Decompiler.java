@@ -1845,8 +1845,29 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                               }
                            } else {
                               System.err.println("DEBUG loadNssFile: Compiled NCS does not exist after compilation");
-                              roundTripPane.setText(
-                                    "// Round-trip decompiled code not available.\n// Compilation failed or compiler not found.");
+                              // Show actual compiler error output instead of generic message
+                              StringBuilder errorMsg = new StringBuilder();
+                              errorMsg.append("// Round-trip decompiled code not available.\n");
+                              errorMsg.append("// Compilation failed.\n\n");
+                              String compilerOutput = output.toString().trim();
+                              if (!compilerOutput.isEmpty()) {
+                                 errorMsg.append("// Compiler output:\n");
+                                 // Format compiler output as comments
+                                 String[] lines = compilerOutput.split("\n");
+                                 for (String line : lines) {
+                                    if (!line.trim().isEmpty()) {
+                                       errorMsg.append("// ").append(line).append("\n");
+                                    }
+                                 }
+                              } else {
+                                 errorMsg.append("// No compiler output available.\n");
+                                 if (finished) {
+                                    errorMsg.append("// Exit code: ").append(proc.exitValue()).append("\n");
+                                 } else {
+                                    errorMsg.append("// Compiler timed out.\n");
+                                 }
+                              }
+                              roundTripPane.setText(errorMsg.toString());
                            }
                         } else {
                            System.err.println("DEBUG loadNssFile: Compiler not found");
