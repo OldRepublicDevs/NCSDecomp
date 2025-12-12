@@ -90,16 +90,17 @@ public class FileDecompiler {
    /**
     * Builds a decompiler configured for the current working directory.
     * <p>
+    * Actions data is loaded lazily when needed (via {@link #ensureActionsLoaded()}).
+    * This prevents startup failures if the actions file is missing. Also loads
+    * {@link #preferSwitches} from config file if present.
+    * <p>
     * Uses {@code user.dir} to locate {@code k1_nwscript.nss} or
     * {@code tsl_nwscript.nss} depending on {@link #isK2Selected}, which mirrors
-    * legacy GUI behavior. Also loads {@link #preferSwitches} from config file if
-    * present.
-    *
-    * @throws DecompilerException if the action table cannot be loaded
+    * legacy GUI behavior.
     */
-   public FileDecompiler() throws DecompilerException {
+   public FileDecompiler() {
       this.filedata = new Hashtable<>(1);
-      this.actions = loadActionsDataInternal(isK2Selected);
+      this.actions = null; // Load lazily when needed to prevent startup failures
       loadPreferSwitchesFromConfig();
    }
 
@@ -169,6 +170,21 @@ public class FileDecompiler {
          if (!actionfile.isFile()) {
             dir = new File(System.getProperty("user.dir"));
             actionfile = isK2Selected ? new File(dir, "tsl_nwscript.nss") : new File(dir, "k1_nwscript.nss");
+         }
+         // If still not found, try JAR/EXE directory's tools folder
+         if (!actionfile.isFile()) {
+            File ncsDecompDir = CompilerUtil.getNCSDecompDirectory();
+            if (ncsDecompDir != null) {
+               File jarToolsDir = new File(ncsDecompDir, "tools");
+               actionfile = isK2Selected ? new File(jarToolsDir, "tsl_nwscript.nss") : new File(jarToolsDir, "k1_nwscript.nss");
+            }
+         }
+         // If still not found, try JAR/EXE directory itself
+         if (!actionfile.isFile()) {
+            File ncsDecompDir = CompilerUtil.getNCSDecompDirectory();
+            if (ncsDecompDir != null) {
+               actionfile = isK2Selected ? new File(ncsDecompDir, "tsl_nwscript.nss") : new File(ncsDecompDir, "k1_nwscript.nss");
+            }
          }
          if (actionfile.isFile()) {
             return new ActionsData(new BufferedReader(new FileReader(actionfile)));
@@ -870,7 +886,7 @@ public class FileDecompiler {
             // Settings compiler doesn't exist - try fallback to JAR/EXE directory's tools folder
             System.err.println("DEBUG FileDecompiler.getCompilerFile: Settings compiler not found: "
                   + settingsCompiler.getAbsolutePath() + ", trying fallback to JAR directory");
-            
+
             // Try JAR/EXE directory's tools folder with all known compiler names
             File ncsDecompDir = CompilerUtil.getNCSDecompDirectory();
             if (ncsDecompDir != null) {
@@ -887,7 +903,7 @@ public class FileDecompiler {
                System.err.println("DEBUG FileDecompiler.getCompilerFile: No fallback compiler found in JAR directory: "
                      + jarToolsDir.getAbsolutePath());
             }
-            
+
             // Fallback failed, but return the Settings path anyway (caller will handle error)
             System.err.println("DEBUG FileDecompiler.getCompilerFile: Using Settings compiler (not found): "
                   + settingsCompiler.getAbsolutePath());
