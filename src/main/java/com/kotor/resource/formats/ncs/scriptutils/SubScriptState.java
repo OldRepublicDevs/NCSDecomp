@@ -864,8 +864,19 @@ public class SubScriptState {
 
    public void transformCopyDownSp(ACopyDownSpCommand node) {
       this.checkStart(node);
+      int nodePos = this.nodedata.getPos(node);
+      boolean isRet = this.isReturn(node);
+      System.err.println("DEBUG transformCopyDownSp: pos=" + nodePos + ", isReturn=" + isRet +
+            ", current=" + this.current.getClass().getSimpleName() +
+            ", hasChildren=" + this.current.hasChildren());
+
       AExpression exp = this.removeLastExp(false);
-      if (this.isReturn(node)) {
+      System.err.println("DEBUG transformCopyDownSp: extracted exp=" +
+            (exp != null ? exp.getClass().getSimpleName() : "null") +
+            ", current hasChildren=" + this.current.hasChildren());
+
+      if (isRet) {
+         System.err.println("DEBUG transformCopyDownSp: creating AReturnStatement");
          AReturnStatement ret = new AReturnStatement(exp);
          this.current.addChild(ret);
       } else {
@@ -943,13 +954,22 @@ public class SubScriptState {
 
    public void transformMoveSp(AMoveSpCommand node) {
       this.checkStart(node);
+      int nodePos = this.nodedata.getPos(node);
+      System.err.println("DEBUG transformMoveSp: pos=" + nodePos + ", state=" + this.state +
+            ", current=" + this.current.getClass().getSimpleName());
+
       if (this.state == 1) {
-         ScriptNode last = this.current.getLastChild();
+         ScriptNode last = this.current.hasChildren() ? this.current.getLastChild() : null;
+         System.err.println("DEBUG transformMoveSp: state==1, last=" +
+               (last != null ? last.getClass().getSimpleName() : "null"));
+
          if (!AReturnStatement.class.isInstance(last)) {
             AExpression expr = null;
             if (AModifyExp.class.isInstance(last)) {
+               System.err.println("DEBUG transformMoveSp: last is AModifyExp, removing as expression");
                expr = (AModifyExp) this.removeLastExp(true);
             } else if (AVarDecl.class.isInstance(last) && ((AVarDecl) last).isFcnReturn() && ((AVarDecl) last).exp() != null) {
+               System.err.println("DEBUG transformMoveSp: last is AVarDecl with function return");
                // Function return value - extract the expression and convert to statement
                // However, don't extract function calls (AActionExp) as standalone statements
                // when in assignment context, as they're almost always part of a larger expression
@@ -960,13 +980,16 @@ public class SubScriptState {
                   // They're almost always part of a larger expression being built
                   // Leave the AVarDecl in place - it will be used by EQUAL/other operations
                   // NEVER extract function calls as statements when state == 1 (assignment context)
+                  System.err.println("DEBUG transformMoveSp: function call, NOT extracting as statement");
                   expr = null; // Don't extract as statement
                } else {
                   // Non-function-call expressions can be extracted
+                  System.err.println("DEBUG transformMoveSp: extracting expression from AVarDecl");
                   expr = ((AVarDecl) last).removeExp();
                   this.current.removeLastChild(); // Remove the AVarDecl
                }
             } else if (AUnaryModExp.class.isInstance(last) || AExpression.class.isInstance(last)) {
+               System.err.println("DEBUG transformMoveSp: last is AUnaryModExp or AExpression, removing as expression");
                // Gracefully handle postfix/prefix inc/dec and other loose expressions.
                // However, don't extract function calls (AActionExp) as standalone statements
                // when in assignment context, as they're almost always part of a larger expression
@@ -974,6 +997,8 @@ public class SubScriptState {
                // In assignment context, function calls should remain as part of the expression tree
                // until the full expression is built (e.g., by EQUAL, ADD, etc. operations).
                expr = (AExpression) this.removeLastExp(true);
+               System.err.println("DEBUG transformMoveSp: removed expression=" +
+                     (expr != null ? expr.getClass().getSimpleName() : "null"));
                // Don't extract function calls as statements in assignment context
                // They're almost always part of a larger expression being built.
                // In assignment context (state == 1), function calls should remain as part of the expression tree
@@ -981,22 +1006,31 @@ public class SubScriptState {
                if (AActionExp.class.isInstance(expr)) {
                   // Put the function call back - it's part of a larger expression
                   // Function calls in assignment context are almost never standalone statements
+                  System.err.println("DEBUG transformMoveSp: function call, putting back");
                   this.current.addChild((ScriptNode) expr);
                   expr = null; // Don't extract as statement
                }
             } else {
-               System.out.println("uh-oh... not a modify exp at " + this.nodedata.getPos(node) + ", " + last);
+               System.err.println("DEBUG transformMoveSp: WARNING - unexpected last child type: " +
+                     (last != null ? last.getClass().getSimpleName() : "null") + " at " + nodePos);
+               System.out.println("uh-oh... not a modify exp at " + nodePos + ", " + last);
             }
 
             if (expr != null) {
+               System.err.println("DEBUG transformMoveSp: creating AExpressionStatement with " + expr.getClass().getSimpleName());
                AExpressionStatement stmt = new AExpressionStatement(expr);
                this.current.addChild(stmt);
                stmt.parent(this.current);
+            } else {
+               System.err.println("DEBUG transformMoveSp: NOT creating AExpressionStatement (expr is null)");
             }
+         } else {
+            System.err.println("DEBUG transformMoveSp: last is AReturnStatement, skipping expression statement creation");
          }
 
          this.state = 0;
       } else {
+         System.err.println("DEBUG transformMoveSp: state != 1, calling checkSwitchEnd");
          this.checkSwitchEnd(node);
       }
 
@@ -1061,14 +1095,23 @@ public class SubScriptState {
 
    public void transformBinary(ABinaryCommand node) {
       this.checkStart(node);
+      int nodePos = this.nodedata.getPos(node);
+      System.err.println("DEBUG transformBinary: pos=" + nodePos + ", op=" + NodeUtils.getOp(node) +
+            ", state=" + this.state + ", current=" + this.current.getClass().getSimpleName() +
+            ", hasChildren=" + this.current.hasChildren());
+
       AExpression right = this.removeLastExp(false);
+      System.err.println("DEBUG transformBinary: right=" + (right != null ? right.getClass().getSimpleName() : "null"));
+
       AExpression left = this.removeLastExp(this.state == 4);
+      System.err.println("DEBUG transformBinary: left=" + (left != null ? left.getClass().getSimpleName() : "null"));
+
       AExpression exp;
       if (NodeUtils.isArithmeticOp(node)) {
          exp = new ABinaryExp(left, right, NodeUtils.getOp(node));
       } else {
          if (!NodeUtils.isConditionalOp(node)) {
-            throw new RuntimeException("Unknown binary op at " + this.nodedata.getPos(node));
+            throw new RuntimeException("Unknown binary op at " + nodePos);
          }
 
          exp = new AConditionalExp(left, right, NodeUtils.getOp(node));
@@ -1076,6 +1119,8 @@ public class SubScriptState {
 
       exp.stackentry(this.stack.get(1));
       this.current.addChild((ScriptNode) exp);
+      System.err.println("DEBUG transformBinary: created " + exp.getClass().getSimpleName() +
+            ", current hasChildren=" + this.current.hasChildren());
       this.checkEnd(node);
    }
 
@@ -1257,22 +1302,50 @@ public class SubScriptState {
    }
 
    public AExpression getReturnExp() {
+      System.err.println("DEBUG getReturnExp: current=" + this.current.getClass().getSimpleName() +
+            ", hasChildren=" + this.current.hasChildren());
+
       if (!this.current.hasChildren()) {
+         System.err.println("DEBUG getReturnExp: no children, returning placeholder");
          return new AConst(new IntConst(0L));
       }
 
       ScriptNode last = this.current.removeLastChild();
+      System.err.println("DEBUG getReturnExp: removed last child=" + last.getClass().getSimpleName());
+
       if (AModifyExp.class.isInstance(last)) {
+         System.err.println("DEBUG getReturnExp: last is AModifyExp, extracting expression");
          return ((AModifyExp) last).expression();
-      } else if (AExpressionStatement.class.isInstance(last)
-            && AModifyExp.class.isInstance(((AExpressionStatement) last).exp())) {
-         return ((AModifyExp) ((AExpressionStatement) last).exp()).expression();
+      } else if (AExpressionStatement.class.isInstance(last)) {
+         AExpression exp = ((AExpressionStatement) last).exp();
+         System.err.println("DEBUG getReturnExp: last is AExpressionStatement, exp=" +
+               (exp != null ? exp.getClass().getSimpleName() : "null"));
+
+         if (AModifyExp.class.isInstance(exp)) {
+            System.err.println("DEBUG getReturnExp: extracting expression from AModifyExp inside AExpressionStatement");
+            return ((AModifyExp) exp).expression();
+         } else if (AExpression.class.isInstance(exp)) {
+            // AExpressionStatement containing a plain expression (e.g., AVarRef)
+            // Extract the expression for the return statement
+            // IMPORTANT: The AExpressionStatement has been removed from the AST, so the expression
+            // inside it should be extracted and used. However, we need to clear the parent relationship
+            // since the AExpressionStatement is being discarded.
+            System.err.println("DEBUG getReturnExp: extracting plain expression from AExpressionStatement");
+            exp.parent(null); // Clear parent since AExpressionStatement is being discarded
+            return exp;
+         } else {
+            System.err.println("DEBUG getReturnExp: AExpressionStatement with unexpected exp type, returning placeholder");
+            return new AConst(new IntConst(0L));
+         }
       } else if (AReturnStatement.class.isInstance(last)) {
+         System.err.println("DEBUG getReturnExp: last is AReturnStatement, extracting exp");
          return ((AReturnStatement) last).exp();
       } else if (AExpression.class.isInstance(last)) {
+         System.err.println("DEBUG getReturnExp: last is AExpression, returning directly");
          return (AExpression) last;
       } else {
          // Keep decompilation alive; emit placeholder when structure is unexpected.
+         System.err.println("DEBUG getReturnExp: unexpected last child type, returning placeholder");
          return new AConst(new IntConst(0L));
       }
    }
@@ -1345,6 +1418,9 @@ public class SubScriptState {
    }
 
    private AExpression removeLastExp(boolean forceOneOnly) {
+      System.err.println("DEBUG removeLastExp: forceOneOnly=" + forceOneOnly + ", current=" +
+            this.current.getClass().getSimpleName() + ", hasChildren=" + this.current.hasChildren());
+
       ArrayList<ScriptNode> trailingErrors = new ArrayList<>();
       while (this.current.hasChildren() && AErrorComment.class.isInstance(this.current.getLastChild())) {
          trailingErrors.add(this.current.removeLastChild());
@@ -1358,12 +1434,21 @@ public class SubScriptState {
          return this.removeIfAsExp();
       } else {
          ScriptNode anode = null;
+         ArrayList<AExpressionStatement> foundExpressionStatements = new ArrayList<>();
          while (true) {
             if (!this.current.hasChildren()) {
+               System.err.println("DEBUG removeLastExp: no more children, breaking");
                break;
             }
             anode = this.current.removeLastChild();
+            System.err.println("DEBUG removeLastExp: removed child=" + anode.getClass().getSimpleName());
+
             if (AExpression.class.isInstance(anode)) {
+               System.err.println("DEBUG removeLastExp: found AExpression, returning");
+               // Found a plain expression - put back any AExpressionStatement nodes we found
+               for (int i = foundExpressionStatements.size() - 1; i >= 0; i--) {
+                  this.current.addChild(foundExpressionStatements.get(i));
+               }
                break;
             }
             if (AVarDecl.class.isInstance(anode)) {
@@ -1373,6 +1458,10 @@ public class SubScriptState {
                   // The AVarDecl has already been removed from children, so we just extract the expression
                   // Use removeExp() to properly clear the parent relationship and remove from AVarDecl
                   AExpression exp = vardecl.removeExp();
+                  // Put back any AExpressionStatement nodes we found
+                  for (int i = foundExpressionStatements.size() - 1; i >= 0; i--) {
+                     this.current.addChild(foundExpressionStatements.get(i));
+                  }
                   for (int i = trailingErrors.size() - 1; i >= 0; i--) {
                      this.current.addChild(trailingErrors.get(i));
                   }
@@ -1380,14 +1469,45 @@ public class SubScriptState {
                } else if (!forceOneOnly && vardecl.exp() != null) {
                   // Regular variable declaration with initializer
                   AExpression exp = vardecl.removeExp();
+                  // Put back any AExpressionStatement nodes we found
+                  for (int i = foundExpressionStatements.size() - 1; i >= 0; i--) {
+                     this.current.addChild(foundExpressionStatements.get(i));
+                  }
                   for (int i = trailingErrors.size() - 1; i >= 0; i--) {
                      this.current.addChild(trailingErrors.get(i));
                   }
                   return exp;
                }
+            } else if (AExpressionStatement.class.isInstance(anode)) {
+               // Store AExpressionStatement nodes and continue searching for plain expressions
+               // Only extract from AExpressionStatement if no plain expressions are found
+               System.err.println("DEBUG removeLastExp: found AExpressionStatement, storing and continuing search");
+               foundExpressionStatements.add((AExpressionStatement) anode);
+               anode = null; // Continue searching
+               continue;
             }
             // Skip non-expression nodes and keep searching.
+            System.err.println("DEBUG removeLastExp: skipping " + anode.getClass().getSimpleName() + ", continuing search");
             anode = null;
+         }
+
+         // If no plain expression was found, try extracting from AExpressionStatement nodes
+         if (anode == null && !foundExpressionStatements.isEmpty()) {
+            System.err.println("DEBUG removeLastExp: no plain expression found, extracting from AExpressionStatement");
+            AExpressionStatement expstmt = foundExpressionStatements.remove(foundExpressionStatements.size() - 1);
+            AExpression exp = expstmt.exp();
+            if (exp != null) {
+               exp.parent(null); // Clear parent since AExpressionStatement is being discarded
+               // Put back remaining AExpressionStatement nodes
+               for (int i = foundExpressionStatements.size() - 1; i >= 0; i--) {
+                  this.current.addChild(foundExpressionStatements.get(i));
+               }
+               for (int i = trailingErrors.size() - 1; i >= 0; i--) {
+                  this.current.addChild(trailingErrors.get(i));
+               }
+               System.err.println("DEBUG removeLastExp: returning expression from AExpressionStatement");
+               return exp;
+            }
          }
 
          if (anode == null) {
