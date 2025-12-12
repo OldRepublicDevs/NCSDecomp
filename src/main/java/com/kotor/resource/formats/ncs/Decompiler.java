@@ -2094,11 +2094,11 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                         ex.printStackTrace();
                         // CRITICAL: Only set error message in RIGHT pane (round-trip panel), NEVER
                         // touch left pane
-                        // Build helpful error message for TSLPatcher elevation errors
+                        // Build helpful error message for elevation errors
                         String errorMsg = ex.getMessage();
                         if (errorMsg != null && errorMsg.contains("error=740")) {
-                           errorMsg = "TSLPatcher compiler requires administrator privileges.\n"
-                                 + "Please run NCSDecomp as administrator or use a different compiler variant in Settings.";
+                           errorMsg = "Compiler requires administrator privileges.\n"
+                                 + "Please run NCSDecomp as administrator.";
                         }
                         roundTripPane.setText("// Round-trip validation error: " + errorMsg
                               + "\n// Check that nwnnsscomp.exe is configured in Settings.");
@@ -2128,7 +2128,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                         JTextPane roundTripPane = (JTextPane) rightScrollPane.getViewport().getView();
                         String errorMsg = e.getMessage();
                         if (errorMsg != null && errorMsg.contains("error=740")) {
-                           errorMsg = "TSLPatcher compiler requires administrator privileges.";
+                           errorMsg = "Compiler requires administrator privileges.";
                         }
                         roundTripPane.setText("// Round-trip validation error: " + errorMsg
                               + "\n// Left side decompiled code is still available and independent of nwnnsscomp.");

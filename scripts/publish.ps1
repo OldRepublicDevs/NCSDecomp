@@ -154,7 +154,7 @@ Filename Suffix=
 Link Scroll Bars=false
 
 nwnnsscomp Folder Path=.\tools
-nwnnsscomp Filename=nwnnsscomp_ktool.exe
+nwnnsscomp Filename=nwnnsscomp.exe
 nwnnsscomp Path=
 
 K1 nwscript Path=.\tools\k1_nwscript.nss

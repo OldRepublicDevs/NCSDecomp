@@ -889,10 +889,14 @@ public class Settings extends Properties implements ActionListener {
          return;
       }
 
-      // Get all files in the directory that start with "nwnnsscomp"
+      // Get all files in the directory that start with "nwnnsscomp" (excluding tslpatcher and v1 variants)
       File[] files = folder.listFiles((dir, name) -> {
          String lowerName = name.toLowerCase();
-         return lowerName.startsWith("nwnnsscomp") && lowerName.endsWith(".exe");
+         if (!lowerName.startsWith("nwnnsscomp") || !lowerName.endsWith(".exe")) {
+            return false;
+         }
+         // Exclude tslpatcher and v1 variants
+         return !lowerName.contains("tslpatcher") && !lowerName.contains("_v1");
       });
 
       String currentSelection = (String) this.nwnnsscompComboBox.getSelectedItem();

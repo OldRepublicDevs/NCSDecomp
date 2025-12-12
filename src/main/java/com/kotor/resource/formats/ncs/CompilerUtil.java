@@ -32,8 +32,7 @@ public class CompilerUtil {
    private static final String[] COMPILER_NAMES = {
       "nwnnsscomp.exe",              // Primary - generic name (highest priority)
       "nwnnsscomp_kscript.exe",      // Secondary - KOTOR Scripting Tool
-      "nwnnsscomp_tslpatcher.exe",   // TSLPatcher variant
-      "nwnnsscomp_v1.exe"            // v1.3 first public release
+      "nwnnsscomp_ktool.exe"         // KOTOR Tool variant
    };
 
    /**

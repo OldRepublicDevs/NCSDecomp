@@ -18,7 +18,6 @@ import java.util.Map;
  * <p>
  * References for recorded hashes and argument shapes:
  * <ul>
- *    <li>vendor/TSLPatcher/TSLPatcher.pl - Original Perl TSLPatcher implementation</li>
  *    <li>vendor/Kotor.NET/Kotor.NET.Patcher/ - Incomplete C# patcher</li>
  *    <li>vendor/xoreos-tools/src/nwscript/compiler.cpp - Xoreos compiler</li>
  * </ul>
@@ -27,6 +26,7 @@ public enum KnownExternalCompilers {
    /**
     * TSLPatcher compiler version.
     */
+   /**
    TSLPATCHER(
       "539EB689D2E0D3751AEED273385865278BEF6696C46BC0CAB116B40C3B2FE820",
       "TSLPatcher",
@@ -35,6 +35,7 @@ public enum KnownExternalCompilers {
       new String[]{"-c", "{source}", "-o", "{output}"},
       new String[]{"-d", "{source}", "-o", "{output}"}
    ),
+   */
 
    /**
     * KOTOR Tool compiler version.
@@ -51,6 +52,7 @@ public enum KnownExternalCompilers {
    /**
     * v1.3 first public release.
     */
+   /**
    V1(
       "EC3E657C18A32AD13D28DA0AA3A77911B32D9661EA83CF0D9BCE02E1C4D8499D",
       "v1.3 first public release",
@@ -59,6 +61,7 @@ public enum KnownExternalCompilers {
       new String[]{"-c", "{source}", "{output}"},
       new String[]{"-d", "{source}", "{output}"}
    ),
+   */
 
    /**
     * KOTOR Scripting Tool compiler.
@@ -73,14 +76,14 @@ public enum KnownExternalCompilers {
    ),
 
    /**
-    * Xoreos Tools compiler (primarily for engine reimplementation).
+    * Xoreos Tools compiler/decompiler.
     */
    XOREOS(
       "",
       "Xoreos Tools",
-      LocalDate.of(2016, 1, 1), // Approximate based on project history
+      LocalDate.of(2016, 1, 1),
       "Xoreos Team",
-      new String[]{}, // Xoreos tools are primarily for engine reimplementation
+      new String[]{},
       new String[]{}
    ),
 
