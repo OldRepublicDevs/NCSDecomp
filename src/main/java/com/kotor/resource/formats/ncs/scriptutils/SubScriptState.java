@@ -902,11 +902,17 @@ public class SubScriptState {
 
    public void transformCopyTopSp(ACopyTopSpCommand node) {
       this.checkStart(node);
+      int nodePos = this.nodedata.getPos(node);
+      
       if (this.state == 5) {
          this.state = 0;
       } else {
          int loc = NodeUtils.stackOffsetToPos(node.getOffset());
          StackEntry sourceEntry = this.stack.get(loc);
+         System.err.println("DEBUG transformCopyTopSp: pos=" + nodePos + ", loc=" + loc + 
+               ", sourceEntry=" + (sourceEntry != null ? sourceEntry.getClass().getSimpleName() : "null") + 
+               ", state=" + this.state + ", current=" + this.current.getClass().getSimpleName() + 
+               ", hasChildren=" + this.current.hasChildren());
 
          // For constants: when copying a constant that's already the last child,
          // we're likely doing short-circuit evaluation (e.g., for || or &&).
@@ -922,6 +928,24 @@ public class SubScriptState {
                // stackentry() returns the Const for AConst nodes
                if (lastConst.stackentry() == sourceEntry) {
                   // Short-circuit pattern: don't add duplicate to children
+                  System.err.println("DEBUG transformCopyTopSp: skipping duplicate constant (short-circuit)");
+                  this.checkEnd(node);
+                  return;
+               }
+            }
+         }
+
+         // For variables: similar logic - if we're copying a variable that's already the last child,
+         // and it's the same variable, we might be doing short-circuit evaluation.
+         // Don't add a duplicate AVarRef in this case.
+         if (Variable.class.isInstance(sourceEntry) && this.current.hasChildren()) {
+            ScriptNode last = this.current.getLastChild();
+            if (AVarRef.class.isInstance(last)) {
+               AVarRef lastVarRef = (AVarRef) last;
+               if (lastVarRef.var() == sourceEntry) {
+                  // Short-circuit pattern: don't add duplicate to children
+                  Variable var = (Variable) sourceEntry;
+                  System.err.println("DEBUG transformCopyTopSp: skipping duplicate AVarRef (short-circuit), var=" + var);
                   this.checkEnd(node);
                   return;
                }
@@ -929,6 +953,9 @@ public class SubScriptState {
          }
 
          AExpression varref = this.getVarToCopy(node);
+         String varName = (varref instanceof AVarRef) ? ((AVarRef) varref).var().toString() : "N/A";
+         System.err.println("DEBUG transformCopyTopSp: adding " + varref.getClass().getSimpleName() + 
+               " to AST, var=" + varName);
          this.current.addChild((ScriptNode) varref);
       }
 
@@ -1030,8 +1057,34 @@ public class SubScriptState {
 
          this.state = 0;
       } else {
-         System.err.println("DEBUG transformMoveSp: state != 1, calling checkSwitchEnd");
-         this.checkSwitchEnd(node);
+         System.err.println("DEBUG transformMoveSp: state != 1, checking for standalone expression statement");
+         // When state == 0, check if we have a standalone expression (like int3;)
+         // that should be converted to an expression statement
+         if (this.current.hasChildren()) {
+            ScriptNode last = this.current.getLastChild();
+            // If the last child is a plain expression (AVarRef, AConst, etc.) that's not part of
+            // a larger expression, convert it to an expression statement
+            // But don't do this for function calls (AActionExp) as they're usually part of expressions
+            if (AExpression.class.isInstance(last) && !AActionExp.class.isInstance(last) 
+                  && !AModifyExp.class.isInstance(last) && !AUnaryModExp.class.isInstance(last)
+                  && !AReturnStatement.class.isInstance(last)) {
+               System.err.println("DEBUG transformMoveSp: converting standalone expression to statement: " + 
+                     last.getClass().getSimpleName());
+               AExpression expr = (AExpression) this.removeLastExp(true);
+               if (expr != null) {
+                  AExpressionStatement stmt = new AExpressionStatement(expr);
+                  this.current.addChild(stmt);
+                  stmt.parent(this.current);
+                  System.err.println("DEBUG transformMoveSp: created AExpressionStatement");
+               }
+            } else {
+               System.err.println("DEBUG transformMoveSp: last child is not a standalone expression, calling checkSwitchEnd");
+               this.checkSwitchEnd(node);
+            }
+         } else {
+            System.err.println("DEBUG transformMoveSp: no children, calling checkSwitchEnd");
+            this.checkSwitchEnd(node);
+         }
       }
 
       this.checkEnd(node);
