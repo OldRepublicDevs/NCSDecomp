@@ -25,17 +25,9 @@ Write-Host "=======================================" -ForegroundColor Green
 Write-Host ""
 
 # Build everything first
-Write-Host "Step 1: Building JAR..." -ForegroundColor Yellow
-$buildScript = Join-Path $PSScriptRoot "build.ps1"
-& $buildScript
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "JAR build failed!" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host ""
+# NOTE: build.ps1 -BuildExecutable already builds the JARs, and it cleans target/ at start.
 $exeType = if ($IsWindows) { ".exe" } elseif ($IsMacOS) { ".app" } else { "executable" }
-Write-Host "Step 2: Building self-contained $exeType..." -ForegroundColor Yellow
+Write-Host "Step 1: Building JAR + self-contained $exeType..." -ForegroundColor Yellow
 $buildScript = Join-Path $PSScriptRoot "build.ps1"
 & $buildScript -BuildExecutable
 if ($LASTEXITCODE -ne 0) {
@@ -43,12 +35,12 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-# Create assembly directory (Java/Maven idiomatic: target/assembly)
+# Create archive staging directory (this becomes the ZIP root)
 $targetDir = Join-Path "." "target"
-$publishDir = Join-Path $targetDir "assembly"
+$publishDir = Join-Path $targetDir "archive-top-level"
 if (Test-Path $publishDir) {
     Write-Host ""
-    Write-Host "Cleaning previous assembly directory..." -ForegroundColor Yellow
+    Write-Host "Cleaning previous archive staging directory..." -ForegroundColor Yellow
     try {
         # Try to stop any processes that might be using files in assembly directory
         if ($IsWindows) {
@@ -63,8 +55,8 @@ if (Test-Path $publishDir) {
             Get-ChildItem -Path $publishDir -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
             Remove-Item -Force $publishDir -ErrorAction SilentlyContinue
         } catch {
-            Write-Host "Error: Could not clean assembly directory. Please close any applications using files in $publishDir" -ForegroundColor Red
-            Write-Host "Or manually delete the target/assembly folder and try again." -ForegroundColor Yellow
+            Write-Host "Error: Could not clean archive staging directory. Please close any applications using files in $publishDir" -ForegroundColor Red
+            Write-Host "Or manually delete the target/archive-top-level folder and try again." -ForegroundColor Yellow
             exit 1
         }
     }
@@ -72,51 +64,34 @@ if (Test-Path $publishDir) {
 New-Item -ItemType Directory -Path $publishDir -Force | Out-Null
 
 Write-Host ""
-Write-Host "Step 3: Packaging distribution files..." -ForegroundColor Yellow
+Write-Host "Step 2: Packaging distribution files..." -ForegroundColor Yellow
 
 # Get JAR file paths first (needed for copying next to executables)
 $jarDir = Join-Path $targetDir "jar"
 $cliJarSource = Join-Path $jarDir "NCSDecomp-CLI.jar"
 $guiJarSource = Join-Path $jarDir "NCSDecomp.jar"
 
-# Copy CLI executable folder (NCSDecompCLI)
-$cliAppImageDir = Join-Path $targetDir (Join-Path "dist" "NCSDecompCLI")
-$cliAppDest = Join-Path $publishDir "NCSDecompCLI"
+# Copy executables (flattened into archive root)
+# Note: jpackage app-images normally require their sibling app/ + runtime/ folders.
+# This publish script intentionally creates a minimal archive layout (EXE/JAR/docs/examples/tools/config).
+$distDir = Join-Path $targetDir "dist"
 
-if (Test-Path $cliAppImageDir) {
-    Copy-Item $cliAppImageDir $cliAppDest -Recurse
-    Write-Host "  - Copied NCSDecompCLI folder (portable app)" -ForegroundColor Cyan
-    $exeName = if ($IsWindows) { "NCSDecompCLI.exe" } else { "NCSDecompCLI" }
-    $runPath = Join-Path "NCSDecompCLI" $exeName
-    Write-Host "    Run: $runPath" -ForegroundColor Gray
-    
-    # Copy JAR next to executable for alternative usage
-    if (Test-Path $cliJarSource) {
-        Copy-Item $cliJarSource (Join-Path $cliAppDest "NCSDecomp-CLI.jar")
-        Write-Host "  - Copied NCSDecomp-CLI.jar to NCSDecompCLI folder" -ForegroundColor Cyan
-    }
+$cliExeName = if ($IsWindows) { "NCSDecompCLI.exe" } else { "NCSDecompCLI" }
+$cliExeSource = Join-Path (Join-Path $distDir "NCSDecompCLI") $cliExeName
+if (Test-Path $cliExeSource) {
+    Copy-Item $cliExeSource (Join-Path $publishDir $cliExeName) -Force
+    Write-Host "  - Copied $cliExeName" -ForegroundColor Cyan
 } else {
-    Write-Host "  Warning: NCSDecompCLI folder not found, skipping..." -ForegroundColor Yellow
+    Write-Host "  Warning: $cliExeName not found at $cliExeSource" -ForegroundColor Yellow
 }
 
-# Copy GUI executable folder (NCSDecomp)
-$guiAppImageDir = Join-Path $targetDir (Join-Path "dist" "NCSDecomp")
-$guiAppDest = Join-Path $publishDir "NCSDecomp"
-
-if (Test-Path $guiAppImageDir) {
-    Copy-Item $guiAppImageDir $guiAppDest -Recurse
-    Write-Host "  - Copied NCSDecomp folder (portable app)" -ForegroundColor Cyan
-    $guiExeName = if ($IsWindows) { "NCSDecomp.exe" } else { "NCSDecomp" }
-    $guiRunPath = Join-Path "NCSDecomp" $guiExeName
-    Write-Host "    Run: $guiRunPath" -ForegroundColor Gray
-    
-    # Copy JAR next to executable for alternative usage
-    if (Test-Path $guiJarSource) {
-        Copy-Item $guiJarSource (Join-Path $guiAppDest "NCSDecomp.jar")
-        Write-Host "  - Copied NCSDecomp.jar to NCSDecomp folder" -ForegroundColor Cyan
-    }
+$guiExeName = if ($IsWindows) { "NCSDecomp.exe" } else { "NCSDecomp" }
+$guiExeSource = Join-Path (Join-Path $distDir "NCSDecomp") $guiExeName
+if (Test-Path $guiExeSource) {
+    Copy-Item $guiExeSource (Join-Path $publishDir $guiExeName) -Force
+    Write-Host "  - Copied $guiExeName" -ForegroundColor Cyan
 } else {
-    Write-Host "  Note: NCSDecomp folder (GUI) not found, skipping..." -ForegroundColor Gray
+    Write-Host "  Note: $guiExeName not found at $guiExeSource (GUI build may have been skipped)" -ForegroundColor Gray
 }
 
 # Copy JAR files to root as well (for standalone usage)
@@ -136,82 +111,82 @@ if (Test-Path $guiJarSource) {
     Write-Host "  Warning: NCSDecomp.jar not found at $guiJarSource" -ForegroundColor Yellow
 }
 
-# Copy required nwscript files from tools/ or src/main/resources
-$nwscriptSource = Join-Path "." (Join-Path "src" (Join-Path "main" "resources"))
+# Copy tools/ payload (compiler + nwscript) into tools/ folder in the archive
 $toolsDir = Join-Path "." "tools"
-$k1Source = Join-Path $nwscriptSource "k1_nwscript.nss"
-$tslSource = Join-Path $nwscriptSource "tsl_nwscript.nss"
-$k1Tools = Join-Path $toolsDir "k1_nwscript.nss"
-$tslTools = Join-Path $toolsDir "tsl_nwscript.nss"
-
-# Copy compiler tools from tools/ directory
 $toolsPublishDir = Join-Path $publishDir "tools"
 New-Item -ItemType Directory -Path $toolsPublishDir -Force | Out-Null
 
-$compilerTools = @(
-    "nwnnsscomp.exe",
+$toolPayload = @(
+    "k1_nwscript.nss",
+    "tsl_nwscript.nss",
     "nwnnsscomp_kscript.exe",
-    "nwnnsscomp_tslpatcher.exe",
-    "nwnnsscomp_v1.exe"
+    "nwnnsscomp_ktool.exe"
 )
 
-foreach ($tool in $compilerTools) {
+foreach ($tool in $toolPayload) {
     $toolPath = Join-Path $toolsDir $tool
     if (Test-Path $toolPath) {
-        Copy-Item $toolPath (Join-Path $toolsPublishDir $tool)
-        Write-Host "  - Copied $tool to tools/" -ForegroundColor Cyan
+        Copy-Item $toolPath (Join-Path $toolsPublishDir $tool) -Force
+        Write-Host "  - Copied tools/$tool" -ForegroundColor Cyan
     } else {
-        Write-Host "  Note: $tool not found (optional)" -ForegroundColor Gray
+        Write-Host "  Warning: tools/$tool not found" -ForegroundColor Yellow
     }
 }
 
-if (Test-Path $k1Source) {
-    Copy-Item $k1Source $publishDir
-    Write-Host "  - Copied k1_nwscript.nss" -ForegroundColor Cyan
-} elseif (Test-Path $k1Tools) {
-    Copy-Item $k1Tools $publishDir
-    Write-Host "  - Copied k1_nwscript.nss" -ForegroundColor Cyan
+# Create default config file into config/
+$configPublishDir = Join-Path $publishDir "config"
+New-Item -ItemType Directory -Path $configPublishDir -Force | Out-Null
+$defaultConfig = @"
+# NCSDecomp Configuration
+# key=value (Java .properties format)
+#
+# The GUI reads this file from: .\config\ncsdecomp.conf
+# (legacy name also supported: .\config\dencs.conf)
+
+Game Variant=k1
+Prefer Switches=false
+Strict Signatures=false
+Overwrite Files=false
+Encoding=Windows-1252
+File Extension=.nss
+Filename Prefix=
+Filename Suffix=
+Link Scroll Bars=false
+
+nwnnsscomp Folder Path=.\tools
+nwnnsscomp Filename=nwnnsscomp_ktool.exe
+nwnnsscomp Path=
+
+K1 nwscript Path=.\tools\k1_nwscript.nss
+K2 nwscript Path=.\tools\tsl_nwscript.nss
+"@
+$configOutPath = Join-Path $configPublishDir "ncsdecomp.conf"
+if ($IsWindows) {
+    $defaultConfig | Out-File $configOutPath -Encoding ASCII
 } else {
-    Write-Host "  Warning: k1_nwscript.nss not found" -ForegroundColor Yellow
+    $defaultConfig | Out-File $configOutPath -Encoding utf8NoBOM
 }
+Write-Host "  - Wrote config/ncsdecomp.conf" -ForegroundColor Cyan
 
-if (Test-Path $tslSource) {
-    Copy-Item $tslSource $publishDir
-    Write-Host "  - Copied tsl_nwscript.nss" -ForegroundColor Cyan
-} elseif (Test-Path $tslTools) {
-    Copy-Item $tslTools $publishDir
-    Write-Host "  - Copied tsl_nwscript.nss" -ForegroundColor Cyan
-} else {
-    Write-Host "  Warning: tsl_nwscript.nss not found" -ForegroundColor Yellow
-}
+# Copy docs into archive root (verbatim names)
+$docsDir = Join-Path "." "docs"
+$docPayload = @(
+    "CHANGELOG.txt",
+    "README-CLI.md",
+    "README-TECHNICAL.md",
+    "README-USER.md",
+    "README.txt",
+    "VERSION.txt"
+)
 
-# Copy user-friendly README
-$docsReadmeUser = Join-Path "." (Join-Path "docs" "README-USER.md")
-$rootReadmeUser = Join-Path "." "README-USER.md"
-if (Test-Path $docsReadmeUser) {
-    Copy-Item $docsReadmeUser (Join-Path $publishDir "README.txt")
-    Write-Host "  - Copied README.txt" -ForegroundColor Cyan
-} elseif (Test-Path $rootReadmeUser) {
-    Copy-Item $rootReadmeUser (Join-Path $publishDir "README.txt")
-    Write-Host "  - Copied README.txt" -ForegroundColor Cyan
-}
-
-# Copy technical documentation
-$docsReadmeCli = Join-Path "." (Join-Path "docs" "README-CLI.md")
-$rootReadmeCli = Join-Path "." "README-CLI.md"
-if (Test-Path $docsReadmeCli) {
-    Copy-Item $docsReadmeCli (Join-Path $publishDir "README-TECHNICAL.md")
-    Write-Host "  - Copied README-TECHNICAL.md" -ForegroundColor Cyan
-} elseif (Test-Path $rootReadmeCli) {
-    Copy-Item $rootReadmeCli (Join-Path $publishDir "README-TECHNICAL.md")
-    Write-Host "  - Copied README-TECHNICAL.md" -ForegroundColor Cyan
-}
-
-# Copy main README if it exists
-$rootReadme = Join-Path "." "README.md"
-if (Test-Path $rootReadme) {
-    Copy-Item $rootReadme $publishDir
-    Write-Host "  - Copied README.md" -ForegroundColor Cyan
+foreach ($doc in $docPayload) {
+    $docPath = Join-Path $docsDir $doc
+    if (Test-Path $docPath) {
+        Copy-Item $docPath (Join-Path $publishDir $doc) -Force
+        Write-Host "  - Copied $doc" -ForegroundColor Cyan
+    } else {
+        Write-Host "  Warning: docs/$doc not found" -ForegroundColor Yellow
+    }
 }
 
 # Copy LICENSE file if it exists (check common locations and names)
@@ -245,7 +220,7 @@ if ($IsWindows) {
     $example1 = @"
 @echo off
 REM Example: Decompile a single file (KotOR 2/TSL)
-NCSDecompCLI\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k2
+..\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k2
 pause
 "@
     $example1 | Out-File (Join-Path $examplesDir "example1-decompile-single.bat") -Encoding ASCII
@@ -253,7 +228,7 @@ pause
     $example2 = @"
 @echo off
 REM Example: Decompile entire directory recursively (KotOR 1)
-NCSDecompCLI\NCSDecompCLI.exe -i "scripts_folder" -r --k1 -O "output_folder"
+..\NCSDecompCLI.exe -i "scripts_folder" -r --k1 -O "output_folder"
 pause
 "@
     $example2 | Out-File (Join-Path $examplesDir "example2-decompile-folder.bat") -Encoding ASCII
@@ -261,7 +236,7 @@ pause
     $example3 = @"
 @echo off
 REM Example: View decompiled code in console
-NCSDecompCLI\NCSDecompCLI.exe -i "script.ncs" --stdout --k2
+..\NCSDecompCLI.exe -i "script.ncs" --stdout --k2
 pause
 "@
     $example3 | Out-File (Join-Path $examplesDir "example3-view-in-console.bat") -Encoding ASCII
@@ -271,7 +246,7 @@ pause
     $example1 = @"
 #!/bin/bash
 # Example: Decompile a single file (KotOR 2/TSL)
-./NCSDecompCLI/NCSDecompCLI -i "script.ncs" -o "script.nss" --k2
+../NCSDecompCLI -i "script.ncs" -o "script.nss" --k2
 "@
     $example1File = Join-Path $examplesDir "example1-decompile-single.sh"
     $example1 | Out-File $example1File -Encoding utf8NoBOM
@@ -283,7 +258,7 @@ pause
     $example2 = @"
 #!/bin/bash
 # Example: Decompile entire directory recursively (KotOR 1)
-./NCSDecompCLI/NCSDecompCLI -i "scripts_folder" -r --k1 -O "output_folder"
+../NCSDecompCLI -i "scripts_folder" -r --k1 -O "output_folder"
 "@
     $example2File = Join-Path $examplesDir "example2-decompile-folder.sh"
     $example2 | Out-File $example2File -Encoding utf8NoBOM
@@ -294,7 +269,7 @@ pause
     $example3 = @"
 #!/bin/bash
 # Example: View decompiled code in console
-./NCSDecompCLI/NCSDecompCLI -i "script.ncs" --stdout --k2
+../NCSDecompCLI -i "script.ncs" --stdout --k2
 "@
     $example3File = Join-Path $examplesDir "example3-view-in-console.sh"
     $example3 | Out-File $example3File -Encoding utf8NoBOM
@@ -305,29 +280,24 @@ pause
 }
 
 Write-Host ""
-Write-Host "Step 4: Creating version info..." -ForegroundColor Yellow
-$versionInfo = @"
-NCSDecomp Distribution Package (CLI + GUI)
-Version: 1.0.0
-Build Date: $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")
-Platform: $(if ($IsWindows) { "Windows" } elseif ($IsMacOS) { "macOS" } elseif ($IsLinux) { "Linux" } else { "Unknown" })
-
-For more information, visit: https://bolabaden.org
-"@
-$versionFile = Join-Path $publishDir "VERSION.txt"
-if ($IsWindows) {
-    $versionInfo | Out-File $versionFile -Encoding ASCII
-} else {
-    $versionInfo | Out-File $versionFile -Encoding utf8NoBOM
-}
-Write-Host "  - Created VERSION.txt" -ForegroundColor Cyan
-
-Write-Host ""
-Write-Host "Step 5: Creating ZIP archive..." -ForegroundColor Yellow
+Write-Host "Step 3: Creating ZIP archive..." -ForegroundColor Yellow
 
 # Create ZIP archive name with version and platform (Java/Maven idiomatic: target/)
 $platformSuffix = if ($IsWindows) { "Windows" } elseif ($IsMacOS) { "macOS" } else { "Linux" }
-$zipFileName = "NCSDecomp-v1.0.0-$platformSuffix.zip"
+$version = "0.0.0"
+$docsVersionPath = Join-Path "." (Join-Path "docs" "VERSION.txt")
+if (Test-Path $docsVersionPath) {
+    try {
+        $versionLine = Get-Content $docsVersionPath | Where-Object { $_ -match '^Version:\s*' } | Select-Object -First 1
+        if ($versionLine) {
+            $parsed = ($versionLine -replace '^Version:\s*', '').Trim()
+            if ($parsed) { $version = $parsed }
+        }
+    } catch {
+        # ignore and keep default
+    }
+}
+$zipFileName = "NCSDecomp-v$version-$platformSuffix.zip"
 $zipPath = Join-Path $targetDir $zipFileName
 
 # Remove existing ZIP if it exists
@@ -395,7 +365,7 @@ Write-Host ""
 Write-Host "================================" -ForegroundColor Green
 Write-Host "Publishing complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "Distribution package ready in: target/assembly" -ForegroundColor Cyan
+Write-Host "Distribution package ready in: target/archive-top-level" -ForegroundColor Cyan
 if (Test-Path $zipPath) {
     Write-Host "ZIP archive created: target/$zipFileName" -ForegroundColor Green
 }

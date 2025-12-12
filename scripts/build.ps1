@@ -433,6 +433,9 @@ if ($BuildExecutable) {
     Write-Host "Building portable executable with jpackage..." -ForegroundColor Yellow
     Write-Host ""
 
+    # Ensure these variables exist for cleanup paths even if we exit early
+    $guiInputDir = $null
+
     try {
         # Build CLI executable
         $cliAppName = "NCSDecompCLI"
@@ -440,6 +443,19 @@ if ($BuildExecutable) {
         $appVersion = "1.0.0"
 
         Write-Host "Building CLI executable ($cliAppName)..." -ForegroundColor Yellow
+
+        # jpackage errors if the destination app-image directory already exists.
+        # Clean up any partial/previous outputs explicitly (some environments keep folders locked).
+        $cliDestDir = Join-Path $exeOutputDir $cliAppName
+        if (Test-Path $cliDestDir) {
+            Write-Host "Cleaning existing jpackage output directory: $cliDestDir" -ForegroundColor Gray
+            try {
+                Remove-Item -Recurse -Force $cliDestDir -ErrorAction Stop
+            } catch {
+                Write-Host "Warning: Could not delete $cliDestDir (files may be locked). Please close any running NCSDecompCLI processes and retry." -ForegroundColor Yellow
+                throw
+            }
+        }
 
         $cliJpackageArgs = @(
             "--type", $packageType,
@@ -473,6 +489,17 @@ if ($BuildExecutable) {
 
         if (Test-Path $guiJarPath) {
             Write-Host "Building GUI executable ($guiAppName)..." -ForegroundColor Yellow
+
+            $guiDestDir = Join-Path $exeOutputDir $guiAppName
+            if (Test-Path $guiDestDir) {
+                Write-Host "Cleaning existing jpackage output directory: $guiDestDir" -ForegroundColor Gray
+                try {
+                    Remove-Item -Recurse -Force $guiDestDir -ErrorAction Stop
+                } catch {
+                    Write-Host "Warning: Could not delete $guiDestDir (files may be locked). Please close any running NCSDecomp processes and retry." -ForegroundColor Yellow
+                    throw
+                }
+            }
 
             # Create GUI input directory
             $guiInputDir = Join-Path $tmpDir "jpackage-input-gui"
@@ -702,7 +729,7 @@ Categories=Utility;
         if (Test-Path $jpackageInput) {
             Remove-Item -Recurse -Force $jpackageInput -ErrorAction SilentlyContinue
         }
-        if (Test-Path $guiInputDir) {
+        if ($guiInputDir -and (Test-Path $guiInputDir)) {
             Remove-Item -Recurse -Force $guiInputDir -ErrorAction SilentlyContinue
         }
         exit 1
