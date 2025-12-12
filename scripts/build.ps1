@@ -601,14 +601,14 @@ if ($BuildExecutable) {
 
                     # Try winget first
                     $wingetPath = Get-Command "winget.exe" -ErrorAction SilentlyContinue
-                    $wingetSucceeded = $false
+                    $packageManagerSucceeded = $false
                     if ($wingetPath) {
                         Write-Host "  Installing NSIS via winget..." -ForegroundColor Gray
                         try {
                             $process = Start-Process -FilePath "winget" -ArgumentList "install", "--id", "NSIS.NSIS", "--accept-package-agreements", "--accept-source-agreements", "--silent" -Wait -PassThru -NoNewWindow
                             if ($process.ExitCode -eq 0) {
                                 Write-Host "  NSIS installed successfully via winget" -ForegroundColor Green
-                                $wingetSucceeded = $true
+                                $packageManagerSucceeded = $true
                                 # Wait a moment for installation to complete
                                 Start-Sleep -Seconds 3
                                 # Refresh PATH
@@ -627,20 +627,62 @@ if ($BuildExecutable) {
                                     }
                                 }
                             } else {
-                                Write-Host "  Winget installation failed (exit code: $($process.ExitCode)), trying direct download..." -ForegroundColor Yellow
+                                Write-Host "  Winget installation failed (exit code: $($process.ExitCode)), trying Chocolatey..." -ForegroundColor Yellow
                             }
                         } catch {
-                            Write-Host "  Winget installation failed: $_, trying direct download..." -ForegroundColor Yellow
+                            Write-Host "  Winget installation failed: $_, trying Chocolatey..." -ForegroundColor Yellow
                         }
                     }
 
-                    # Fallback: Download and install NSIS directly (only if winget didn't succeed)
-                    if (-not $makensisPath -and -not $wingetSucceeded) {
-                        Write-Host "  Downloading NSIS installer..." -ForegroundColor Gray
-                        $nsisInstallerUrl = "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.11/nsis-3.11-setup.exe"
-                        $installerPath = Join-Path $env:TEMP "nsis-3.11-setup.exe"
+                    # Fallback to Chocolatey if winget failed or not available
+                    if (-not $makensisPath -and -not $packageManagerSucceeded) {
+                        $chocoPath = Get-Command "choco.exe" -ErrorAction SilentlyContinue
+                        if ($chocoPath) {
+                            Write-Host "  Installing NSIS via Chocolatey..." -ForegroundColor Gray
+                            try {
+                                $process = Start-Process -FilePath "choco" -ArgumentList "install", "nsis", "-y" -Wait -PassThru -NoNewWindow
+                                if ($process.ExitCode -eq 0) {
+                                    Write-Host "  NSIS installed successfully via Chocolatey" -ForegroundColor Green
+                                    $packageManagerSucceeded = $true
+                                    # Wait a moment for installation to complete
+                                    Start-Sleep -Seconds 3
+                                    # Refresh PATH
+                                    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+                                    # Check PATH first
+                                    $makensisInPath = Get-Command $makensisExe -ErrorAction SilentlyContinue
+                                    if ($makensisInPath) {
+                                        $makensisPath = $makensisInPath.Source
+                                    } else {
+                                        # Check common installation paths
+                                        foreach ($path in $nsisPaths) {
+                                            if (Test-Path $path) {
+                                                $makensisPath = $path
+                                                break
+                                            }
+                                        }
+                                    }
+                                } else {
+                                    Write-Host "  Chocolatey installation failed (exit code: $($process.ExitCode)), trying SourceForge..." -ForegroundColor Yellow
+                                }
+                            } catch {
+                                Write-Host "  Chocolatey installation failed: $_, trying SourceForge..." -ForegroundColor Yellow
+                            }
+                        } else {
+                            Write-Host "  Chocolatey not available, trying SourceForge..." -ForegroundColor Yellow
+                        }
+                    }
+
+                    # Final fallback: Download and install NSIS directly from SourceForge (latest version)
+                    if (-not $makensisPath -and -not $packageManagerSucceeded) {
+                        Write-Host "  Downloading latest NSIS installer from SourceForge..." -ForegroundColor Gray
+                        # Use SourceForge's latest download URL (always gets the latest version)
+                        $nsisInstallerUrl = "https://sourceforge.net/projects/nsis/files/latest/download"
+                        $installerPath = Join-Path $env:TEMP "nsis-latest-setup.exe"
 
                         try {
+                            # SourceForge's latest URL redirects to the actual download
+                            # Invoke-WebRequest follows redirects automatically by default
+                            Write-Host "  Downloading from: $nsisInstallerUrl" -ForegroundColor Gray
                             Invoke-WebRequest -Uri $nsisInstallerUrl -OutFile $installerPath -UseBasicParsing
                             Write-Host "  Installing NSIS (silent mode)..." -ForegroundColor Gray
                             $process = Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait -PassThru -NoNewWindow
@@ -648,7 +690,7 @@ if ($BuildExecutable) {
 
                             # Refresh PATH and check again
                             $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-                            Start-Sleep -Seconds 2
+                            Start-Sleep -Seconds 3
 
                             $makensisInPath = Get-Command $makensisExe -ErrorAction SilentlyContinue
                             if ($makensisInPath) {
@@ -662,7 +704,7 @@ if ($BuildExecutable) {
                                 }
                             }
                         } catch {
-                            Write-Host "  Error installing NSIS: $_" -ForegroundColor Red
+                            Write-Host "  Error installing NSIS from SourceForge: $_" -ForegroundColor Red
                         }
                     }
                 }
