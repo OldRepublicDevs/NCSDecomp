@@ -974,11 +974,8 @@ Categories=Utility;
 
         # CLI executable info
         $cliSizeMB = [math]::Round((Get-ChildItem $cliAppImagePath -Recurse | Measure-Object -Property Length -Sum).Sum / 1MB, 2)
-        Write-Host "  CLI (directory): $cliExePath ($cliSizeMB MB)" -ForegroundColor White
-        if ($cliSingleFile -and (Test-Path $cliSingleFile)) {
-            $cliSingleSizeMB = [math]::Round((Get-Item $cliSingleFile).Length / 1MB, 2)
-            Write-Host "  CLI (single-file): $cliSingleFile ($cliSingleSizeMB MB)" -ForegroundColor Green
-        }
+        Write-Host "  CLI: $cliExePath ($cliSizeMB MB)" -ForegroundColor White
+        Write-Host "  Note: Single-file executable not created for CLI (NSIS installer UI incompatible with console apps)" -ForegroundColor Gray
 
         # GUI executable info (if exists)
         if (Test-Path $guiAppImagePath) {
