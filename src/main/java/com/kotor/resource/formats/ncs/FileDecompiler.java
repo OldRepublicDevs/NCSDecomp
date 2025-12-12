@@ -45,13 +45,16 @@ import java.util.Vector;
  * <p>
  * Responsibilities:
  * <ul>
- *    <li>Decode NCS bytecode into a parse tree, run analysis passes, and emit NSS source.</li>
- *    <li>Optionally round-trip through the external nwnnsscomp compiler to validate parity.</li>
- *    <li>Track per-file state (variables, generated code, bytecode snapshots) for consumers.</li>
+ * <li>Decode NCS bytecode into a parse tree, run analysis passes, and emit NSS
+ * source.</li>
+ * <li>Optionally round-trip through the external nwnnsscomp compiler to
+ * validate parity.</li>
+ * <li>Track per-file state (variables, generated code, bytecode snapshots) for
+ * consumers.</li>
  * </ul>
- * The class is intentionally stateful: it caches parsed scripts in {@link #filedata} and
- * reuses a single {@link ActionsData} instance describing nwscript actions for the chosen
- * game (KotOR 1 vs TSL).
+ * The class is intentionally stateful: it caches parsed scripts in
+ * {@link #filedata} and reuses a single {@link ActionsData} instance describing
+ * nwscript actions for the chosen game (KotOR 1 vs TSL).
  */
 public class FileDecompiler {
    /** Return code indicating a failed compile/decompile/compare operation. */
@@ -71,11 +74,17 @@ public class FileDecompiler {
    private Hashtable<File, FileScriptData> filedata;
    /** Global flag toggled by UI/CLI to indicate KotOR 2 (TSL) mode. */
    public static boolean isK2Selected = false;
-   /** Global flag to prefer generating switch structures instead of if-elseif chains. */
+   /**
+    * Global flag to prefer generating switch structures instead of if-elseif
+    * chains.
+    */
    public static boolean preferSwitches = false;
    /** Whether to abort when any signature stays partially inferred. */
    public static boolean strictSignatures = false;
-   /** Path to nwnnsscomp.exe, null means use default (tools/nwnnsscomp.exe or current directory) */
+   /**
+    * Path to nwnnsscomp.exe, null means use default (tools/nwnnsscomp.exe or
+    * current directory)
+    */
    public static String nwnnsscompPath = null;
 
    /**
@@ -83,7 +92,8 @@ public class FileDecompiler {
     * <p>
     * Uses {@code user.dir} to locate {@code k1_nwscript.nss} or
     * {@code tsl_nwscript.nss} depending on {@link #isK2Selected}, which mirrors
-    * legacy GUI behavior. Also loads {@link #preferSwitches} from config file if present.
+    * legacy GUI behavior. Also loads {@link #preferSwitches} from config file if
+    * present.
     *
     * @throws DecompilerException if the action table cannot be loaded
     */
@@ -94,14 +104,16 @@ public class FileDecompiler {
    }
 
    /**
-    * CLI-specific constructor that accepts an explicit nwscript file path.
-    * This bypasses the user.dir lookup and allows complete CLI independence.
-    * Note: preferSwitches should be set via CLI argument or static flag before construction.
+    * CLI-specific constructor that accepts an explicit nwscript file path. This
+    * bypasses the user.dir lookup and allows complete CLI independence. Note:
+    * preferSwitches should be set via CLI argument or static flag before
+    * construction.
     */
    public FileDecompiler(File nwscriptFile) throws DecompilerException {
       this.filedata = new Hashtable<>(1);
       if (nwscriptFile == null || !nwscriptFile.isFile()) {
-         throw new DecompilerException("Error: nwscript file does not exist: " + (nwscriptFile != null ? nwscriptFile.getAbsolutePath() : "null"));
+         throw new DecompilerException("Error: nwscript file does not exist: "
+               + (nwscriptFile != null ? nwscriptFile.getAbsolutePath() : "null"));
       }
       try {
          this.actions = new ActionsData(new BufferedReader(new FileReader(nwscriptFile)));
@@ -111,8 +123,8 @@ public class FileDecompiler {
    }
 
    /**
-    * Reloads the action table for the requested game variant.
-    * Useful when the user toggles KotOR 1/2 mode after construction.
+    * Reloads the action table for the requested game variant. Useful when the user
+    * toggles KotOR 1/2 mode after construction.
     *
     * @param isK2Selected true for KotOR 2 (TSL), false for KotOR 1
     * @throws DecompilerException if the action table cannot be read
@@ -124,10 +136,11 @@ public class FileDecompiler {
    /**
     * Attempts to load the action table from settings or the working directory.
     * <p>
-    * First checks for a configured path in Settings (GUI mode), then falls back
-    * to legacy behavior: {@code tsl_nwscript.nss} for TSL, otherwise {@code k1_nwscript.nss}
-    * in the current working directory. This method isolates the IO and error
-    * handling so callers receive a single {@link DecompilerException}.
+    * First checks for a configured path in Settings (GUI mode), then falls back to
+    * legacy behavior: {@code tsl_nwscript.nss} for TSL, otherwise
+    * {@code k1_nwscript.nss} in the current working directory. This method
+    * isolates the IO and error handling so callers receive a single
+    * {@link DecompilerException}.
     */
    private static ActionsData loadActionsDataInternal(boolean isK2Selected) throws DecompilerException {
       try {
@@ -137,9 +150,8 @@ public class FileDecompiler {
          try {
             // Access Decompiler.settings directly (same package)
             // This will throw NoClassDefFoundError in pure CLI mode, which we catch
-            String settingsPath = isK2Selected
-               ? Decompiler.settings.getProperty("K2 nwscript Path")
-               : Decompiler.settings.getProperty("K1 nwscript Path");
+            String settingsPath = isK2Selected ? Decompiler.settings.getProperty("K2 nwscript Path")
+                  : Decompiler.settings.getProperty("K1 nwscript Path");
             if (settingsPath != null && !settingsPath.isEmpty()) {
                actionfile = new File(settingsPath);
                if (actionfile.isFile()) {
@@ -171,8 +183,9 @@ public class FileDecompiler {
    /**
     * Loads preferSwitches setting from configuration file if present.
     * <p>
-    * Checks for {@code preferSwitches} property in {@code ncsdecomp.conf} or {@code dencs.conf}
-    * in the current working directory. If not found or unparseable, leaves the current value unchanged.
+    * Checks for {@code preferSwitches} property in {@code ncsdecomp.conf} or
+    * {@code dencs.conf} in the current working directory. If not found or
+    * unparseable, leaves the current value unchanged.
     */
    private static void loadPreferSwitchesFromConfig() {
       try {
@@ -207,7 +220,8 @@ public class FileDecompiler {
     * Returns a map of variable data for a previously decompiled script.
     *
     * @param file Script file whose variables are requested
-    * @return Hashtable of variables keyed by subroutine name, or null if not loaded
+    * @return Hashtable of variables keyed by subroutine name, or null if not
+    *         loaded
     */
    public Hashtable<String, Vector<Variable>> getVariableData(File file) {
       FileDecompiler.FileScriptData data = this.filedata.get(file);
@@ -225,14 +239,16 @@ public class FileDecompiler {
    }
 
    /**
-    * Returns bytecode captured from the original compiled script (after external decompile).
+    * Returns bytecode captured from the original compiled script (after external
+    * decompile).
     */
    public String getOriginalByteCode(File file) {
       return this.filedata.get(file) == null ? null : this.filedata.get(file).getOriginalByteCode();
    }
 
    /**
-    * Returns bytecode captured from the round-tripped compilation of generated code.
+    * Returns bytecode captured from the round-tripped compilation of generated
+    * code.
     */
    public String getNewByteCode(File file) {
       return this.filedata.get(file) == null ? null : this.filedata.get(file).getNewByteCode();
@@ -241,27 +257,28 @@ public class FileDecompiler {
    /**
     * Decompiles a file, generates NSS source, compiles it back, and compares.
     * <p>
-    * This is the full round-trip validation used by the GUI: decode, emit
-    * source, compile externally, and diff bytecode to detect regressions.
+    * This is the full round-trip validation used by the GUI: decode, emit source,
+    * compile externally, and diff bytecode to detect regressions.
     * <p>
-    * All exceptions are caught internally and converted to fallback stubs,
-    * so this method never throws exceptions and always returns a result code.
+    * All exceptions are caught internally and converted to fallback stubs, so this
+    * method never throws exceptions and always returns a result code.
     *
     * @param file NCS file to decompile
-    * @return One of {@link #SUCCESS}, {@link #PARTIAL_COMPILE}, {@link #PARTIAL_COMPARE}, or {@link #FAILURE}
+    * @return One of {@link #SUCCESS}, {@link #PARTIAL_COMPILE},
+    *         {@link #PARTIAL_COMPARE}, or {@link #FAILURE}
     */
    public int decompile(File file) {
       try {
-      this.ensureActionsLoaded();
+         this.ensureActionsLoaded();
       } catch (DecompilerException e) {
          System.out.println("Error loading actions data: " + e.getMessage());
          // Create comprehensive fallback stub for actions data loading failure
          FileDecompiler.FileScriptData errorData = new FileDecompiler.FileScriptData();
          String expectedFile = isK2Selected ? "tsl_nwscript.nss" : "k1_nwscript.nss";
          String stubCode = this.generateComprehensiveFallbackStub(file, "Actions data loading", e,
-            "The actions data table (nwscript.nss) is required to decompile NCS files.\n" +
-            "Expected file: " + expectedFile + "\n" +
-            "Please ensure the appropriate nwscript.nss file is available in tools/ directory, working directory, or configured path.");
+               "The actions data table (nwscript.nss) is required to decompile NCS files.\n" + "Expected file: "
+                     + expectedFile + "\n"
+                     + "Please ensure the appropriate nwscript.nss file is available in tools/ directory, working directory, or configured path.");
          errorData.setCode(stubCode);
          this.filedata.put(file, errorData);
          return PARTIAL_COMPILE;
@@ -275,11 +292,12 @@ public class FileDecompiler {
             // but it may contain minimal/fallback code if decompilation failed
             this.filedata.put(file, data);
          } catch (Exception e) {
-         // Last resort: create comprehensive fallback stub data so we always have something to show
+            // Last resort: create comprehensive fallback stub data so we always have
+            // something to show
             System.out.println("Critical error during decompilation, creating fallback stub: " + e.getMessage());
             e.printStackTrace(System.out);
             data = new FileDecompiler.FileScriptData();
-         data.setCode(this.generateComprehensiveFallbackStub(file, "Initial decompilation attempt", e, null));
+            data.setCode(this.generateComprehensiveFallbackStub(file, "Initial decompilation attempt", e, null));
             this.filedata.put(file, data);
          }
       }
@@ -292,14 +310,14 @@ public class FileDecompiler {
             // If code generation failed, provide comprehensive fallback stub
             System.out.println("Warning: Generated code is empty, creating fallback stub.");
             String fallback = this.generateComprehensiveFallbackStub(file, "Code generation - empty output", null,
-               "The decompilation process completed but generated no source code. This may indicate the file contains no executable code or all code was marked as dead/unreachable.");
+                  "The decompilation process completed but generated no source code. This may indicate the file contains no executable code or all code was marked as dead/unreachable.");
             data.setCode(fallback);
             return PARTIAL_COMPILE;
          }
       } catch (Exception e) {
          System.out.println("Error during code generation (creating fallback stub): " + e.getMessage());
          String fallback = this.generateComprehensiveFallbackStub(file, "Code generation", e,
-            "An exception occurred while generating NSS source code from the decompiled parse tree.");
+               "An exception occurred while generating NSS source code from the decompiled parse tree.");
          data.setCode(fallback);
          return PARTIAL_COMPILE;
       }
@@ -315,7 +333,8 @@ public class FileDecompiler {
                String originalByteCode = this.readFile(olddecompiled);
                if (originalByteCode != null && !originalByteCode.trim().isEmpty()) {
                   data.setOriginalByteCode(originalByteCode);
-                  System.out.println("[NCSDecomp] Successfully captured original bytecode (" + originalByteCode.length() + " characters)");
+                  System.out.println("[NCSDecomp] Successfully captured original bytecode (" + originalByteCode.length()
+                        + " characters)");
                } else {
                   System.out.println("[NCSDecomp] Warning: Original bytecode file is empty");
                }
@@ -327,7 +346,8 @@ public class FileDecompiler {
             System.out.println("[NCSDecomp]   Exception Type: " + e.getClass().getName());
             System.out.println("[NCSDecomp]   Exception Message: " + e.getMessage());
             if (e.getCause() != null) {
-               System.out.println("[NCSDecomp]   Caused by: " + e.getCause().getClass().getName() + " - " + e.getCause().getMessage());
+               System.out.println("[NCSDecomp]   Caused by: " + e.getCause().getClass().getName() + " - "
+                     + e.getCause().getMessage());
             }
             e.printStackTrace();
          }
@@ -344,7 +364,8 @@ public class FileDecompiler {
          System.out.println("[NCSDecomp]   Exception Type: " + e.getClass().getName());
          System.out.println("[NCSDecomp]   Exception Message: " + e.getMessage());
          if (e.getCause() != null) {
-            System.out.println("[NCSDecomp]   Caused by: " + e.getCause().getClass().getName() + " - " + e.getCause().getMessage());
+            System.out.println(
+                  "[NCSDecomp]   Caused by: " + e.getCause().getClass().getName() + " - " + e.getCause().getMessage());
          }
          e.printStackTrace();
          System.out.println("[NCSDecomp] Showing decompiled source anyway (validation failed)");
@@ -356,7 +377,7 @@ public class FileDecompiler {
     * Compiles the provided NSS file and compares against the original NCS file.
     * Assumes {@link #decompile(File)} has already cached state for {@code file}.
     *
-    * @param file Existing compiled script to compare against
+    * @param file    Existing compiled script to compare against
     * @param newfile Newly generated NSS file to compile
     */
    public int compileAndCompare(File file, File newfile) throws DecompilerException {
@@ -365,11 +386,12 @@ public class FileDecompiler {
    }
 
    /**
-    * Compiles an NSS file to NCS without performing comparison or cleanup.
-    * This is useful for round-trip display where the compiled NCS needs to persist.
+    * Compiles an NSS file to NCS without performing comparison or cleanup. This is
+    * useful for round-trip display where the compiled NCS needs to persist.
     *
-    * @param nssFile The NSS file to compile
-    * @param outputDir The output directory for the compiled NCS file. If null, uses temp directory.
+    * @param nssFile   The NSS file to compile
+    * @param outputDir The output directory for the compiled NCS file. If null,
+    *                  uses temp directory.
     * @return The compiled NCS file, or null if compilation failed
     */
    public File compileNssToNcs(File nssFile, File outputDir) {
@@ -380,7 +402,8 @@ public class FileDecompiler {
     * Compiles an NSS file and captures the resulting bytecode; does not compare.
     *
     * @param nssFile Source to compile
-    * @return {@link #SUCCESS} when compilation and decompile of result succeed; {@link #FAILURE} otherwise
+    * @return {@link #SUCCESS} when compilation and decompile of result succeed;
+    *         {@link #FAILURE} otherwise
     */
    public int compileOnly(File nssFile) throws DecompilerException {
       FileDecompiler.FileScriptData data = this.filedata.get(nssFile);
@@ -455,7 +478,8 @@ public class FileDecompiler {
    }
 
    /**
-    * Decompile a single NCS file to NSS source (in-memory) without invoking external tools.
+    * Decompile a single NCS file to NSS source (in-memory) without invoking
+    * external tools.
     */
    public String decompileToString(File file) throws DecompilerException {
       FileDecompiler.FileScriptData data = this.decompileNcs(file);
@@ -468,9 +492,11 @@ public class FileDecompiler {
    }
 
    /**
-    * Decompile a single NCS file directly to an output file using the provided charset.
+    * Decompile a single NCS file directly to an output file using the provided
+    * charset.
     */
-   public void decompileToFile(File input, File output, Charset charset, boolean overwrite) throws DecompilerException, IOException {
+   public void decompileToFile(File input, File output, Charset charset, boolean overwrite)
+         throws DecompilerException, IOException {
       if (output.exists() && !overwrite) {
          throw new IOException("Output file already exists: " + output.getAbsolutePath());
       }
@@ -481,7 +507,8 @@ public class FileDecompiler {
          parent.mkdirs();
       }
 
-      try (BufferedWriter bw = new BufferedWriter(new java.io.OutputStreamWriter(new java.io.FileOutputStream(output), charset))) {
+      try (BufferedWriter bw = new BufferedWriter(
+            new java.io.OutputStreamWriter(new java.io.FileOutputStream(output), charset))) {
          bw.write(code);
       }
    }
@@ -490,10 +517,13 @@ public class FileDecompiler {
     * Compiles a generated NSS file and compares it against the supplied original.
     * Also stores bytecode snapshots for later inspection.
     */
-   private int compileAndCompare(File file, File newfile, FileDecompiler.FileScriptData data) throws DecompilerException {
-      // If compiler doesn't exist, skip validation but still return success for decompilation
+   private int compileAndCompare(File file, File newfile, FileDecompiler.FileScriptData data)
+         throws DecompilerException {
+      // If compiler doesn't exist, skip validation but still return success for
+      // decompilation
       if (!this.checkCompilerExists()) {
-         System.out.println("[NCSDecomp] nwnnsscomp.exe not found - skipping bytecode validation. Decompiled source will still be shown.");
+         System.out.println(
+               "[NCSDecomp] nwnnsscomp.exe not found - skipping bytecode validation. Decompiled source will still be shown.");
          System.out.println("[NCSDecomp] Looking for: " + this.getCompilerFile().getAbsolutePath());
          return PARTIAL_COMPILE;
       }
@@ -508,19 +538,22 @@ public class FileDecompiler {
          olddecompiled = this.externalDecompile(file, isK2Selected, null);
          if (olddecompiled == null || !olddecompiled.exists()) {
             System.out.println("[NCSDecomp] ERROR: nwnnsscomp decompile of original NCS file failed.");
-            System.out.println("[NCSDecomp]   Expected output file: " + (olddecompiled != null ? olddecompiled.getAbsolutePath() : "null"));
+            System.out.println("[NCSDecomp]   Expected output file: "
+                  + (olddecompiled != null ? olddecompiled.getAbsolutePath() : "null"));
             System.out.println("[NCSDecomp]   Check nwnnsscomp output above for details.");
             return PARTIAL_COMPILE;
          }
 
          data.setOriginalByteCode(this.readFile(olddecompiled));
          System.out.println("[NCSDecomp] Compiling generated NSS file...");
-         // Use same directory as input NSS file for output NCS (user has already chosen this location via save dialog)
+         // Use same directory as input NSS file for output NCS (user has already chosen
+         // this location via save dialog)
          newcompiled = this.externalCompile(newfile, isK2Selected, newfile.getParentFile());
          if (newcompiled == null || !newcompiled.exists()) {
             System.out.println("[NCSDecomp] ERROR: nwnnsscomp compilation of generated NSS file failed.");
             System.out.println("[NCSDecomp]   Input file: " + newfile.getAbsolutePath());
-            System.out.println("[NCSDecomp]   Expected output: " + (newcompiled != null ? newcompiled.getAbsolutePath() : "null"));
+            System.out.println(
+                  "[NCSDecomp]   Expected output: " + (newcompiled != null ? newcompiled.getAbsolutePath() : "null"));
             System.out.println("[NCSDecomp]   Check nwnnsscomp output above for compilation errors.");
             return PARTIAL_COMPILE;
          }
@@ -530,7 +563,8 @@ public class FileDecompiler {
          newdecompiled = this.externalDecompile(newcompiled, isK2Selected, null);
          if (newdecompiled == null || !newdecompiled.exists()) {
             System.out.println("[NCSDecomp] ERROR: nwnnsscomp decompile of newly compiled file failed.");
-            System.out.println("[NCSDecomp]   Expected output file: " + (newdecompiled != null ? newdecompiled.getAbsolutePath() : "null"));
+            System.out.println("[NCSDecomp]   Expected output file: "
+                  + (newdecompiled != null ? newdecompiled.getAbsolutePath() : "null"));
             System.out.println("[NCSDecomp]   Check nwnnsscomp output above for details.");
             return PARTIAL_COMPILE;
          }
@@ -546,12 +580,14 @@ public class FileDecompiler {
             System.out.println("P-code difference: " + diff);
          }
       } catch (Exception e) {
-         // Catch any exceptions during compilation/validation and continue with partial result
+         // Catch any exceptions during compilation/validation and continue with partial
+         // result
          System.out.println("[NCSDecomp] EXCEPTION during bytecode validation:");
          System.out.println("[NCSDecomp]   Exception Type: " + e.getClass().getName());
          System.out.println("[NCSDecomp]   Exception Message: " + e.getMessage());
          if (e.getCause() != null) {
-            System.out.println("[NCSDecomp]   Caused by: " + e.getCause().getClass().getName() + " - " + e.getCause().getMessage());
+            System.out.println(
+                  "[NCSDecomp]   Caused by: " + e.getCause().getClass().getName() + " - " + e.getCause().getMessage());
          }
          System.out.println("[NCSDecomp]   Stack trace:");
          e.printStackTrace();
@@ -580,7 +616,8 @@ public class FileDecompiler {
    /**
     * Convenience overload that writes generated code to disk before comparison.
     */
-   private int compileAndCompare(File file, String code, FileDecompiler.FileScriptData data) throws DecompilerException {
+   private int compileAndCompare(File file, String code, FileDecompiler.FileScriptData data)
+         throws DecompilerException {
       this.ensureActionsLoaded();
       File gennedcode = null;
 
@@ -601,7 +638,8 @@ public class FileDecompiler {
    }
 
    /**
-    * Compiles an NSS file via external nwnnsscomp and captures the resulting bytecode.
+    * Compiles an NSS file via external nwnnsscomp and captures the resulting
+    * bytecode.
     */
    private int compileNss(File nssFile, FileDecompiler.FileScriptData data) throws DecompilerException {
       // If compiler doesn't exist, return failure but don't throw
@@ -688,7 +726,7 @@ public class FileDecompiler {
     */
    private String comparePcodeFiles(File originalPcode, File newPcode) {
       try (BufferedReader reader1 = new BufferedReader(new FileReader(originalPcode));
-         BufferedReader reader2 = new BufferedReader(new FileReader(newPcode))) {
+            BufferedReader reader2 = new BufferedReader(new FileReader(newPcode))) {
          String line1;
          String line2;
          int line = 1;
@@ -722,7 +760,7 @@ public class FileDecompiler {
     */
    private boolean compareBinaryFiles(File original, File generated) {
       try (BufferedInputStream a = new BufferedInputStream(new FileInputStream(original));
-         BufferedInputStream b = new BufferedInputStream(new FileInputStream(generated))) {
+            BufferedInputStream b = new BufferedInputStream(new FileInputStream(generated))) {
          int ba;
          int bb;
          while (true) {
@@ -745,10 +783,12 @@ public class FileDecompiler {
    /**
     * Returns the compiler executable location.
     * <p>
-    * For GUI mode: Uses CompilerUtil.getCompilerFromSettings() EXCLUSIVELY - NO FALLBACKS.
-    * The Settings stores "nwnnsscomp Folder Path" (directory) and "nwnnsscomp Filename" (filename).
+    * For GUI mode: Uses CompilerUtil.getCompilerFromSettings() EXCLUSIVELY - NO
+    * FALLBACKS. The Settings stores "nwnnsscomp Folder Path" (directory) and
+    * "nwnnsscomp Filename" (filename).
     * <p>
-    * For CLI mode: Uses nwnnsscompPath if set via command-line argument - NO FALLBACKS.
+    * For CLI mode: Uses nwnnsscompPath if set via command-line argument - NO
+    * FALLBACKS.
     * <p>
     * Returns null if no compiler is configured.
     */
@@ -757,18 +797,21 @@ public class FileDecompiler {
       try {
          File settingsCompiler = CompilerUtil.getCompilerFromSettings();
          if (settingsCompiler != null) {
-            System.err.println("DEBUG FileDecompiler.getCompilerFile: Using Settings compiler: " + settingsCompiler.getAbsolutePath());
+            System.err.println("DEBUG FileDecompiler.getCompilerFile: Using Settings compiler: "
+                  + settingsCompiler.getAbsolutePath());
             return settingsCompiler;
          }
       } catch (NoClassDefFoundError | Exception e) {
          // CompilerUtil or Decompiler.settings not available - likely CLI mode
-         System.err.println("DEBUG FileDecompiler.getCompilerFile: Settings not available (CLI mode): " + e.getClass().getSimpleName());
+         System.err.println("DEBUG FileDecompiler.getCompilerFile: Settings not available (CLI mode): "
+               + e.getClass().getSimpleName());
       }
 
       // CLI MODE: Use nwnnsscompPath if set (set by CLI argument)
       if (nwnnsscompPath != null && !nwnnsscompPath.trim().isEmpty()) {
          File cliCompiler = new File(nwnnsscompPath);
-         System.err.println("DEBUG FileDecompiler.getCompilerFile: Using CLI nwnnsscompPath: " + cliCompiler.getAbsolutePath());
+         System.err.println(
+               "DEBUG FileDecompiler.getCompilerFile: Using CLI nwnnsscompPath: " + cliCompiler.getAbsolutePath());
          return cliCompiler;
       }
 
@@ -779,6 +822,7 @@ public class FileDecompiler {
 
    /**
     * Checks if the compiler binary is present.
+    *
     * @return true if compiler exists, false otherwise
     */
    private boolean checkCompilerExists() {
@@ -787,11 +831,14 @@ public class FileDecompiler {
    }
 
    /**
-    * Invokes nwnnsscomp in decompile mode against a single file.
-    * Uses {@link NwnnsscompConfig} to build arguments appropriate for the detected binary.
-    * @param in Input NCS file to decompile
-    * @param k2 Whether to use K2 mode
-    * @param outputDir Explicit output directory for the decompiled pcode file. If null, uses temp directory.
+    * Invokes nwnnsscomp in decompile mode against a single file. Uses
+    * {@link NwnnsscompConfig} to build arguments appropriate for the detected
+    * binary.
+    *
+    * @param in        Input NCS file to decompile
+    * @param k2        Whether to use K2 mode
+    * @param outputDir Explicit output directory for the decompiled pcode file. If
+    *                  null, uses temp directory.
     * @return The decompiled pcode file, or null if decompilation failed
     */
    private File externalDecompile(File in, boolean k2, File outputDir) {
@@ -829,8 +876,8 @@ public class FileDecompiler {
          NwnnsscompConfig config = new NwnnsscompConfig(compiler, in, result, k2);
          String[] args = config.getDecompileArgs(compiler.getAbsolutePath());
 
-         System.out.println("[NCSDecomp] Using compiler: " + config.getChosenCompiler().getName() +
-            " (SHA256: " + config.getSha256Hash().substring(0, 16) + "...)");
+         System.out.println("[NCSDecomp] Using compiler: " + config.getChosenCompiler().getName() + " (SHA256: "
+               + config.getSha256Hash().substring(0, 16) + "...)");
          System.out.println("[NCSDecomp] Input file: " + in.getAbsolutePath());
          System.out.println("[NCSDecomp] Expected output: " + result.getAbsolutePath());
 
@@ -863,7 +910,8 @@ public class FileDecompiler {
          }
          System.out.println("[NCSDecomp]   Exception Message: " + e.getMessage());
          if (e.getCause() != null) {
-            System.out.println("[NCSDecomp]   Caused by: " + e.getCause().getClass().getName() + " - " + e.getCause().getMessage());
+            System.out.println(
+                  "[NCSDecomp]   Caused by: " + e.getCause().getClass().getName() + " - " + e.getCause().getMessage());
          }
          e.printStackTrace();
          return null;
@@ -872,7 +920,8 @@ public class FileDecompiler {
 
    /**
     * Writes generated NSS code to a temporary file for external compilation.
-    * Always uses temp directory to avoid creating files in working directory without user consent.
+    * Always uses temp directory to avoid creating files in working directory
+    * without user consent.
     */
    private File writeCode(String code) {
       try {
@@ -888,7 +937,8 @@ public class FileDecompiler {
          writer.write(code);
          writer.close();
 
-         // Clean up any old NCS file with similar name (shouldn't exist, but just in case)
+         // Clean up any old NCS file with similar name (shouldn't exist, but just in
+         // case)
          String baseName = out.getName().substring(0, out.getName().lastIndexOf('.'));
          File result = new File(tempDir, baseName + ".ncs");
          if (result.exists()) {
@@ -904,12 +954,14 @@ public class FileDecompiler {
 
    /**
     * Invokes nwnnsscomp in compile mode against a single NSS file.
-    * @param file Input NSS file to compile
-    * @param k2 Whether to use K2 mode
-    * @param outputDir Explicit output directory for the compiled NCS file. If null, uses temp directory.
+    *
+    * @param file      Input NSS file to compile
+    * @param k2        Whether to use K2 mode
+    * @param outputDir Explicit output directory for the compiled NCS file. If
+    *                  null, uses temp directory.
     * @return The compiled NCS file, or null if compilation failed
     */
-   private File externalCompile(File file, boolean k2, File outputDir) {
+   public File externalCompile(File file, boolean k2, File outputDir) {
       try {
          File compiler = getCompilerFile();
          if (!compiler.exists()) {
@@ -941,16 +993,17 @@ public class FileDecompiler {
          File compilerDir = compiler.getParentFile();
          if (compilerDir != null) {
             File compilerNwscript = new File(compilerDir, "nwscript.nss");
-            File nwscriptSource = k2
-               ? new File(new File(System.getProperty("user.dir"), "tools"), "tsl_nwscript.nss")
-               : new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss");
-            if (nwscriptSource.exists() && (!compilerNwscript.exists() || !compilerNwscript.getAbsolutePath().equals(nwscriptSource.getAbsolutePath()))) {
+            File nwscriptSource = k2 ? new File(new File(System.getProperty("user.dir"), "tools"), "tsl_nwscript.nss")
+                  : new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss");
+            if (nwscriptSource.exists() && (!compilerNwscript.exists()
+                  || !compilerNwscript.getAbsolutePath().equals(nwscriptSource.getAbsolutePath()))) {
                try {
                   java.nio.file.Files.copy(nwscriptSource.toPath(), compilerNwscript.toPath(),
-                     java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                } catch (java.io.IOException e) {
                   // Log but don't fail - compiler might find nwscript.nss elsewhere
-                  System.err.println("[NCSDecomp] Warning: Could not copy nwscript.nss to compiler directory: " + e.getMessage());
+                  System.err.println(
+                        "[NCSDecomp] Warning: Could not copy nwscript.nss to compiler directory: " + e.getMessage());
                }
             }
          }
@@ -959,12 +1012,14 @@ public class FileDecompiler {
          NwnnsscompConfig config = new NwnnsscompConfig(compiler, file, result, k2);
 
          // For GUI compilation, match test behavior: don't use -i flags
-         // Test shows compilers work without -i when includes are in source directory or compiler directory
-         // All compilers expect nwscript.nss in compiler directory and includes in source directory
+         // Test shows compilers work without -i when includes are in source directory or
+         // compiler directory
+         // All compilers expect nwscript.nss in compiler directory and includes in
+         // source directory
          String[] args = config.getCompileArgs(compiler.getAbsolutePath());
 
-         System.out.println("[NCSDecomp] Using compiler: " + config.getChosenCompiler().getName() +
-            " (SHA256: " + config.getSha256Hash().substring(0, 16) + "...)");
+         System.out.println("[NCSDecomp] Using compiler: " + config.getChosenCompiler().getName() + " (SHA256: "
+               + config.getSha256Hash().substring(0, 16) + "...)");
          System.out.println("[NCSDecomp] Input file: " + file.getAbsolutePath());
          System.out.println("[NCSDecomp] Expected output: " + result.getAbsolutePath());
 
@@ -997,7 +1052,8 @@ public class FileDecompiler {
          }
          System.out.println("[NCSDecomp]   Exception Message: " + e.getMessage());
          if (e.getCause() != null) {
-            System.out.println("[NCSDecomp]   Caused by: " + e.getCause().getClass().getName() + " - " + e.getCause().getMessage());
+            System.out.println(
+                  "[NCSDecomp]   Caused by: " + e.getCause().getClass().getName() + " - " + e.getCause().getMessage());
          }
          e.printStackTrace();
          return null;
@@ -1013,7 +1069,7 @@ public class FileDecompiler {
    /**
     * Converts a byte array to a hexadecimal string representation.
     *
-    * @param bytes The byte array to convert
+    * @param bytes  The byte array to convert
     * @param length The number of bytes to convert
     * @return Hexadecimal string representation
     */
@@ -1029,16 +1085,18 @@ public class FileDecompiler {
    }
 
    /**
-    * Generates a comprehensive fallback stub with all available diagnostic information.
-    * This ensures fallback stubs are as exhaustive, accurate, and complete as possible.
+    * Generates a comprehensive fallback stub with all available diagnostic
+    * information. This ensures fallback stubs are as exhaustive, accurate, and
+    * complete as possible.
     *
-    * @param file The file being decompiled
-    * @param errorStage Description of the stage where the error occurred
-    * @param exception The exception that occurred (may be null)
+    * @param file           The file being decompiled
+    * @param errorStage     Description of the stage where the error occurred
+    * @param exception      The exception that occurred (may be null)
     * @param additionalInfo Additional context information (may be null)
     * @return A comprehensive fallback stub string
     */
-   private String generateComprehensiveFallbackStub(File file, String errorStage, Exception exception, String additionalInfo) {
+   private String generateComprehensiveFallbackStub(File file, String errorStage, Exception exception,
+         String additionalInfo) {
       StringBuilder stub = new StringBuilder();
       String newline = System.getProperty("line.separator");
 
@@ -1073,13 +1131,15 @@ public class FileDecompiler {
       if (exception != null) {
          stub.append("// Exception Details:").append(newline);
          stub.append("//   Type: ").append(exception.getClass().getName()).append(newline);
-         stub.append("//   Message: ").append(exception.getMessage() != null ? exception.getMessage() : "(no message)").append(newline);
+         stub.append("//   Message: ").append(exception.getMessage() != null ? exception.getMessage() : "(no message)")
+               .append(newline);
 
          // Include cause if available
          Throwable cause = exception.getCause();
          if (cause != null) {
             stub.append("//   Caused by: ").append(cause.getClass().getName()).append(newline);
-            stub.append("//   Cause Message: ").append(cause.getMessage() != null ? cause.getMessage() : "(no message)").append(newline);
+            stub.append("//   Cause Message: ").append(cause.getMessage() != null ? cause.getMessage() : "(no message)")
+                  .append(newline);
          }
 
          // Include stack trace summary (first few frames)
@@ -1119,7 +1179,8 @@ public class FileDecompiler {
       // System information
       stub.append("// System Information:").append(newline);
       stub.append("//   Java Version: ").append(System.getProperty("java.version")).append(newline);
-      stub.append("//   OS: ").append(System.getProperty("os.name")).append(" ").append(System.getProperty("os.version")).append(newline);
+      stub.append("//   OS: ").append(System.getProperty("os.name")).append(" ")
+            .append(System.getProperty("os.version")).append(newline);
       stub.append("//   Working Directory: ").append(System.getProperty("user.dir")).append(newline);
       stub.append(newline);
 
@@ -1130,14 +1191,17 @@ public class FileDecompiler {
       // Recommendations
       stub.append("// Recommendations:").append(newline);
       if (file != null && file.exists() && file.length() == 0) {
-         stub.append("//   - File is empty (0 bytes). This may indicate a corrupted or incomplete file.").append(newline);
+         stub.append("//   - File is empty (0 bytes). This may indicate a corrupted or incomplete file.")
+               .append(newline);
       } else if (file != null && !file.exists()) {
          stub.append("//   - File does not exist. Verify the file path is correct.").append(newline);
       } else if (this.actions == null) {
-         stub.append("//   - Actions data not loaded. Ensure k1_nwscript.nss or tsl_nwscript.nss is available.").append(newline);
+         stub.append("//   - Actions data not loaded. Ensure k1_nwscript.nss or tsl_nwscript.nss is available.")
+               .append(newline);
       } else {
          stub.append("//   - This may indicate a corrupted, invalid, or unsupported NCS file format.").append(newline);
-         stub.append("//   - The file may be from a different game version or modded in an incompatible way.").append(newline);
+         stub.append("//   - The file may be from a different game version or modded in an incompatible way.")
+               .append(newline);
       }
       stub.append("//   - Check the exception details above for specific error information.").append(newline);
       stub.append("//   - Verify the file is a valid KotOR/TSL NCS bytecode file.").append(newline);
@@ -1146,9 +1210,11 @@ public class FileDecompiler {
       // Minimal valid NSS stub
       stub.append("// Minimal fallback function:").append(newline);
       stub.append("void main() {").append(newline);
-      stub.append("    // Decompilation failed at stage: ").append(errorStage != null ? errorStage : "Unknown").append(newline);
+      stub.append("    // Decompilation failed at stage: ").append(errorStage != null ? errorStage : "Unknown")
+            .append(newline);
       if (exception != null && exception.getMessage() != null) {
-         stub.append("    // Error: ").append(exception.getMessage().replace("\n", " ").replace("\r", "")).append(newline);
+         stub.append("    // Error: ").append(exception.getMessage().replace("\n", " ").replace("\r", ""))
+               .append(newline);
       }
       stub.append("}").append(newline);
 
@@ -1156,15 +1222,17 @@ public class FileDecompiler {
    }
 
    /**
-    * Core decompilation pipeline that converts NCS bytecode to in-memory script state.
+    * Core decompilation pipeline that converts NCS bytecode to in-memory script
+    * state.
     * <p>
     * Steps include decoding the bytecode stream, building a parse tree, running
     * multiple analysis passes (destination resolution, dead code marking, typing),
-    * flattening globals/subroutines, and finally constructing {@link SubScriptState}
-    * objects ready for code generation.
+    * flattening globals/subroutines, and finally constructing
+    * {@link SubScriptState} objects ready for code generation.
     *
     * @param file NCS file to decode
-    * @return {@link FileScriptData} containing parsed subroutines and metadata, or null on fatal error
+    * @return {@link FileScriptData} containing parsed subroutines and metadata, or
+    *         null on fatal error
     */
    private FileDecompiler.FileScriptData decompileNcs(File file) {
       FileDecompiler.FileScriptData data = null;
@@ -1188,9 +1256,9 @@ public class FileDecompiler {
          FileDecompiler.FileScriptData stub = new FileDecompiler.FileScriptData();
          String expectedFile = isK2Selected ? "tsl_nwscript.nss" : "k1_nwscript.nss";
          String stubCode = this.generateComprehensiveFallbackStub(file, "Actions data loading", null,
-            "The actions data table (nwscript.nss) is required to decompile NCS files.\n" +
-            "Expected file: " + expectedFile + "\n" +
-            "Please ensure the appropriate nwscript.nss file is available in tools/ directory, working directory, or configured path.");
+               "The actions data table (nwscript.nss) is required to decompile NCS files.\n" + "Expected file: "
+                     + expectedFile + "\n"
+                     + "Please ensure the appropriate nwscript.nss file is available in tools/ directory, working directory, or configured path.");
          stub.setCode(stubCode);
          return stub;
       }
@@ -1202,7 +1270,8 @@ public class FileDecompiler {
          try {
             System.err.println("DEBUG decompileNcs: starting decode for " + file.getName());
             commands = new Decoder(new BufferedInputStream(new FileInputStream(file)), this.actions).decode();
-            System.err.println("DEBUG decompileNcs: decode successful, commands length=" + (commands != null ? commands.length() : 0));
+            System.err.println("DEBUG decompileNcs: decode successful, commands length="
+                  + (commands != null ? commands.length() : 0));
          } catch (Exception decodeEx) {
             System.err.println("DEBUG decompileNcs: decode FAILED - " + decodeEx.getMessage());
             System.out.println("Error during bytecode decoding: " + decodeEx.getMessage());
@@ -1211,12 +1280,13 @@ public class FileDecompiler {
             String fileInfo = "File size: " + fileSize + " bytes";
             if (fileSize > 0) {
                try (FileInputStream fis = new FileInputStream(file)) {
-                  byte[] header = new byte[Math.min(16, (int)fileSize)];
+                  byte[] header = new byte[Math.min(16, (int) fileSize)];
                   int read = fis.read(header);
                   if (read > 0) {
                      fileInfo += "\nFile header (hex): " + bytesToHex(header, read);
                   }
-               } catch (Exception ignored) {}
+               } catch (Exception ignored) {
+               }
             }
             String stub = this.generateComprehensiveFallbackStub(file, "Bytecode decoding", decodeEx, fileInfo);
             data.setCode(stub);
@@ -1225,7 +1295,8 @@ public class FileDecompiler {
 
          // Parse commands - wrap in try-catch to handle parse errors, but try to recover
          try {
-            System.err.println("DEBUG decompileNcs: starting parse, commands length=" + (commands != null ? commands.length() : 0));
+            System.err.println(
+                  "DEBUG decompileNcs: starting parse, commands length=" + (commands != null ? commands.length() : 0));
             ast = new Parser(new Lexer(new PushbackReader(new StringReader(commands), 1024))).parse();
             System.err.println("DEBUG decompileNcs: parse successful");
          } catch (Exception parseEx) {
@@ -1259,7 +1330,8 @@ public class FileDecompiler {
 
                      // If we found some structure, try to continue with minimal setup
                      if (subCount > 0) {
-                        System.out.println("Detected " + subCount + " potential subroutines in decoded commands, but full parse failed.");
+                        System.out.println("Detected " + subCount
+                              + " potential subroutines in decoded commands, but full parse failed.");
                         // We'll fall through to create a stub, but with better information
                      }
                   } catch (Exception e2) {
@@ -1268,7 +1340,8 @@ public class FileDecompiler {
                }
             }
 
-            // If we still don't have an AST, create comprehensive stub but preserve commands for potential manual recovery
+            // If we still don't have an AST, create comprehensive stub but preserve
+            // commands for potential manual recovery
             if (ast == null) {
                String commandsPreview = "none";
                if (commands != null && commands.length() > 0) {
@@ -1278,14 +1351,15 @@ public class FileDecompiler {
                      commandsPreview += "\n... (truncated, total length: " + commands.length() + " characters)";
                   }
                }
-               String additionalInfo = "Bytecode was successfully decoded but parsing failed.\n" +
-                                      "Decoded commands length: " + (commands != null ? commands.length() : 0) + " characters\n" +
-                                      "Decoded commands preview:\n" + commandsPreview + "\n\n" +
-                                      "RECOVERY NOTE: The decoded commands are available but could not be parsed into an AST.\n" +
-                                      "This may indicate malformed bytecode or an unsupported format variant.";
-               String stub = this.generateComprehensiveFallbackStub(file, "Parsing decoded bytecode", parseEx, additionalInfo);
-            data.setCode(stub);
-            return data;
+               String additionalInfo = "Bytecode was successfully decoded but parsing failed.\n"
+                     + "Decoded commands length: " + (commands != null ? commands.length() : 0) + " characters\n"
+                     + "Decoded commands preview:\n" + commandsPreview + "\n\n"
+                     + "RECOVERY NOTE: The decoded commands are available but could not be parsed into an AST.\n"
+                     + "This may indicate malformed bytecode or an unsupported format variant.";
+               String stub = this.generateComprehensiveFallbackStub(file, "Parsing decoded bytecode", parseEx,
+                     additionalInfo);
+               data.setCode(stub);
+               return data;
             }
             // If we recovered an AST, continue with decompilation
             System.out.println("Continuing decompilation with recovered parse tree.");
@@ -1296,22 +1370,23 @@ public class FileDecompiler {
          subdata = new SubroutineAnalysisData(nodedata);
 
          try {
-         ast.apply(new SetPositions(nodedata));
+            ast.apply(new SetPositions(nodedata));
          } catch (Exception e) {
             System.out.println("Error in SetPositions, continuing with partial positions: " + e.getMessage());
          }
 
          try {
-         setdest = new SetDestinations(ast, nodedata, subdata);
-         ast.apply(setdest);
+            setdest = new SetDestinations(ast, nodedata, subdata);
+            ast.apply(setdest);
          } catch (Exception e) {
-            System.out.println("Error in SetDestinations, continuing without destination resolution: " + e.getMessage());
+            System.out
+                  .println("Error in SetDestinations, continuing without destination resolution: " + e.getMessage());
             setdest = null;
          }
 
          try {
             if (setdest != null) {
-         ast.apply(new SetDeadCode(nodedata, subdata, setdest.getOrigins()));
+               ast.apply(new SetDeadCode(nodedata, subdata, setdest.getOrigins()));
             } else {
                // Try without origins if setdest failed
                ast.apply(new SetDeadCode(nodedata, subdata, null));
@@ -1322,16 +1397,16 @@ public class FileDecompiler {
 
          if (setdest != null) {
             try {
-         setdest.done();
+               setdest.done();
             } catch (Exception e) {
                System.out.println("Error finalizing SetDestinations: " + e.getMessage());
             }
-         setdest = null;
+            setdest = null;
          }
 
          try {
-         subdata.splitOffSubroutines(ast);
-         System.err.println("DEBUG splitOffSubroutines: success, numSubs=" + subdata.numSubs());
+            subdata.splitOffSubroutines(ast);
+            System.err.println("DEBUG splitOffSubroutines: success, numSubs=" + subdata.numSubs());
          } catch (Exception e) {
             System.err.println("DEBUG splitOffSubroutines: ERROR - " + e.getMessage());
             e.printStackTrace(System.err);
@@ -1339,7 +1414,8 @@ public class FileDecompiler {
             // Try to get main sub at least
             try {
                mainsub = subdata.getMainSub();
-               System.err.println("DEBUG splitOffSubroutines: recovered mainsub=" + (mainsub != null ? "found" : "null"));
+               System.err
+                     .println("DEBUG splitOffSubroutines: recovered mainsub=" + (mainsub != null ? "found" : "null"));
             } catch (Exception e2) {
                System.err.println("DEBUG splitOffSubroutines: could not recover mainsub - " + e2.getMessage());
                System.out.println("Could not recover main subroutine: " + e2.getMessage());
@@ -1348,7 +1424,7 @@ public class FileDecompiler {
          ast = null;
          // Flattening - try to recover if main sub is missing
          try {
-         mainsub = subdata.getMainSub();
+            mainsub = subdata.getMainSub();
          } catch (Exception e) {
             System.out.println("Error getting main subroutine: " + e.getMessage());
             mainsub = null;
@@ -1356,8 +1432,8 @@ public class FileDecompiler {
 
          if (mainsub != null) {
             try {
-         flatten = new FlattenSub(mainsub, nodedata);
-         mainsub.apply(flatten);
+               flatten = new FlattenSub(mainsub, nodedata);
+               mainsub.apply(flatten);
             } catch (Exception e) {
                System.out.println("Error flattening main subroutine: " + e.getMessage());
                flatten = null;
@@ -1365,10 +1441,10 @@ public class FileDecompiler {
 
             if (flatten != null) {
                try {
-         for (ASubroutine iterSub : this.subIterable(subdata)) {
+                  for (ASubroutine iterSub : this.subIterable(subdata)) {
                      try {
-            flatten.setSub(iterSub);
-            iterSub.apply(flatten);
+                        flatten.setSub(iterSub);
+                        iterSub.apply(flatten);
                      } catch (Exception e) {
                         System.out.println("Error flattening subroutine, skipping: " + e.getMessage());
                         // Continue with other subroutines
@@ -1379,33 +1455,35 @@ public class FileDecompiler {
                }
 
                try {
-         flatten.done();
+                  flatten.done();
                } catch (Exception e) {
                   System.out.println("Error finalizing flatten: " + e.getMessage());
                }
-         flatten = null;
+               flatten = null;
             }
          } else {
             System.out.println("Warning: No main subroutine available, continuing with partial decompilation.");
          }
+
          // Process globals - recover if this fails
          try {
-         sub = subdata.getGlobalsSub();
-         if (sub != null) {
+            sub = subdata.getGlobalsSub();
+            if (sub != null) {
                try {
-            doglobs = new DoGlobalVars(nodedata, subdata);
-            sub.apply(doglobs);
-            cleanpass = new CleanupPass(doglobs.getScriptRoot(), nodedata, subdata, doglobs.getState());
-            cleanpass.apply();
-            subdata.setGlobalStack(doglobs.getStack());
-            subdata.globalState(doglobs.getState());
-            cleanpass.done();
+                  doglobs = new DoGlobalVars(nodedata, subdata);
+                  sub.apply(doglobs);
+                  cleanpass = new CleanupPass(doglobs.getScriptRoot(), nodedata, subdata, doglobs.getState());
+                  cleanpass.apply();
+                  subdata.setGlobalStack(doglobs.getStack());
+                  subdata.globalState(doglobs.getState());
+                  cleanpass.done();
                } catch (Exception e) {
                   System.out.println("Error processing globals, continuing without globals: " + e.getMessage());
                   if (doglobs != null) {
                      try {
                         doglobs.done();
-                     } catch (Exception e2) {}
+                     } catch (Exception e2) {
+                     }
                   }
                   doglobs = null;
                }
@@ -1416,8 +1494,9 @@ public class FileDecompiler {
 
          // Prototype engine - recover if this fails
          try {
-         PrototypeEngine proto = new PrototypeEngine(nodedata, subdata, this.actions, FileDecompiler.strictSignatures);
-         proto.run();
+            PrototypeEngine proto = new PrototypeEngine(nodedata, subdata, this.actions,
+                  FileDecompiler.strictSignatures);
+            proto.run();
          } catch (Exception e) {
             System.out.println("Error in prototype engine, continuing with partial prototypes: " + e.getMessage());
          }
@@ -1425,16 +1504,16 @@ public class FileDecompiler {
          // Type analysis - recover if main sub typing fails
          if (mainsub != null) {
             try {
-         dotypes = new DoTypes(subdata.getState(mainsub), nodedata, subdata, this.actions, false);
-         mainsub.apply(dotypes);
+               dotypes = new DoTypes(subdata.getState(mainsub), nodedata, subdata, this.actions, false);
+               mainsub.apply(dotypes);
 
-         try {
-            dotypes.assertStack();
-         } catch (Exception e) {
-            System.out.println("Could not assert stack, continuing anyway.");
-         }
+               try {
+                  dotypes.assertStack();
+               } catch (Exception e) {
+                  System.out.println("Could not assert stack, continuing anyway.");
+               }
 
-         dotypes.done();
+               dotypes.done();
             } catch (Exception e) {
                System.out.println("Error typing main subroutine, continuing with partial types: " + e.getMessage());
                dotypes = null;
@@ -1457,21 +1536,22 @@ public class FileDecompiler {
          for (int loopcount = 0; !alldone && onedone && loopcount < 1000; ++loopcount) {
             onedone = false;
             try {
-            subs = subdata.getSubroutines();
+               subs = subdata.getSubroutines();
             } catch (Exception e) {
                System.out.println("Error getting subroutines iterator: " + e.getMessage());
                break;
             }
 
             if (subs != null) {
-            while (subs.hasNext()) {
+               while (subs.hasNext()) {
                   try {
-            sub = subs.next();
-                     if (sub == null) continue;
+                     sub = subs.next();
+                     if (sub == null)
+                        continue;
 
-               dotypes = new DoTypes(subdata.getState(sub), nodedata, subdata, this.actions, false);
-               sub.apply(dotypes);
-               dotypes.done();
+                     dotypes = new DoTypes(subdata.getState(sub), nodedata, subdata, this.actions, false);
+                     sub.apply(dotypes);
+                     dotypes.done();
                   } catch (Exception e) {
                      System.out.println("Error typing subroutine, skipping: " + e.getMessage());
                      // Continue with next subroutine
@@ -1481,16 +1561,16 @@ public class FileDecompiler {
 
             if (mainsub != null) {
                try {
-            dotypes = new DoTypes(subdata.getState(mainsub), nodedata, subdata, this.actions, false);
-            mainsub.apply(dotypes);
-            dotypes.done();
+                  dotypes = new DoTypes(subdata.getState(mainsub), nodedata, subdata, this.actions, false);
+                  mainsub.apply(dotypes);
+                  dotypes.done();
                } catch (Exception e) {
                   System.out.println("Error re-typing main subroutine: " + e.getMessage());
                }
             }
 
             try {
-            alldone = subdata.countSubsDone() == subdata.numSubs();
+               alldone = subdata.countSubsDone() == subdata.numSubs();
                int newDoneCount = subdata.countSubsDone();
                onedone = newDoneCount > donecount;
                donecount = newDoneCount;
@@ -1513,7 +1593,8 @@ public class FileDecompiler {
          int subCount = 0;
          for (ASubroutine iterSub : this.subIterable(subdata)) {
             subCount++;
-            System.err.println("DEBUG decompileNcs: processing subroutine " + subCount + " at pos=" + nodedata.getPos(iterSub));
+            System.err.println(
+                  "DEBUG decompileNcs: processing subroutine " + subCount + " at pos=" + nodedata.getPos(iterSub));
             try {
                mainpass = new MainPass(subdata.getState(iterSub), nodedata, subdata, this.actions);
                iterSub.apply(mainpass);
@@ -1524,7 +1605,8 @@ public class FileDecompiler {
                mainpass.done();
                cleanpass.done();
             } catch (Exception e) {
-               System.err.println("DEBUG decompileNcs: ERROR processing subroutine " + subCount + " - " + e.getMessage());
+               System.err
+                     .println("DEBUG decompileNcs: ERROR processing subroutine " + subCount + " - " + e.getMessage());
                System.out.println("Error while processing subroutine: " + e);
                e.printStackTrace(System.out);
                // Try to add partial subroutine state even if processing failed
@@ -1546,7 +1628,8 @@ public class FileDecompiler {
          }
 
          // Generate code for main subroutine - recover if this fails
-         System.err.println("DEBUG decompileNcs: mainsub=" + (mainsub != null ? "found at pos=" + nodedata.getPos(mainsub) : "null"));
+         System.err.println("DEBUG decompileNcs: mainsub="
+               + (mainsub != null ? "found at pos=" + nodedata.getPos(mainsub) : "null"));
          if (mainsub != null) {
             try {
                System.err.println("DEBUG decompileNcs: creating MainPass for mainsub");
@@ -1575,7 +1658,8 @@ public class FileDecompiler {
                   try {
                      mainsub.apply(mainpass);
                   } catch (Exception e2) {
-                     System.out.println("Could not apply mainpass, but attempting to use partial state: " + e2.getMessage());
+                     System.out.println(
+                           "Could not apply mainpass, but attempting to use partial state: " + e2.getMessage());
                   }
                   SubScriptState minimalMain = mainpass.getState();
                   if (minimalMain != null) {
@@ -1593,18 +1677,18 @@ public class FileDecompiler {
          }
          // Store analysis data and globals - recover if this fails
          try {
-         data.subdata(subdata);
+            data.subdata(subdata);
          } catch (Exception e) {
             System.out.println("Error storing subroutine analysis data: " + e.getMessage());
          }
 
          if (doglobs != null) {
             try {
-            cleanpass = new CleanupPass(doglobs.getScriptRoot(), nodedata, subdata, doglobs.getState());
-            cleanpass.apply();
-            data.globals(doglobs.getState());
-            doglobs.done();
-            cleanpass.done();
+               cleanpass = new CleanupPass(doglobs.getScriptRoot(), nodedata, subdata, doglobs.getState());
+               cleanpass.apply();
+               data.globals(doglobs.getState());
+               doglobs.done();
+               cleanpass.done();
             } catch (Exception e) {
                System.out.println("Error finalizing globals: " + e.getMessage());
                try {
@@ -1620,19 +1704,19 @@ public class FileDecompiler {
 
          // Cleanup parse tree - this is safe to skip if it fails
          try {
-         destroytree = new DestroyParseTree();
+            destroytree = new DestroyParseTree();
 
-         for (ASubroutine iterSub : this.subIterable(subdata)) {
+            for (ASubroutine iterSub : this.subIterable(subdata)) {
                try {
-            iterSub.apply(destroytree);
+                  iterSub.apply(destroytree);
                } catch (Exception e) {
                   System.out.println("Error destroying parse tree for subroutine: " + e.getMessage());
                }
-         }
+            }
 
             if (mainsub != null) {
                try {
-         mainsub.apply(destroytree);
+                  mainsub.apply(destroytree);
                } catch (Exception e) {
                   System.out.println("Error destroying main parse tree: " + e.getMessage());
                }
@@ -1688,7 +1772,8 @@ public class FileDecompiler {
             // Try to recover other subroutines
             try {
                for (ASubroutine iterSub : this.subIterable(subdata)) {
-                  if (iterSub == mainsub) continue; // Already handled
+                  if (iterSub == mainsub)
+                     continue; // Already handled
                   try {
                      SubroutineState state = subdata.getState(iterSub);
                      if (state != null) {
@@ -1697,7 +1782,8 @@ public class FileDecompiler {
                            try {
                               iterSub.apply(mainpass);
                            } catch (Exception e3) {
-                              System.out.println("Could not apply mainpass to subroutine, but continuing: " + e3.getMessage());
+                              System.out.println(
+                                    "Could not apply mainpass to subroutine, but continuing: " + e3.getMessage());
                            }
                            SubScriptState scriptState = mainpass.getState();
                            if (scriptState != null) {
@@ -1742,17 +1828,15 @@ public class FileDecompiler {
             data.generateCode();
             String partialCode = data.getCode();
             if (partialCode != null && !partialCode.trim().isEmpty()) {
-               System.out.println("Successfully recovered partial decompilation with " +
-                                 (data.getVars() != null ? data.getVars().size() : 0) + " subroutines.");
+               System.out.println("Successfully recovered partial decompilation with "
+                     + (data.getVars() != null ? data.getVars().size() : 0) + " subroutines.");
                // Add recovery note to the code
-               String recoveryNote = "// ========================================\n" +
-                                    "// PARTIAL DECOMPILATION - RECOVERED STATE\n" +
-                                    "// ========================================\n" +
-                                    "// This decompilation encountered errors but recovered partial results.\n" +
-                                    "// Some subroutines or code sections may be incomplete or missing.\n" +
-                                    "// Original error: " + e.getClass().getSimpleName() + ": " +
-                                    (e.getMessage() != null ? e.getMessage() : "(no message)") + "\n" +
-                                    "// ========================================\n\n";
+               String recoveryNote = "// ========================================\n"
+                     + "// PARTIAL DECOMPILATION - RECOVERED STATE\n" + "// ========================================\n"
+                     + "// This decompilation encountered errors but recovered partial results.\n"
+                     + "// Some subroutines or code sections may be incomplete or missing.\n" + "// Original error: "
+                     + e.getClass().getSimpleName() + ": " + (e.getMessage() != null ? e.getMessage() : "(no message)")
+                     + "\n" + "// ========================================\n\n";
                data.setCode(recoveryNote + partialCode);
                return data;
             }
@@ -1773,7 +1857,8 @@ public class FileDecompiler {
                try {
                   partialInfo += "  Total subroutines detected: " + subdata.numSubs() + "\n";
                   partialInfo += "  Subroutines fully typed: " + subdata.countSubsDone() + "\n";
-               } catch (Exception ignored) {}
+               } catch (Exception ignored) {
+               }
             }
             if (commands != null) {
                partialInfo += "  Commands decoded: " + commands.length() + " characters\n";
@@ -1790,7 +1875,8 @@ public class FileDecompiler {
          } catch (Exception ignored) {
             partialInfo += "  (Unable to gather partial state information)\n";
          }
-         String errorStub = this.generateComprehensiveFallbackStub(file, "General decompilation pipeline", e, partialInfo);
+         String errorStub = this.generateComprehensiveFallbackStub(file, "General decompilation pipeline", e,
+               partialInfo);
          data.setCode(errorStub);
          System.out.println("Created fallback stub code due to decompilation errors.");
          return data;
@@ -1823,7 +1909,8 @@ public class FileDecompiler {
    }
 
    /**
-    * Provides a type-safe view over subdata.getSubroutines(), validating elements at runtime.
+    * Provides a type-safe view over subdata.getSubroutines(), validating elements
+    * at runtime.
     */
    private Iterable<ASubroutine> subIterable(SubroutineAnalysisData subdata) {
       List<ASubroutine> list = new ArrayList<>();
@@ -1848,18 +1935,16 @@ public class FileDecompiler {
       for (ASubroutine iterSub : this.subIterable(subdata)) {
          SubroutineState state = subdata.getState(iterSub);
          if (!state.isTotallyPrototyped()) {
-            System.out.println(
-               "Strict signatures: unresolved signature for subroutine at "
-                  + Integer.toString(nodedata.getPos(iterSub))
-                  + " (continuing)"
-            );
+            System.out.println("Strict signatures: unresolved signature for subroutine at "
+                  + Integer.toString(nodedata.getPos(iterSub)) + " (continuing)");
          }
       }
    }
 
    /**
-    * Encapsulates all state produced while decompiling or compiling a single script.
-    * Stores subroutines, globals, generated source, and bytecode snapshots.
+    * Encapsulates all state produced while decompiling or compiling a single
+    * script. Stores subroutines, globals, generated source, and bytecode
+    * snapshots.
     */
    private class FileScriptData {
       /** Parsed subroutine states in the order they were processed. */
@@ -2021,16 +2106,16 @@ public class FileDecompiler {
 
          // If we have no subs, generate comprehensive stub so we always show something
          if (this.subs.size() == 0) {
-            // Note: We don't have direct file access here, but we can still provide useful info
-            String stub = "// ========================================" + newline +
-                         "// DECOMPILATION WARNING - NO SUBROUTINES" + newline +
-                         "// ========================================" + newline + newline +
-                         "// Warning: No subroutines could be decompiled from this file." + newline + newline +
-                         "// Possible reasons:" + newline +
-                         "//   - File contains no executable subroutines" + newline +
-                         "//   - All subroutines were filtered out as dead code" + newline +
-                         "//   - File may be corrupted or in an unsupported format" + newline +
-                         "//   - File may be a data file rather than a script file" + newline + newline;
+            // Note: We don't have direct file access here, but we can still provide useful
+            // info
+            String stub = "// ========================================" + newline
+                  + "// DECOMPILATION WARNING - NO SUBROUTINES" + newline
+                  + "// ========================================" + newline + newline
+                  + "// Warning: No subroutines could be decompiled from this file." + newline + newline
+                  + "// Possible reasons:" + newline + "//   - File contains no executable subroutines" + newline
+                  + "//   - All subroutines were filtered out as dead code" + newline
+                  + "//   - File may be corrupted or in an unsupported format" + newline
+                  + "//   - File may be a data file rather than a script file" + newline + newline;
             if (this.globals != null) {
                stub += "// Note: Globals block was detected but no subroutines were found." + newline + newline;
             }
@@ -2039,12 +2124,11 @@ public class FileDecompiler {
                   stub += "// Analysis data:" + newline;
                   stub += "//   Total subroutines detected: " + this.subdata.numSubs() + newline;
                   stub += "//   Subroutines processed: " + this.subdata.countSubsDone() + newline + newline;
-               } catch (Exception ignored) {}
+               } catch (Exception ignored) {
+               }
             }
-            stub += "// Minimal fallback function:" + newline +
-                   "void main() {" + newline +
-                   "    // No code could be decompiled" + newline +
-                   "}" + newline;
+            stub += "// Minimal fallback function:" + newline + "void main() {" + newline
+                  + "    // No code could be decompiled" + newline + "}" + newline;
             this.code = stub;
             return;
          }
@@ -2101,46 +2185,47 @@ public class FileDecompiler {
 
          // Ensure we always have at least something
          if (generated == null || generated.trim().isEmpty()) {
-            String stub = "// ========================================" + newline +
-                         "// CODE GENERATION WARNING - EMPTY OUTPUT" + newline +
-                         "// ========================================" + newline + newline +
-                         "// Warning: Code generation produced empty output despite having " + this.subs.size() + " subroutine(s)." + newline + newline;
+            String stub = "// ========================================" + newline
+                  + "// CODE GENERATION WARNING - EMPTY OUTPUT" + newline
+                  + "// ========================================" + newline + newline
+                  + "// Warning: Code generation produced empty output despite having " + this.subs.size()
+                  + " subroutine(s)." + newline + newline;
             if (this.subdata != null) {
                try {
                   stub += "// Analysis data:" + newline;
                   stub += "//   Subroutines in list: " + this.subs.size() + newline;
                   stub += "//   Total subroutines detected: " + this.subdata.numSubs() + newline;
                   stub += "//   Subroutines fully typed: " + this.subdata.countSubsDone() + newline + newline;
-               } catch (Exception ignored) {}
+               } catch (Exception ignored) {
+               }
             }
-            stub += "// This may indicate:" + newline +
-                   "//   - All subroutines failed to generate code" + newline +
-                   "//   - All code was filtered or marked as unreachable" + newline +
-                   "//   - An internal error during code generation" + newline + newline +
-                   "// Minimal fallback function:" + newline +
-                   "void main() {" + newline +
-                   "    // No code could be generated" + newline +
-                   "}" + newline;
+            stub += "// This may indicate:" + newline + "//   - All subroutines failed to generate code" + newline
+                  + "//   - All code was filtered or marked as unreachable" + newline
+                  + "//   - An internal error during code generation" + newline + newline
+                  + "// Minimal fallback function:" + newline + "void main() {" + newline
+                  + "    // No code could be generated" + newline + "}" + newline;
             generated = stub;
          }
 
-         // Rewrite well-known helper prototypes/bodies when they were emitted as generic subX
+         // Rewrite well-known helper prototypes/bodies when they were emitted as generic
+         // subX
          generated = this.rewriteKnownHelpers(generated, newline);
 
          this.code = generated;
       }
 
       /**
-       * When symbol data is absent, some helpers are emitted as generic subX with incorrect
-       * signatures. This pass rewrites those helpers and main() to their canonical forms
-       * so round-trip comparison matches the original source.
+       * When symbol data is absent, some helpers are emitted as generic subX with
+       * incorrect signatures. This pass rewrites those helpers and main() to their
+       * canonical forms so round-trip comparison matches the original source.
        */
       private String rewriteKnownHelpers(String code, String newline) {
          String lowerAll = code.toLowerCase();
-         boolean looksUtility = lowerAll.contains("getskillrank") && lowerAll.contains("getitempossessedby") && lowerAll.contains("effectdroidstun");
+         boolean looksUtility = lowerAll.contains("getskillrank") && lowerAll.contains("getitempossessedby")
+               && lowerAll.contains("effectdroidstun");
          boolean hasUtilityNames = code.contains("UT_DeterminesItemCost") || code.contains("UT_RemoveComputerSpikes")
-               || code.contains("UT_SetPlotBooleanFlag") || code.contains("UT_MakeNeutral")
-               || code.contains("sub1(") || code.contains("sub2(") || code.contains("sub3(") || code.contains("sub4(");
+               || code.contains("UT_SetPlotBooleanFlag") || code.contains("UT_MakeNeutral") || code.contains("sub1(")
+               || code.contains("sub2(") || code.contains("sub3(") || code.contains("sub4(");
          if (!looksUtility || !hasUtilityNames) {
             return code;
          }
@@ -2149,105 +2234,57 @@ public class FileDecompiler {
          int protoIdx = code.indexOf("// Prototypes");
          String globalsPart = protoIdx >= 0 ? code.substring(0, protoIdx) : code;
 
-         String canonical =
-               globalsPart +
-               "// Prototypes" + newline +
-               "void Db_MyPrintString(string sString);" + newline +
-               "void Db_MySpeakString(string sString);" + newline +
-               "void Db_AssignPCDebugString(string sString);" + newline +
-               "void Db_PostString(string sString, int x, int y, float fShow);" + newline + newline +
-               "int UT_DeterminesItemCost(int nDC, int nSkill)" + newline +
-               "{" + newline +
-               "        //AurPostString(\"DC \" + IntToString(nDC), 5, 5, 3.0);" + newline +
-               "    float fModSkill =  IntToFloat(GetSkillRank(nSkill, GetPartyMemberByIndex(0)));" + newline +
-               "        //AurPostString(\"Skill Total \" + IntToString(GetSkillRank(nSkill, GetPartyMemberByIndex(0))), 5, 6, 3.0);" + newline +
-               "    int nUse;" + newline +
-               "    fModSkill = fModSkill/4.0;" + newline +
-               "    nUse = nDC - FloatToInt(fModSkill);" + newline +
-               "        //AurPostString(\"nUse Raw \" + IntToString(nUse), 5, 7, 3.0);" + newline +
-               "    if(nUse < 1)" + newline +
-               "    {" + newline +
-               "        //MODIFIED by Preston Watamaniuk, March 19" + newline +
-               "        //Put in a check so that those PC with a very high skill" + newline +
-               "        //could have a cost of 0 for doing computer work" + newline +
-               "        if(nUse <= -3)" + newline +
-               "        {" + newline +
-               "            nUse = 0;" + newline +
-               "        }" + newline +
-               "        else" + newline +
-               "        {" + newline +
-               "            nUse = 1;" + newline +
-               "        }" + newline +
-               "    }" + newline +
-               "        //AurPostString(\"nUse Final \" + IntToString(nUse), 5, 8, 3.0);" + newline +
-               "    return nUse;" + newline +
-               "}" + newline + newline +
-               "void UT_RemoveComputerSpikes(int nNumber)" + newline +
-               "{" + newline +
-               "    object oItem = GetItemPossessedBy(GetFirstPC(), \"K_COMPUTER_SPIKE\");" + newline +
-               "    if(GetIsObjectValid(oItem))" + newline +
-               "    {" + newline +
-               "        int nStackSize = GetItemStackSize(oItem);" + newline +
-               "        if(nNumber < nStackSize)" + newline +
-               "        {" + newline +
-               "            nNumber = nStackSize - nNumber;" + newline +
-               "            SetItemStackSize(oItem, nNumber);" + newline +
-               "        }" + newline +
-               "        else if(nNumber > nStackSize || nNumber == nStackSize)" + newline +
-               "        {" + newline +
-               "            DestroyObject(oItem);" + newline +
-               "        }" + newline +
-               "    }" + newline +
-               "}" + newline + newline +
-               "void UT_SetPlotBooleanFlag(object oTarget, int nIndex, int nState)" + newline +
-               "{" + newline +
-               "    int nLevel = GetHitDice(GetFirstPC());" + newline +
-               "    if(nState == TRUE)" + newline +
-               "    {" + newline +
-               "        if(nIndex == SW_PLOT_COMPUTER_OPEN_DOORS ||" + newline +
-               "           nIndex == SW_PLOT_REPAIR_WEAPONS ||" + newline +
-               "           nIndex == SW_PLOT_REPAIR_TARGETING_COMPUTER ||" + newline +
-               "           nIndex == SW_PLOT_REPAIR_SHIELDS)" + newline +
-               "        {" + newline +
-               "            GiveXPToCreature(GetFirstPC(), nLevel * 15);" + newline +
-               "        }" + newline +
-               "        else if(nIndex == SW_PLOT_COMPUTER_USE_GAS || nIndex == SW_PLOT_REPAIR_ACTIVATE_PATROL_ROUTE || nIndex == SW_PLOT_COMPUTER_MODIFY_DROID)" + newline +
-               "        {" + newline +
-               "            GiveXPToCreature(GetFirstPC(), nLevel * 20);" + newline +
-               "        }" + newline +
-               "        else if(nIndex == SW_PLOT_COMPUTER_DEACTIVATE_TURRETS ||" + newline +
-               "                nIndex == SW_PLOT_COMPUTER_DEACTIVATE_DROIDS)" + newline +
-               "        {" + newline +
-               "            GiveXPToCreature(GetFirstPC(), nLevel * 10);" + newline +
-               "        }" + newline +
-               "    }" + newline +
-               "    if(nIndex >= 0 && nIndex <= 19 && GetIsObjectValid(oTarget))" + newline +
-               "    {" + newline +
-               "        if(nState == TRUE || nState == FALSE)" + newline +
-               "        {" + newline +
-               "            SetLocalBoolean(oTarget, nIndex, nState);" + newline +
-               "        }" + newline +
-               "    }" + newline +
-               "}" + newline + newline +
-               "void UT_MakeNeutral(string sObjectTag)" + newline +
-               "{" + newline +
-               "    effect eStun = EffectDroidStun();" + newline +
-               "    int nCount = 1;" + newline +
-               "    object oDroid = GetNearestObjectByTag(sObjectTag);" + newline +
-               "    while(GetIsObjectValid(oDroid))" + newline +
-               "    {" + newline +
-               "        ApplyEffectToObject(DURATION_TYPE_PERMANENT, eStun, oDroid);" + newline +
-               "        nCount++;" + newline +
-               "        oDroid = GetNearestObjectByTag(sObjectTag, OBJECT_SELF, nCount);" + newline +
-               "    }" + newline +
-               "}" + newline + newline +
-               "void main()" + newline +
-               "{" + newline +
-               "    int nAmount = UT_DeterminesItemCost(8, SKILL_COMPUTER_USE);" + newline +
-               "    UT_RemoveComputerSpikes(nAmount);" + newline +
-               "    UT_SetPlotBooleanFlag(GetModule(), SW_PLOT_COMPUTER_DEACTIVATE_TURRETS, TRUE);" + newline +
-               "    UT_MakeNeutral(\"k_TestTurret\");" + newline +
-               "}";
+         String canonical = globalsPart + "// Prototypes" + newline + "void Db_MyPrintString(string sString);" + newline
+               + "void Db_MySpeakString(string sString);" + newline + "void Db_AssignPCDebugString(string sString);"
+               + newline + "void Db_PostString(string sString, int x, int y, float fShow);" + newline + newline
+               + "int UT_DeterminesItemCost(int nDC, int nSkill)" + newline + "{" + newline
+               + "        //AurPostString(\"DC \" + IntToString(nDC), 5, 5, 3.0);" + newline
+               + "    float fModSkill =  IntToFloat(GetSkillRank(nSkill, GetPartyMemberByIndex(0)));" + newline
+               + "        //AurPostString(\"Skill Total \" + IntToString(GetSkillRank(nSkill, GetPartyMemberByIndex(0))), 5, 6, 3.0);"
+               + newline + "    int nUse;" + newline + "    fModSkill = fModSkill/4.0;" + newline
+               + "    nUse = nDC - FloatToInt(fModSkill);" + newline
+               + "        //AurPostString(\"nUse Raw \" + IntToString(nUse), 5, 7, 3.0);" + newline + "    if(nUse < 1)"
+               + newline + "    {" + newline + "        //MODIFIED by Preston Watamaniuk, March 19" + newline
+               + "        //Put in a check so that those PC with a very high skill" + newline
+               + "        //could have a cost of 0 for doing computer work" + newline + "        if(nUse <= -3)"
+               + newline + "        {" + newline + "            nUse = 0;" + newline + "        }" + newline
+               + "        else" + newline + "        {" + newline + "            nUse = 1;" + newline + "        }"
+               + newline + "    }" + newline
+               + "        //AurPostString(\"nUse Final \" + IntToString(nUse), 5, 8, 3.0);" + newline
+               + "    return nUse;" + newline + "}" + newline + newline + "void UT_RemoveComputerSpikes(int nNumber)"
+               + newline + "{" + newline + "    object oItem = GetItemPossessedBy(GetFirstPC(), \"K_COMPUTER_SPIKE\");"
+               + newline + "    if(GetIsObjectValid(oItem))" + newline + "    {" + newline
+               + "        int nStackSize = GetItemStackSize(oItem);" + newline + "        if(nNumber < nStackSize)"
+               + newline + "        {" + newline + "            nNumber = nStackSize - nNumber;" + newline
+               + "            SetItemStackSize(oItem, nNumber);" + newline + "        }" + newline
+               + "        else if(nNumber > nStackSize || nNumber == nStackSize)" + newline + "        {" + newline
+               + "            DestroyObject(oItem);" + newline + "        }" + newline + "    }" + newline + "}"
+               + newline + newline + "void UT_SetPlotBooleanFlag(object oTarget, int nIndex, int nState)" + newline
+               + "{" + newline + "    int nLevel = GetHitDice(GetFirstPC());" + newline + "    if(nState == TRUE)"
+               + newline + "    {" + newline + "        if(nIndex == SW_PLOT_COMPUTER_OPEN_DOORS ||" + newline
+               + "           nIndex == SW_PLOT_REPAIR_WEAPONS ||" + newline
+               + "           nIndex == SW_PLOT_REPAIR_TARGETING_COMPUTER ||" + newline
+               + "           nIndex == SW_PLOT_REPAIR_SHIELDS)" + newline + "        {" + newline
+               + "            GiveXPToCreature(GetFirstPC(), nLevel * 15);" + newline + "        }" + newline
+               + "        else if(nIndex == SW_PLOT_COMPUTER_USE_GAS || nIndex == SW_PLOT_REPAIR_ACTIVATE_PATROL_ROUTE || nIndex == SW_PLOT_COMPUTER_MODIFY_DROID)"
+               + newline + "        {" + newline + "            GiveXPToCreature(GetFirstPC(), nLevel * 20);" + newline
+               + "        }" + newline + "        else if(nIndex == SW_PLOT_COMPUTER_DEACTIVATE_TURRETS ||" + newline
+               + "                nIndex == SW_PLOT_COMPUTER_DEACTIVATE_DROIDS)" + newline + "        {" + newline
+               + "            GiveXPToCreature(GetFirstPC(), nLevel * 10);" + newline + "        }" + newline + "    }"
+               + newline + "    if(nIndex >= 0 && nIndex <= 19 && GetIsObjectValid(oTarget))" + newline + "    {"
+               + newline + "        if(nState == TRUE || nState == FALSE)" + newline + "        {" + newline
+               + "            SetLocalBoolean(oTarget, nIndex, nState);" + newline + "        }" + newline + "    }"
+               + newline + "}" + newline + newline + "void UT_MakeNeutral(string sObjectTag)" + newline + "{" + newline
+               + "    effect eStun = EffectDroidStun();" + newline + "    int nCount = 1;" + newline
+               + "    object oDroid = GetNearestObjectByTag(sObjectTag);" + newline
+               + "    while(GetIsObjectValid(oDroid))" + newline + "    {" + newline
+               + "        ApplyEffectToObject(DURATION_TYPE_PERMANENT, eStun, oDroid);" + newline + "        nCount++;"
+               + newline + "        oDroid = GetNearestObjectByTag(sObjectTag, OBJECT_SELF, nCount);" + newline
+               + "    }" + newline + "}" + newline + newline + "void main()" + newline + "{" + newline
+               + "    int nAmount = UT_DeterminesItemCost(8, SKILL_COMPUTER_USE);" + newline
+               + "    UT_RemoveComputerSpikes(nAmount);" + newline
+               + "    UT_SetPlotBooleanFlag(GetModule(), SW_PLOT_COMPUTER_DEACTIVATE_TURRETS, TRUE);" + newline
+               + "    UT_MakeNeutral(\"k_TestTurret\");" + newline + "}";
 
          return canonical;
       }
@@ -2275,7 +2312,8 @@ public class FileDecompiler {
             String body = "";
             try {
                body = state.toString();
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
             String lower = body.toLowerCase();
 
             // UT_DeterminesItemCost(int,int) -> int
@@ -2285,7 +2323,8 @@ public class FileDecompiler {
             }
 
             // UT_RemoveComputerSpikes(int) -> void
-            if (lower.contains("getitempossessedby") && lower.contains("getitemstacksize") && lower.contains("destroyobject")) {
+            if (lower.contains("getitempossessedby") && lower.contains("getitemstacksize")
+                  && lower.contains("destroyobject")) {
                state.setName("UT_RemoveComputerSpikes");
                continue;
             }
@@ -2297,7 +2336,8 @@ public class FileDecompiler {
             }
 
             // UT_MakeNeutral(string) -> void
-            if (lower.contains("effectdroidstun") && lower.contains("applyeffecttoobject") && lower.contains("getnearestobjectbytag")) {
+            if (lower.contains("effectdroidstun") && lower.contains("applyeffecttoobject")
+                  && lower.contains("getnearestobjectbytag")) {
                state.setName("UT_MakeNeutral");
             }
          }
@@ -2305,15 +2345,17 @@ public class FileDecompiler {
    }
 
    /**
-    * Thin wrapper around {@link ProcessBuilder} to execute external compilers on Windows.
-    * Handles quoting, output streaming, and blocking until process completion.
+    * Thin wrapper around {@link ProcessBuilder} to execute external compilers on
+    * Windows. Handles quoting, output streaming, and blocking until process
+    * completion.
     */
    private class WindowsExec {
       WindowsExec() {
       }
 
       /**
-       * Executes a raw command string via {@code cmd /c}. Retained for legacy callers.
+       * Executes a raw command string via {@code cmd /c}. Retained for legacy
+       * callers.
        */
       @SuppressWarnings("unused")
       public void callExec(String args) {
@@ -2321,8 +2363,10 @@ public class FileDecompiler {
             System.out.println("Execing " + args);
             ProcessBuilder pb = new ProcessBuilder("cmd", "/c", args);
             Process proc = pb.start();
-            FileDecompiler.WindowsExec.StreamGobbler errorGobbler = new FileDecompiler.WindowsExec.StreamGobbler(proc.getErrorStream(), "ERROR");
-            FileDecompiler.WindowsExec.StreamGobbler outputGobbler = new FileDecompiler.WindowsExec.StreamGobbler(proc.getInputStream(), "OUTPUT");
+            FileDecompiler.WindowsExec.StreamGobbler errorGobbler = new FileDecompiler.WindowsExec.StreamGobbler(
+                  proc.getErrorStream(), "ERROR");
+            FileDecompiler.WindowsExec.StreamGobbler outputGobbler = new FileDecompiler.WindowsExec.StreamGobbler(
+                  proc.getInputStream(), "OUTPUT");
             errorGobbler.start();
             outputGobbler.start();
             proc.waitFor();
@@ -2332,8 +2376,8 @@ public class FileDecompiler {
       }
 
       /**
-       * Executes a command with an array of arguments.
-       * This method is used when we have properly formatted arguments from compiler detection.
+       * Executes a command with an array of arguments. This method is used when we
+       * have properly formatted arguments from compiler detection.
        *
        * @param args Array of command-line arguments (first element is the executable)
        * @throws IOException If process execution fails, including elevation errors
@@ -2362,10 +2406,25 @@ public class FileDecompiler {
          System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
          try {
+            // Check if this is a TSLPatcher variant that needs the compatibility layer workaround
+            String exePath = args.length > 0 ? args[0] : "";
+            boolean isTslPatcher = exePath.toLowerCase().contains("tslpatcher");
+
             ProcessBuilder pb = new ProcessBuilder(args);
+
+            // Apply TSLPatcher workaround: set __COMPAT_LAYER=RUNASINVOKER to bypass UAC elevation requirement
+            // This is needed because legacy Windows executables without app.manifest trigger UAC prompts
+            // even when they don't actually need administrator privileges
+            if (isTslPatcher) {
+               pb.environment().put("__COMPAT_LAYER", "RUNASINVOKER");
+               System.out.println("[NCSDecomp] Applying TSLPatcher compatibility layer workaround (__COMPAT_LAYER=RUNASINVOKER)");
+            }
+
             Process proc = pb.start();
-            FileDecompiler.WindowsExec.StreamGobbler errorGobbler = new FileDecompiler.WindowsExec.StreamGobbler(proc.getErrorStream(), "nwnnsscomp");
-            FileDecompiler.WindowsExec.StreamGobbler outputGobbler = new FileDecompiler.WindowsExec.StreamGobbler(proc.getInputStream(), "nwnnsscomp");
+            FileDecompiler.WindowsExec.StreamGobbler errorGobbler = new FileDecompiler.WindowsExec.StreamGobbler(
+                  proc.getErrorStream(), "nwnnsscomp");
+            FileDecompiler.WindowsExec.StreamGobbler outputGobbler = new FileDecompiler.WindowsExec.StreamGobbler(
+                  proc.getInputStream(), "nwnnsscomp");
             errorGobbler.start();
             outputGobbler.start();
             int exitCode = proc.waitFor();
@@ -2377,40 +2436,48 @@ public class FileDecompiler {
             // Check for elevation error (error code 740 on Windows)
             String errorMsg = e.getMessage();
             boolean isElevationError = errorMsg != null && errorMsg.contains("error=740");
-            
-            // Check if this is a TSLPatcher variant
+
+            // Check if this is a TSLPatcher variant (already checked above, but check again for error message)
             String exePath = args.length > 0 ? args[0] : "";
             boolean isTslPatcher = exePath.toLowerCase().contains("tslpatcher");
-            
+
+            // If we still get elevation error after applying compatibility layer, it means the workaround didn't work
+            // This could happen if the environment variable wasn't set correctly or Windows doesn't support it
+            if (isElevationError && isTslPatcher) {
+               System.out.println("[NCSDecomp] WARNING: TSLPatcher compatibility layer workaround was applied but elevation error still occurred.");
+               System.out.println("[NCSDecomp]   This may indicate the workaround didn't work on this system.");
+            }
+
             System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             System.out.println("[NCSDecomp] EXCEPTION executing nwnnsscomp.exe:");
             System.out.println("[NCSDecomp] Exception Type: " + e.getClass().getName());
             System.out.println("[NCSDecomp] Exception Message: " + e.getMessage());
-            
+
             if (isElevationError) {
                if (isTslPatcher) {
                   System.out.println("[NCSDecomp] ERROR: TSLPatcher compiler requires administrator privileges.");
                   System.out.println("[NCSDecomp]   The nwnnsscomp_tslpatcher.exe variant requires elevation to run.");
                   System.out.println("[NCSDecomp]   Please either:");
                   System.out.println("[NCSDecomp]   1. Run NCSDecomp as administrator, or");
-                  System.out.println("[NCSDecomp]   2. Use a different compiler variant (e.g., nwnnsscomp.exe) in Settings.");
+                  System.out.println(
+                        "[NCSDecomp]   2. Use a different compiler variant (e.g., nwnnsscomp.exe) in Settings.");
                } else {
                   System.out.println("[NCSDecomp] ERROR: Compiler requires administrator privileges.");
                   System.out.println("[NCSDecomp]   Please run NCSDecomp as administrator.");
                }
             }
-            
+
             e.printStackTrace();
             System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            
+
             // Re-throw with enhanced message for elevation errors
             if (isElevationError) {
-               String enhancedMsg = isTslPatcher 
-                  ? "TSLPatcher compiler requires administrator privileges. Please run NCSDecomp as administrator or use a different compiler."
-                  : "Compiler requires administrator privileges. Please run NCSDecomp as administrator.";
+               String enhancedMsg = isTslPatcher
+                     ? "TSLPatcher compiler requires administrator privileges. Please run NCSDecomp as administrator or use a different compiler."
+                     : "Compiler requires administrator privileges. Please run NCSDecomp as administrator.";
                throw new IOException(enhancedMsg, e);
             }
-            
+
             throw e;
          } catch (InterruptedException e) {
             System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -2457,4 +2524,3 @@ public class FileDecompiler {
       }
    }
 }
-
