@@ -62,6 +62,10 @@ import javax.swing.JTextArea;
 import javax.swing.JTextPane;
 import javax.swing.JTree;
 import javax.swing.text.JTextComponent;
+import javax.swing.undo.UndoManager;
+import javax.swing.event.UndoableEditEvent;
+import javax.swing.event.UndoableEditListener;
+import javax.swing.AbstractAction;
 import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import javax.swing.border.EmptyBorder;
@@ -1176,6 +1180,69 @@ public class Decompiler
       textPane.setFont(new Font("Monospaced", Font.PLAIN, 12));
       textPane.setEditable(true);
 
+      // Add undo/redo support
+      UndoManager undoManager = new UndoManager();
+      textPane.getDocument().addUndoableEditListener(new UndoableEditListener() {
+         @Override
+         public void undoableEditHappened(UndoableEditEvent e) {
+            undoManager.addEdit(e.getEdit());
+         }
+      });
+      textPane.putClientProperty("undoManager", undoManager);
+
+      // Add undo/redo keyboard shortcuts
+      textPane.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK), "undo");
+      textPane.getActionMap().put("undo", new AbstractAction("undo") {
+         @Override
+         public void actionPerformed(ActionEvent e) {
+            if (undoManager.canUndo()) {
+               undoManager.undo();
+            }
+         }
+      });
+      textPane.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Y, InputEvent.CTRL_DOWN_MASK), "redo");
+      textPane.getActionMap().put("redo", new AbstractAction("redo") {
+         @Override
+         public void actionPerformed(ActionEvent e) {
+            if (undoManager.canRedo()) {
+               undoManager.redo();
+            }
+         }
+      });
+      // Also support Ctrl+Shift+Z for redo (common alternative)
+      textPane.getInputMap().put(KeyStroke.getKeyStroke(KeyEvent.VK_Z, InputEvent.CTRL_DOWN_MASK | InputEvent.SHIFT_DOWN_MASK), "redo");
+
+      // Add document listener to mark files as dirty when text changes
+      textPane.getDocument().addDocumentListener(new DocumentListener() {
+         @Override
+         public void insertUpdate(DocumentEvent e) {
+            markFileAsDirty();
+         }
+
+         @Override
+         public void removeUpdate(DocumentEvent e) {
+            markFileAsDirty();
+         }
+
+         @Override
+         public void changedUpdate(DocumentEvent e) {
+            markFileAsDirty();
+         }
+
+         private void markFileAsDirty() {
+            JComponent tabComponent = Decompiler.this.getSelectedTabComponent();
+            if (tabComponent != null) {
+               File file = Decompiler.this.hash_TabComponent2File.get(tabComponent);
+               if (file != null && !Decompiler.unsavedFiles.contains(file)) {
+                  Decompiler.unsavedFiles.add(file);
+                  if (tabComponent instanceof JPanel) {
+                     Decompiler.this.updateTabLabel((JPanel)tabComponent, true);
+                  }
+               }
+            }
+         }
+      });
+
       // Syntax highlighting, caret/keyboard event hooks, drag and drop, etc.
       textPane.addCaretListener(this);
       textPane.addKeyListener(this);
@@ -1847,6 +1914,7 @@ public class Decompiler
                this.status.append("success\n");
                break;
             case 2:
+               // Refresh bytecode views
                this.panels = (JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(index));
                if (this.panels != null && this.panels.length > 1 && this.panels[1] instanceof JSplitPane) {
                   try {
@@ -1866,6 +1934,10 @@ public class Decompiler
                      System.out.println("Error updating bytecode view: " + e.getMessage());
                   }
                }
+
+               // Refresh decompiled code view with newly generated code
+               this.refreshDecompiledCodeView(index);
+
                this.hash_Func2VarVec = this.fileDecompiler.getVariableData(this.file);
                this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
                this.fileDecompiler.getOriginalByteCode(this.file);
@@ -1875,10 +1947,18 @@ public class Decompiler
                   this.hash_TabComponent2Func2VarVec.put(selectedTab2, this.hash_Func2VarVec);
                   this.hash_TabComponent2TreeModel.put(selectedTab2, this.jTree.getModel());
                }
+
+               // Mark as saved
+               unsavedFiles.remove(this.file);
+               if (tabComponent instanceof JPanel) {
+                  this.updateTabLabel((JPanel)tabComponent, false);
+               }
+
                this.setTabComponentPanel(1);
                this.status.append("partial-could not recompile\n");
                break;
             case 3:
+               // Refresh bytecode views
                this.panels = (JComponent[])this.jTB.getClientProperty((JComponent)this.jTB.getTabComponentAt(index));
                if (this.panels != null && this.panels.length > 1 && this.panels[1] instanceof JSplitPane) {
                   try {
@@ -1918,6 +1998,9 @@ public class Decompiler
                   }
                }
 
+               // Refresh decompiled code view with newly generated code
+               this.refreshDecompiledCodeView(index);
+
                this.hash_Func2VarVec = this.fileDecompiler.getVariableData(this.file);
                this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
                this.fileDecompiler.getOriginalByteCode(this.file);
@@ -1927,15 +2010,94 @@ public class Decompiler
                   this.hash_TabComponent2Func2VarVec.put(selectedTab3, this.hash_Func2VarVec);
                   this.hash_TabComponent2TreeModel.put(selectedTab3, this.jTree.getModel());
                }
+
+               // Mark as saved
+               unsavedFiles.remove(this.file);
+               if (tabComponent instanceof JPanel) {
+                  this.updateTabLabel((JPanel)tabComponent, false);
+               }
+
                this.setTabComponentPanel(1);
                this.status.append("partial-byte code does not match\n");
          }
 
+         // Mark as saved (already done in case statements above, but ensure it's done here too)
          unsavedFiles.remove(this.file);
          if (tabComponent instanceof JPanel) {
             this.updateTabLabel((JPanel)tabComponent, false);
          }
          newFile = null;
+      }
+   }
+
+   /**
+    * Refreshes the decompiled code view with the newly generated code after save/recompilation.
+    *
+    * @param index The tab index to refresh
+    */
+   private void refreshDecompiledCodeView(int index) {
+      try {
+         JComponent tabComponent = (JComponent)this.jTB.getTabComponentAt(index);
+         if (tabComponent == null) {
+            return;
+         }
+
+         File file = this.hash_TabComponent2File.get(tabComponent);
+         if (file == null) {
+            return;
+         }
+
+         Object clientProperty = this.jTB.getClientProperty(tabComponent);
+         if (!(clientProperty instanceof JComponent[])) {
+            return;
+         }
+
+         JComponent[] panels = (JComponent[])clientProperty;
+         if (panels.length == 0 || !(panels[0] instanceof JPanel)) {
+            return;
+         }
+
+         JPanel panel = (JPanel)panels[0];
+         if (panel.getComponentCount() == 0 || !(panel.getComponent(0) instanceof JScrollPane)) {
+            return;
+         }
+
+         JScrollPane scrollPane = (JScrollPane)panel.getComponent(0);
+         if (!(scrollPane.getViewport().getView() instanceof JTextPane)) {
+            return;
+         }
+
+         JTextPane codePane = (JTextPane)scrollPane.getViewport().getView();
+
+         // Get the newly generated code
+         String generatedCode = this.fileDecompiler.getGeneratedCode(file);
+         if (generatedCode != null) {
+            // Temporarily disable highlighting during setText
+            NWScriptSyntaxHighlighter.setSkipHighlighting(codePane, true);
+
+            // Save caret position
+            int caretPos = codePane.getCaretPosition();
+
+            // Update the code
+            codePane.setText(generatedCode);
+
+            // Restore caret position (clamped to document length)
+            int newLength = codePane.getDocument().getLength();
+            codePane.setCaretPosition(Math.min(caretPos, newLength));
+
+            // Re-enable highlighting and apply
+            NWScriptSyntaxHighlighter.setSkipHighlighting(codePane, false);
+            NWScriptSyntaxHighlighter.applyHighlightingImmediate(codePane);
+
+            // Reset undo manager since we're loading new content
+            UndoManager undoManager = (UndoManager)codePane.getClientProperty("undoManager");
+            if (undoManager != null) {
+               undoManager.discardAllEdits();
+            }
+         }
+      } catch (Exception e) {
+         System.err.println("Error refreshing decompiled code view: " + e.getMessage());
+         e.printStackTrace();
       }
    }
 
