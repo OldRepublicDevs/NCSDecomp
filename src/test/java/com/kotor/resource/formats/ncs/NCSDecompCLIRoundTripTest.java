@@ -95,92 +95,18 @@ public class NCSDecompCLIRoundTripTest {
   private static final Path REPO_ROOT = Paths.get(".").toAbsolutePath().normalize();
 
   /**
-   * Finds the compiler executable by trying multiple filenames in multiple locations.
-   * Tries in order:
-   * 1. tools/ directory - all compiler filenames
-   * 2. Current working directory - all compiler filenames
-   * 3. NCSDecomp installation directory - all compiler filenames
-   *
-   * Filenames tried in priority order:
-   * 1. nwnnsscomp.exe (primary - generic name)
-   * 2. nwnnsscomp_kscript.exe (secondary - KOTOR Scripting Tool)
-   * 3. nwnnsscomp_tslpatcher.exe (TSLPatcher variant)
-   * 4. nwnnsscomp_v1.exe (v1.3 first public release)
+   * Finds the compiler executable using the shared CompilerUtil.
+   * This ensures both GUI and CLI modes use the same fallback logic.
    *
    * @return Path to the found compiler, or default path if not found
    */
   private static Path findCompiler() {
-     // Priority order: primary first, then secondary, then others
-     String[] compilerNames = {
-        "nwnnsscomp.exe",              // Primary - generic name (highest priority)
-        "nwnnsscomp_kscript.exe",      // Secondary - KOTOR Scripting Tool
-        "nwnnsscomp_tslpatcher.exe",   // TSLPatcher variant
-        "nwnnsscomp_v1.exe"            // v1.3 first public release
-     };
-
-     // 1. Try tools/ directory - all 3 filenames
-     Path toolsDir = REPO_ROOT.resolve("tools");
-     for (String name : compilerNames) {
-        Path candidate = toolsDir.resolve(name);
-        if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
-           return candidate;
-        }
+     // Use shared CompilerUtil with fallbacks for CLI/test mode
+     File compiler = CompilerUtil.resolveCompilerPathWithFallbacks(null);
+     if (compiler != null) {
+        return compiler.toPath();
      }
-
-     // 2. Try current working directory - all 3 filenames
-     Path cwd = Paths.get(System.getProperty("user.dir"));
-     for (String name : compilerNames) {
-        Path candidate = cwd.resolve(name);
-        if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
-           return candidate;
-        }
-     }
-
-     // 3. Try NCSDecomp installation directory - all 3 filenames
-     try {
-        // Get the location of the test class (jar/exe location)
-        java.net.URL location = NCSDecompCLIRoundTripTest.class.getProtectionDomain().getCodeSource().getLocation();
-        if (location != null) {
-           String path = location.getPath();
-           if (path != null) {
-              // Handle URL-encoded paths
-              if (path.startsWith("file:")) {
-                 path = path.substring(5);
-              }
-              // Decode URL encoding
-              try {
-                 path = java.net.URLDecoder.decode(path, "UTF-8");
-              } catch (java.io.UnsupportedEncodingException e) {
-                 // Fall through with original path
-              }
-              Path jarFile = Paths.get(path);
-              if (Files.exists(jarFile)) {
-                 Path ncsDecompDir = jarFile.getParent();
-                 if (ncsDecompDir != null && !ncsDecompDir.equals(cwd)) {
-                    // Try directly in NCSDecomp directory
-                    for (String name : compilerNames) {
-                       Path candidate = ncsDecompDir.resolve(name);
-                       if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
-                          return candidate;
-                       }
-                    }
-                    // Also try tools/ subdirectory of NCSDecomp directory
-                    Path ncsToolsDir = ncsDecompDir.resolve("tools");
-                    for (String name : compilerNames) {
-                       Path candidate = ncsToolsDir.resolve(name);
-                       if (Files.exists(candidate) && Files.isRegularFile(candidate)) {
-                          return candidate;
-                       }
-                    }
-                 }
-              }
-           }
-        }
-     } catch (Exception e) {
-        // Fall through - couldn't determine jar location
-     }
-
-     // Default fallback
+     // Default fallback if CompilerUtil returns null
      return REPO_ROOT.resolve("tools").resolve("nwnnsscomp.exe");
   }
 

@@ -179,43 +179,43 @@ public class Settings extends Properties implements ActionListener {
       this.setProperty("Output Directory", this.outputDirectoryField.getText());
       this.setProperty("Open Directory", this.openDirectoryField.getText());
 
-      // Save the full path to the selected compiler (from combobox selection)
+      // Save folder path and filename separately (EXCLUSIVELY from Settings UI)
       String selectedCompiler = (String) this.nwnnsscompComboBox.getSelectedItem();
       String folderPath = this.nwnnsscompPathField.getText().trim();
 
-      // Always prioritize combobox selection if available
-      if (selectedCompiler != null && !selectedCompiler.isEmpty() && !folderPath.isEmpty()) {
+      // Normalize folder path (ensure it's a directory path, not a file path)
+      if (!folderPath.isEmpty()) {
          File folder = new File(folderPath);
          if (folder.isFile()) {
             folder = folder.getParentFile();
-         }
-         if (folder != null && folder.isDirectory()) {
-            File compilerFile = new File(folder, selectedCompiler);
-            if (compilerFile.exists() && compilerFile.isFile()) {
-               String fullPath = compilerFile.getAbsolutePath();
-               this.setProperty("nwnnsscomp Path", fullPath);
-               FileDecompiler.nwnnsscompPath = fullPath;
-            } else {
-               // Compiler file doesn't exist, but save the path anyway
-               String fullPath = compilerFile.getAbsolutePath();
-               this.setProperty("nwnnsscomp Path", fullPath);
-               FileDecompiler.nwnnsscompPath = fullPath;
+            if (folder != null) {
+               folderPath = folder.getAbsolutePath();
             }
-         } else if (!folderPath.isEmpty()) {
-            // Folder doesn't exist or is invalid, but save what we have
-            this.setProperty("nwnnsscomp Path", folderPath);
-            FileDecompiler.nwnnsscompPath = folderPath;
-         } else {
-            this.remove("nwnnsscomp Path");
-            FileDecompiler.nwnnsscompPath = null;
+         } else if (!folder.isDirectory() && !folderPath.toLowerCase().endsWith(".exe")) {
+            // Assume it's meant to be a directory path even if it doesn't exist yet
+            folderPath = folder.getAbsolutePath();
          }
-      } else if (!folderPath.isEmpty()) {
-         // No compiler selected, but folder path exists - save folder path
-         this.setProperty("nwnnsscomp Path", folderPath);
-         FileDecompiler.nwnnsscompPath = folderPath;
+      }
+
+      // Save folder path (MUST be a folder path, not a file path)
+      if (!folderPath.isEmpty()) {
+         this.setProperty("nwnnsscomp Folder Path", folderPath);
       } else {
-         // Nothing to save
-         this.remove("nwnnsscomp Path");
+         this.remove("nwnnsscomp Folder Path");
+      }
+
+      // Save filename from combobox (if selected)
+      if (selectedCompiler != null && !selectedCompiler.isEmpty()) {
+         this.setProperty("nwnnsscomp Filename", selectedCompiler);
+      } else {
+         this.remove("nwnnsscomp Filename");
+      }
+
+      // Update FileDecompiler.nwnnsscompPath for backward compatibility (full path)
+      if (!folderPath.isEmpty() && selectedCompiler != null && !selectedCompiler.isEmpty()) {
+         File compilerFile = new File(folderPath, selectedCompiler);
+         FileDecompiler.nwnnsscompPath = compilerFile.getAbsolutePath();
+      } else {
          FileDecompiler.nwnnsscompPath = null;
       }
       String k1NwscriptPath = this.k1NwscriptPathField.getText().trim();
@@ -432,8 +432,10 @@ public class Settings extends Properties implements ActionListener {
       String defaultOutputDir = new File(System.getProperty("user.dir"), "ncsdecomp_converted").getAbsolutePath();
       this.setProperty("Output Directory", defaultOutputDir);
       this.setProperty("Open Directory", System.getProperty("user.dir"));
-      String defaultNwnnsscompPath = new File(new File(System.getProperty("user.dir"), "tools"), "nwnnsscomp.exe").getAbsolutePath();
-      this.setProperty("nwnnsscomp Path", defaultNwnnsscompPath);
+      String defaultNwnnsscompFolderPath = new File(System.getProperty("user.dir"), "tools").getAbsolutePath();
+      String defaultNwnnsscompFilename = "nwnnsscomp.exe";
+      this.setProperty("nwnnsscomp Folder Path", defaultNwnnsscompFolderPath);
+      this.setProperty("nwnnsscomp Filename", defaultNwnnsscompFilename);
       String defaultK1Path = new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss").getAbsolutePath();
       String defaultK2Path = new File(new File(System.getProperty("user.dir"), "tools"), "tsl_nwscript.nss").getAbsolutePath();
       this.setProperty("K1 nwscript Path", defaultK1Path);
@@ -824,146 +826,6 @@ public class Settings extends Properties implements ActionListener {
    }
 
    /**
-    * Finds the compiler executable using the same fallback logic as FileDecompiler.getCompilerFile().
-    * This ensures the settings window shows the compiler that will actually be used.
-    *
-    * @param configuredPath The configured path from the settings field (may be empty)
-    * @return A CompilerResolutionResult containing the found compiler file and whether it's a fallback
-    */
-   private CompilerResolutionResult findCompilerFile(String configuredPath) {
-      // Priority order: primary first, then secondary, then others
-      String[] compilerNames = {
-         "nwnnsscomp.exe",              // Primary - generic name (highest priority)
-         "nwnnsscomp_kscript.exe",      // Secondary - KOTOR Scripting Tool
-         "nwnnsscomp_tslpatcher.exe",   // TSLPatcher variant
-         "nwnnsscomp_v1.exe"            // v1.3 first public release
-      };
-
-      String configuredPathTrimmed = configuredPath != null ? configuredPath.trim() : "";
-      boolean isConfigured = !configuredPathTrimmed.isEmpty();
-
-      // 1. Try configured path (if set) - all compiler filenames
-      if (isConfigured) {
-         File configuredDir = new File(configuredPathTrimmed);
-         if (configuredDir.isDirectory()) {
-            // If it's a directory, try all filenames in it
-            for (String name : compilerNames) {
-               File candidate = new File(configuredDir, name);
-               if (candidate.exists() && candidate.isFile()) {
-                  return new CompilerResolutionResult(candidate, false, "Configured directory: " + configuredPathTrimmed);
-               }
-            }
-         } else {
-            // If it's a file, check if it exists
-            if (configuredDir.exists() && configuredDir.isFile()) {
-               return new CompilerResolutionResult(configuredDir, false, "Configured path: " + configuredPathTrimmed);
-            }
-            // Also try other filenames in the same directory
-            File parent = configuredDir.getParentFile();
-            if (parent != null) {
-               for (String name : compilerNames) {
-                  File candidate = new File(parent, name);
-                  if (candidate.exists() && candidate.isFile()) {
-                     return new CompilerResolutionResult(candidate, true, "Fallback in configured directory: " + parent.getAbsolutePath());
-                  }
-               }
-            }
-         }
-      }
-
-      // 2. Try tools/ directory - all compiler filenames
-      File toolsDir = new File(System.getProperty("user.dir"), "tools");
-      for (String name : compilerNames) {
-         File candidate = new File(toolsDir, name);
-         if (candidate.exists() && candidate.isFile()) {
-            return new CompilerResolutionResult(candidate, true, "Fallback: tools/ directory");
-         }
-      }
-
-      // 3. Try current working directory - all compiler filenames
-      File cwd = new File(System.getProperty("user.dir"));
-      for (String name : compilerNames) {
-         File candidate = new File(cwd, name);
-         if (candidate.exists() && candidate.isFile()) {
-            return new CompilerResolutionResult(candidate, true, "Fallback: current directory");
-         }
-      }
-
-      // 4. Try NCSDecomp installation directory - all compiler filenames
-      File ncsDecompDir = getNCSDecompDirectory();
-      if (ncsDecompDir != null && !ncsDecompDir.equals(cwd)) {
-         for (String name : compilerNames) {
-            File candidate = new File(ncsDecompDir, name);
-            if (candidate.exists() && candidate.isFile()) {
-               return new CompilerResolutionResult(candidate, true, "Fallback: NCSDecomp directory");
-            }
-         }
-         // Also try tools/ subdirectory of NCSDecomp directory
-         File ncsToolsDir = new File(ncsDecompDir, "tools");
-         for (String name : compilerNames) {
-            File candidate = new File(ncsToolsDir, name);
-            if (candidate.exists() && candidate.isFile()) {
-               return new CompilerResolutionResult(candidate, true, "Fallback: NCSDecomp tools/ directory");
-            }
-         }
-      }
-
-      // Not found
-      return null;
-   }
-
-   /**
-    * Gets the NCSDecomp installation directory using the same logic as FileDecompiler.
-    */
-   private File getNCSDecompDirectory() {
-      try {
-         // Try to get the location of the jar/exe file
-         java.net.URL location = Settings.class.getProtectionDomain().getCodeSource().getLocation();
-         if (location != null) {
-            String path = location.getPath();
-            if (path != null) {
-               // Handle URL-encoded paths
-               if (path.startsWith("file:")) {
-                  path = path.substring(5);
-               }
-               // Decode URL encoding
-               try {
-                  path = java.net.URLDecoder.decode(path, "UTF-8");
-               } catch (java.io.UnsupportedEncodingException e) {
-                  // Fall through with original path
-               }
-               File jarFile = new File(path);
-               if (jarFile.exists()) {
-                  File parent = jarFile.getParentFile();
-                  if (parent != null) {
-                     return parent;
-                  }
-               }
-            }
-         }
-      } catch (Exception e) {
-         // Fall through to user.dir
-      }
-      // Fallback to user.dir if we can't determine jar location
-      return new File(System.getProperty("user.dir"));
-   }
-
-   /**
-    * Result of compiler file resolution.
-    */
-   private static class CompilerResolutionResult {
-      final File file;
-      final boolean isFallback;
-      final String source;
-
-      CompilerResolutionResult(File file, boolean isFallback, String source) {
-         this.file = file;
-         this.isFallback = isFallback;
-         this.source = source;
-      }
-   }
-
-   /**
     * Handles changes to the nwnnsscomp path field.
     * Extracts parent folder if a file path is entered, then populates the combobox.
     */
@@ -1135,28 +997,6 @@ public class Settings extends Properties implements ActionListener {
          }
       } catch (IOException e) {
          this.nwnnsscompComboBox.setToolTipText("Error reading compiler file: " + e.getMessage());
-      }
-   }
-
-   /**
-    * Returns an emoji representing the compiler type.
-    */
-   private String getCompilerEmoji(KnownExternalCompilers compiler) {
-      switch (compiler) {
-         case TSLPATCHER:
-            return "🔧";
-         case KOTOR_TOOL:
-            return "🛠️";
-         case V1:
-            return "📦";
-         case KOTOR_SCRIPTING_TOOL:
-            return "⚙️";
-         case XOREOS:
-            return "🌐";
-         case KNSSCOMP:
-            return "✨";
-         default:
-            return "📄";
       }
    }
 }

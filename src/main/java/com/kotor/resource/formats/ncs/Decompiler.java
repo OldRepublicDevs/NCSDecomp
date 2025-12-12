@@ -1422,6 +1422,119 @@ public class Decompiler
                NWScriptSyntaxHighlighter.setSkipHighlighting(textPane, false);
                NWScriptSyntaxHighlighter.applyHighlightingImmediate(textPane);
             }
+
+            // Populate round-trip decompiled code panel (NSS -> NCS -> NSS)
+            // For NSS files, we need to compile them first, then decompile the result
+            try {
+               java.awt.Component rightComp = decompSplitPane.getRightComponent();
+               if (rightComp instanceof JScrollPane) {
+                  JScrollPane rightScrollPane = (JScrollPane)rightComp;
+                  if (rightScrollPane.getViewport().getView() instanceof JTextPane) {
+                     JTextPane roundTripPane = (JTextPane)rightScrollPane.getViewport().getView();
+
+                     System.err.println("DEBUG loadNssFile: Starting round-trip for NSS file: " + file.getAbsolutePath());
+
+                     // Compile the NSS file to NCS, then decompile it
+                     File compiledNcs = null;
+                     try {
+                        // Use CompilerUtil to get compiler from Settings (GUI mode - NO FALLBACKS)
+                        File compiler = CompilerUtil.getCompilerFromSettingsOrNull();
+                        System.err.println("DEBUG loadNssFile: Found compiler via CompilerUtil: " + (compiler != null ? compiler.getAbsolutePath() : "null"));
+
+                        if (compiler != null && compiler.exists()) {
+                           // Create output NCS file in same directory as input
+                           // Reuse baseName from outer scope
+                           String compiledBaseName = baseName;
+                           compiledNcs = new File(file.getParentFile(), compiledBaseName + ".ncs");
+
+                           // Use NwnnsscompConfig to compile (same as FileDecompiler.externalCompile)
+                           boolean isK2 = FileDecompiler.isK2Selected;
+                           System.err.println("DEBUG loadNssFile: Compiling NSS with isK2: " + isK2);
+
+                           // Ensure nwscript.nss is in compiler directory
+                           File compilerDir = compiler.getParentFile();
+                           if (compilerDir != null) {
+                              File compilerNwscript = new File(compilerDir, "nwscript.nss");
+                              File nwscriptSource = isK2
+                                 ? new File(new File(System.getProperty("user.dir"), "tools"), "tsl_nwscript.nss")
+                                 : new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss");
+                              if (nwscriptSource.exists() && (!compilerNwscript.exists() || !compilerNwscript.getAbsolutePath().equals(nwscriptSource.getAbsolutePath()))) {
+                                 try {
+                                    java.nio.file.Files.copy(nwscriptSource.toPath(), compilerNwscript.toPath(),
+                                       java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                                 } catch (java.io.IOException e) {
+                                    System.err.println("DEBUG loadNssFile: Warning: Could not copy nwscript.nss: " + e.getMessage());
+                                 }
+                              }
+                           }
+
+                           NwnnsscompConfig config = new NwnnsscompConfig(compiler, file, compiledNcs, isK2);
+                           String[] cmd = config.getCompileArgs(compiler.getAbsolutePath());
+
+                           System.err.println("DEBUG loadNssFile: Running compiler: " + java.util.Arrays.toString(cmd));
+                           ProcessBuilder pb = new ProcessBuilder(cmd);
+                           pb.directory(file.getParentFile());
+                           pb.redirectErrorStream(true);
+                           Process proc = pb.start();
+
+                           // Read output
+                           StringBuilder output = new StringBuilder();
+                           try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                                 new java.io.InputStreamReader(proc.getInputStream()))) {
+                              String line;
+                              while ((line = reader.readLine()) != null) {
+                                 output.append(line).append("\n");
+                              }
+                           }
+
+                           boolean finished = proc.waitFor(25, java.util.concurrent.TimeUnit.SECONDS);
+                           if (!finished) {
+                              proc.destroyForcibly();
+                              System.err.println("DEBUG loadNssFile: Compiler timed out");
+                           } else {
+                              int exitCode = proc.exitValue();
+                              System.err.println("DEBUG loadNssFile: Compiler exit code: " + exitCode);
+                              if (exitCode != 0) {
+                                 System.err.println("DEBUG loadNssFile: Compiler output: " + output.toString());
+                              }
+                           }
+
+                           if (compiledNcs.exists()) {
+                              System.err.println("DEBUG loadNssFile: Compiled NCS exists at: " + compiledNcs.getAbsolutePath());
+                              // Decompile the compiled NCS
+                              String gameFlag = isK2 ? "k2" : "k1";
+                              String roundTripCode = RoundTripUtil.decompileNcsToNss(compiledNcs, gameFlag);
+                              System.err.println("DEBUG loadNssFile: Round-trip code result: " + (roundTripCode != null ? "not null, length=" + roundTripCode.length() : "null"));
+
+                              if (roundTripCode != null && !roundTripCode.trim().isEmpty()) {
+                                 System.err.println("DEBUG loadNssFile: Setting round-trip code in right panel");
+                                 NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, true);
+                                 roundTripPane.setText(roundTripCode);
+                                 NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, false);
+                                 NWScriptSyntaxHighlighter.applyHighlightingImmediate(roundTripPane);
+                              } else {
+                                 System.err.println("DEBUG loadNssFile: Round-trip code is null or empty");
+                                 roundTripPane.setText("// Round-trip decompiled code not available.\n// The compiled NCS could not be decompiled.");
+                              }
+                           } else {
+                              System.err.println("DEBUG loadNssFile: Compiled NCS does not exist after compilation");
+                              roundTripPane.setText("// Round-trip decompiled code not available.\n// Compilation failed or compiler not found.");
+                           }
+                        } else {
+                           System.err.println("DEBUG loadNssFile: Compiler not found");
+                           roundTripPane.setText("// Round-trip decompiled code not available.\n// Compiler (nwnnsscomp.exe) not found.");
+                        }
+                     } catch (Exception e) {
+                        System.err.println("DEBUG loadNssFile: Error during round-trip: " + e.getMessage());
+                        e.printStackTrace();
+                        roundTripPane.setText("// Round-trip decompiled code not available.\n// Error: " + e.getMessage());
+                     }
+                  }
+               }
+            } catch (Exception e) {
+               System.err.println("DEBUG loadNssFile: Error populating round-trip panel: " + e.getMessage());
+               e.printStackTrace();
+            }
          }
       }
 
@@ -1538,51 +1651,49 @@ public class Decompiler
             System.out.println("Bytecode comparison not available: " + e.getMessage());
          }
 
-         // Try to populate round-trip panel if a recompiled NCS exists
-         // (e.g., if this file was previously saved and recompiled)
+         // Populate round-trip decompiled code panel (NCS -> NSS -> NCS -> NSS)
+         // After compileAndCompare, the recompiled NCS should be _generatedcode.ncs in the working directory
          try {
-            java.awt.Component rightComp = decompSplitPane.getRightComponent();
-            if (rightComp instanceof JScrollPane) {
-               JScrollPane rightScrollPane = (JScrollPane)rightComp;
-               if (rightScrollPane.getViewport().getView() instanceof JTextPane) {
-                  JTextPane roundTripPane = (JTextPane)rightScrollPane.getViewport().getView();
+            // Get the decomp split pane from panels[0]
+            if (this.panels[0] instanceof JSplitPane) {
+               JSplitPane decompSplitPane = (JSplitPane)this.panels[0];
+               java.awt.Component rightComp = decompSplitPane.getRightComponent();
+               if (rightComp instanceof JScrollPane) {
+                  JScrollPane rightScrollPane = (JScrollPane)rightComp;
+                  if (rightScrollPane.getViewport().getView() instanceof JTextPane) {
+                     JTextPane roundTripPane = (JTextPane)rightScrollPane.getViewport().getView();
 
-                  // Look for a saved NSS file in the same directory
-                  File parentDir = file.getParentFile();
-                  if (parentDir != null && parentDir.exists()) {
-                     String baseName = file.getName();
-                     if (baseName.toLowerCase().endsWith(".ncs")) {
-                        baseName = baseName.substring(0, baseName.length() - 4);
-                     }
+                     // Check for recompiled NCS file (_generatedcode.ncs) created by compileAndCompare
+                     File recompiledNcs = new File("_generatedcode.ncs").getAbsoluteFile();
+                     System.err.println("DEBUG decompile: Checking for recompiled NCS at: " + recompiledNcs.getAbsolutePath());
+                     System.err.println("DEBUG decompile: Recompiled NCS exists: " + recompiledNcs.exists());
 
-                     // Look for .nss file with same base name
-                     File[] nssFiles = parentDir.listFiles((dir, name) -> {
-                        String lowerName = name.toLowerCase();
-                        return lowerName.equals(baseName.toLowerCase() + ".nss") ||
-                           (lowerName.startsWith(baseName.toLowerCase() + "_") && lowerName.endsWith(".nss"));
-                     });
+                     if (recompiledNcs.exists()) {
+                        // Decompile the recompiled NCS to show round-trip result
+                        String gameFlag = FileDecompiler.isK2Selected ? "k2" : "k1";
+                        System.err.println("DEBUG decompile: Decompiling recompiled NCS with gameFlag: " + gameFlag);
+                        String roundTripCode = RoundTripUtil.decompileNcsToNss(recompiledNcs, gameFlag);
+                        System.err.println("DEBUG decompile: Round-trip code result: " + (roundTripCode != null ? "not null, length=" + roundTripCode.length() : "null"));
 
-                     if (nssFiles != null && nssFiles.length > 0) {
-                        File savedNssFile = nssFiles[0];
-                        String roundTripCode = getRoundTripDecompiledCode(savedNssFile);
                         if (roundTripCode != null && !roundTripCode.trim().isEmpty()) {
+                           System.err.println("DEBUG decompile: Setting round-trip code in right panel");
                            NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, true);
                            roundTripPane.setText(roundTripCode);
                            NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, false);
                            NWScriptSyntaxHighlighter.applyHighlightingImmediate(roundTripPane);
                         } else {
-                           roundTripPane.setText("// Round-trip decompiled code not available.\n// Save the file to trigger round-trip validation and decompilation.");
+                           System.err.println("DEBUG decompile: Round-trip code is null or empty, showing placeholder");
+                           roundTripPane.setText("// Round-trip decompiled code not available.\n// The recompiled NCS could not be decompiled.");
                         }
                      } else {
+                        System.err.println("DEBUG decompile: Recompiled NCS not found, showing placeholder");
                         roundTripPane.setText("// Round-trip decompiled code not available.\n// Save the file to trigger round-trip validation and decompilation.");
                      }
-                  } else {
-                     roundTripPane.setText("// Round-trip decompiled code not available.\n// Save the file to trigger round-trip validation and decompilation.");
                   }
                }
             }
          } catch (Exception e) {
-            System.err.println("Error populating round-trip panel on initial load: " + e.getMessage());
+            System.err.println("DEBUG decompile: Error populating round-trip panel: " + e.getMessage());
             e.printStackTrace();
          }
 
@@ -2287,7 +2398,7 @@ public class Decompiler
                if (savedNssFile != null) {
                   roundTripCode = getRoundTripDecompiledCode(savedNssFile);
                }
-               if (roundTripCode != null && !roundTripCode.trim().isEmpty()) {
+               if (roundTripCode != null) {
                   NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, true);
                   roundTripPane.setText(roundTripCode);
                   NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, false);
