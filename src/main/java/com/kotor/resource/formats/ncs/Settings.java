@@ -46,13 +46,13 @@ public class Settings extends Properties implements ActionListener {
    private static final long serialVersionUID = 1L;
    private static final String CONFIG_FILE = "ncsdecomp.conf";
    private static final String LEGACY_CONFIG_FILE = "dencs.conf";
-   
+
    // UI Components
    private JFrame frame;
    private JTabbedPane tabbedPane;
    private JButton saveButton;
    private JButton cancelButton;
-   
+
    // File/Directory Settings
    private JTextField outputDirectoryField;
    private JButton browseOutputDirButton;
@@ -65,22 +65,22 @@ public class Settings extends Properties implements ActionListener {
    private JButton browseK1NwscriptButton;
    private JTextField k2NwscriptPathField;
    private JButton browseK2NwscriptButton;
-   
+
    // Game Settings
    private JRadioButton gameK1Radio;
    private JRadioButton gameK2Radio;
-   
+
    // Decompilation Options
    private JCheckBox preferSwitchesCheckBox;
    private JCheckBox strictSignaturesCheckBox;
    private JCheckBox overwriteFilesCheckBox;
-   
+
    // Output Settings
    private JComboBox<String> encodingComboBox;
    private JTextField fileExtensionField;
    private JTextField filenamePrefixField;
    private JTextField filenameSuffixField;
-   
+
    // UI Settings
    private JCheckBox linkScrollBarsCheckBox;
 
@@ -90,7 +90,7 @@ public class Settings extends Properties implements ActionListener {
    @Override
    public void actionPerformed(ActionEvent e) {
       Object src = e.getSource();
-      
+
       if (src == this.saveButton) {
          saveSettings();
          this.save();
@@ -118,7 +118,7 @@ public class Settings extends Properties implements ActionListener {
             public boolean accept(File f) {
                return f.isDirectory() || f.getName().toLowerCase().endsWith(".nss");
             }
-            
+
             @Override
             public String getDescription() {
                return "NSS Files (*.nss)";
@@ -136,7 +136,7 @@ public class Settings extends Properties implements ActionListener {
             public boolean accept(File f) {
                return f.isDirectory() || f.getName().toLowerCase().endsWith(".nss");
             }
-            
+
             @Override
             public String getDescription() {
                return "NSS Files (*.nss)";
@@ -154,7 +154,7 @@ public class Settings extends Properties implements ActionListener {
             public boolean accept(File f) {
                return f.isDirectory() || f.getName().toLowerCase().endsWith(".exe");
             }
-            
+
             @Override
             public String getDescription() {
                return "Executable Files (*.exe)";
@@ -167,7 +167,7 @@ public class Settings extends Properties implements ActionListener {
          }
       }
    }
-   
+
    private void saveSettings() {
       // File/Directory Settings
       this.setProperty("Output Directory", this.outputDirectoryField.getText());
@@ -190,7 +190,7 @@ public class Settings extends Properties implements ActionListener {
       } else {
          this.setProperty("K2 nwscript Path", k2NwscriptPath);
       }
-      
+
       // Game Settings
       if (this.gameK1Radio.isSelected()) {
          this.setProperty("Game Variant", "k1");
@@ -199,47 +199,49 @@ public class Settings extends Properties implements ActionListener {
          this.setProperty("Game Variant", "k2");
          FileDecompiler.isK2Selected = true;
       }
-      
+
       // Apply nwnnsscomp path to FileDecompiler
       String nwnnsscompPathValue = this.nwnnsscompPathField.getText().trim();
       FileDecompiler.nwnnsscompPath = nwnnsscompPathValue.isEmpty() ? null : nwnnsscompPathValue;
-      
+
       // Decompilation Options
       this.setProperty("Prefer Switches", String.valueOf(this.preferSwitchesCheckBox.isSelected()));
       FileDecompiler.preferSwitches = this.preferSwitchesCheckBox.isSelected();
       this.setProperty("Strict Signatures", String.valueOf(this.strictSignaturesCheckBox.isSelected()));
       FileDecompiler.strictSignatures = this.strictSignaturesCheckBox.isSelected();
       this.setProperty("Overwrite Files", String.valueOf(this.overwriteFilesCheckBox.isSelected()));
-      
+
       // Output Settings
       this.setProperty("Encoding", (String) this.encodingComboBox.getSelectedItem());
       this.setProperty("File Extension", this.fileExtensionField.getText());
       this.setProperty("Filename Prefix", this.filenamePrefixField.getText());
       this.setProperty("Filename Suffix", this.filenameSuffixField.getText());
-      
+
       // UI Settings
       this.setProperty("Link Scroll Bars", String.valueOf(this.linkScrollBarsCheckBox.isSelected()));
    }
-   
+
    private void loadSettingsIntoUI() {
       // File/Directory Settings
       // Default output directory: ./ncsdecomp_converted relative to current working directory
       String defaultOutputDir = new File(System.getProperty("user.dir"), "ncsdecomp_converted").getAbsolutePath();
       this.outputDirectoryField.setText(this.getProperty("Output Directory", defaultOutputDir));
       this.openDirectoryField.setText(this.getProperty("Open Directory", System.getProperty("user.dir")));
-      
+
       // Default nwnnsscomp path: tools/ directory + filename
       String defaultNwnnsscompPath = new File(new File(System.getProperty("user.dir"), "tools"), "nwnnsscomp.exe").getAbsolutePath();
-      this.nwnnsscompPathField.setText(this.getProperty("nwnnsscomp Path", defaultNwnnsscompPath));
+      // Check FileDecompiler.nwnnsscompPath first to ensure synchronization with actual runtime state
+      String nwnnsscompPath = FileDecompiler.nwnnsscompPath != null ? FileDecompiler.nwnnsscompPath : this.getProperty("nwnnsscomp Path", defaultNwnnsscompPath);
+      this.nwnnsscompPathField.setText(nwnnsscompPath);
       // Update compiler info after setting the path
       updateCompilerInfo();
-      
+
       // Default nwscript paths: tools/ directory + filename
       String defaultK1Path = new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss").getAbsolutePath();
       String defaultK2Path = new File(new File(System.getProperty("user.dir"), "tools"), "tsl_nwscript.nss").getAbsolutePath();
       this.k1NwscriptPathField.setText(this.getProperty("K1 nwscript Path", defaultK1Path));
       this.k2NwscriptPathField.setText(this.getProperty("K2 nwscript Path", defaultK2Path));
-      
+
       // Game Settings
       String gameVariant = this.getProperty("Game Variant", "k1").toLowerCase();
       if (gameVariant.equals("k2") || gameVariant.equals("tsl") || gameVariant.equals("2")) {
@@ -249,14 +251,14 @@ public class Settings extends Properties implements ActionListener {
          this.gameK1Radio.setSelected(true);
          FileDecompiler.isK2Selected = false;
       }
-      
+
       // Decompilation Options
       this.preferSwitchesCheckBox.setSelected(Boolean.parseBoolean(this.getProperty("Prefer Switches", "false")));
       FileDecompiler.preferSwitches = this.preferSwitchesCheckBox.isSelected();
       this.strictSignaturesCheckBox.setSelected(Boolean.parseBoolean(this.getProperty("Strict Signatures", "false")));
       FileDecompiler.strictSignatures = this.strictSignaturesCheckBox.isSelected();
       this.overwriteFilesCheckBox.setSelected(Boolean.parseBoolean(this.getProperty("Overwrite Files", "false")));
-      
+
       // Output Settings
       // Default encoding: Windows-1252 (standard for KotOR/TSL)
       String encoding = this.getProperty("Encoding", "Windows-1252");
@@ -264,7 +266,7 @@ public class Settings extends Properties implements ActionListener {
       this.fileExtensionField.setText(this.getProperty("File Extension", ".nss"));
       this.filenamePrefixField.setText(this.getProperty("Filename Prefix", ""));
       this.filenameSuffixField.setText(this.getProperty("Filename Suffix", ""));
-      
+
       // UI Settings
       this.linkScrollBarsCheckBox.setSelected(Boolean.parseBoolean(this.getProperty("Link Scroll Bars", "false")));
    }
@@ -299,7 +301,7 @@ public class Settings extends Properties implements ActionListener {
          this.reset();
          this.save();
       }
-      
+
       // Apply loaded settings to static flags
       String gameVariant = this.getProperty("Game Variant", "k1").toLowerCase();
       FileDecompiler.isK2Selected = gameVariant.equals("k2") || gameVariant.equals("tsl") || gameVariant.equals("2");
@@ -354,28 +356,28 @@ public class Settings extends Properties implements ActionListener {
       this.frame = new JFrame("NCSDecomp Settings");
       this.frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
       this.frame.setResizable(true);
-      
+
       // Create tabbed pane
       this.tabbedPane = new JTabbedPane();
-      
+
       // File/Directory Settings Tab
       this.tabbedPane.addTab("Files & Directories", createFilesDirectoriesPanel());
-      
+
       // Game Settings Tab
       this.tabbedPane.addTab("Game", createGameSettingsPanel());
-      
+
       // Decompilation Options Tab
       this.tabbedPane.addTab("Decompilation", createDecompilationPanel());
-      
+
       // Output Settings Tab
       this.tabbedPane.addTab("Output", createOutputSettingsPanel());
-      
+
       // UI Settings Tab
       this.tabbedPane.addTab("Interface", createUISettingsPanel());
-      
+
       // Load current settings into UI
       this.loadSettingsIntoUI();
-      
+
       // Buttons panel
       JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
       this.saveButton = new JButton("Save");
@@ -384,20 +386,20 @@ public class Settings extends Properties implements ActionListener {
       this.cancelButton.addActionListener(this);
       buttonPanel.add(this.cancelButton);
       buttonPanel.add(this.saveButton);
-      
+
       // Main panel
       JPanel mainPanel = new JPanel(new BorderLayout());
       mainPanel.add(this.tabbedPane, BorderLayout.CENTER);
       mainPanel.add(buttonPanel, BorderLayout.SOUTH);
       mainPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-      
+
       this.frame.getContentPane().add(mainPanel);
       this.frame.pack();
       this.frame.setSize(600, 500);
       this.frame.setLocationRelativeTo(null);
       this.frame.setVisible(true);
    }
-   
+
    private JPanel createFilesDirectoriesPanel() {
       JPanel panel = new JPanel(new GridBagLayout());
       panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -405,7 +407,7 @@ public class Settings extends Properties implements ActionListener {
       gbc.insets = new Insets(5, 5, 5, 5);
       gbc.anchor = GridBagConstraints.WEST;
       gbc.fill = GridBagConstraints.HORIZONTAL;
-      
+
       // Output Directory
       gbc.gridx = 0;
       gbc.gridy = 0;
@@ -421,7 +423,7 @@ public class Settings extends Properties implements ActionListener {
       this.browseOutputDirButton = new JButton("Browse...");
       this.browseOutputDirButton.addActionListener(this);
       panel.add(this.browseOutputDirButton, gbc);
-      
+
       // Open Directory
       gbc.gridx = 0;
       gbc.gridy = 1;
@@ -437,7 +439,7 @@ public class Settings extends Properties implements ActionListener {
       this.browseOpenDirButton = new JButton("Browse...");
       this.browseOpenDirButton.addActionListener(this);
       panel.add(this.browseOpenDirButton, gbc);
-      
+
       // nwnnsscomp Path
       gbc.gridx = 0;
       gbc.gridy = 2;
@@ -468,14 +470,14 @@ public class Settings extends Properties implements ActionListener {
       this.browseNwnnsscompButton = new JButton("Browse...");
       this.browseNwnnsscompButton.addActionListener(this);
       panel.add(this.browseNwnnsscompButton, gbc);
-      
+
       // Compiler info indicator (emoji + tooltip)
       gbc.gridx = 3;
       gbc.weightx = 0.0;
       this.nwnnsscompInfoLabel = new JLabel("");
       this.nwnnsscompInfoLabel.setToolTipText("Compiler information will appear here");
       panel.add(this.nwnnsscompInfoLabel, gbc);
-      
+
       // K1 nwscript Path
       gbc.gridx = 0;
       gbc.gridy = 3;
@@ -491,7 +493,7 @@ public class Settings extends Properties implements ActionListener {
       this.browseK1NwscriptButton = new JButton("Browse...");
       this.browseK1NwscriptButton.addActionListener(this);
       panel.add(this.browseK1NwscriptButton, gbc);
-      
+
       // K2 nwscript Path
       gbc.gridx = 0;
       gbc.gridy = 4;
@@ -507,37 +509,37 @@ public class Settings extends Properties implements ActionListener {
       this.browseK2NwscriptButton = new JButton("Browse...");
       this.browseK2NwscriptButton.addActionListener(this);
       panel.add(this.browseK2NwscriptButton, gbc);
-      
+
       // Spacer
       gbc.gridx = 0;
       gbc.gridy = 4;
       gbc.weighty = 1.0;
       panel.add(new JLabel(), gbc);
-      
+
       return panel;
    }
-   
+
    private JPanel createGameSettingsPanel() {
       JPanel panel = new JPanel(new GridBagLayout());
       panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
       GridBagConstraints gbc = new GridBagConstraints();
       gbc.insets = new Insets(5, 5, 5, 5);
       gbc.anchor = GridBagConstraints.WEST;
-      
+
       // Game Variant
       gbc.gridx = 0;
       gbc.gridy = 0;
       panel.add(new JLabel("Game Variant:"), gbc);
-      
+
       ButtonGroup gameGroup = new ButtonGroup();
       this.gameK1Radio = new JRadioButton("KotOR 1");
       this.gameK1Radio.setToolTipText("Use KotOR 1 (Knights of the Old Republic) action definitions");
       this.gameK2Radio = new JRadioButton("KotOR 2");
       this.gameK2Radio.setToolTipText("Use KotOR 2 (The Sith Lords) action definitions");
-      
+
       gameGroup.add(this.gameK1Radio);
       gameGroup.add(this.gameK2Radio);
-      
+
       JPanel radioPanel = new JPanel(new GridBagLayout());
       GridBagConstraints radioGbc = new GridBagConstraints();
       radioGbc.insets = new Insets(2, 5, 2, 5);
@@ -547,11 +549,11 @@ public class Settings extends Properties implements ActionListener {
       radioPanel.add(this.gameK1Radio, radioGbc);
       radioGbc.gridy = 1;
       radioPanel.add(this.gameK2Radio, radioGbc);
-      
+
       gbc.gridx = 1;
       gbc.gridy = 0;
       panel.add(radioPanel, gbc);
-      
+
       // Info label
       gbc.gridx = 0;
       gbc.gridy = 1;
@@ -560,23 +562,23 @@ public class Settings extends Properties implements ActionListener {
                                     "Configure nwscript paths in the \"Files & Directories\" tab.</i></html>");
       infoLabel.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
       panel.add(infoLabel, gbc);
-      
+
       // Spacer
       gbc.gridx = 0;
       gbc.gridy = 2;
       gbc.weighty = 1.0;
       panel.add(new JLabel(), gbc);
-      
+
       return panel;
    }
-   
+
    private JPanel createDecompilationPanel() {
       JPanel panel = new JPanel(new GridBagLayout());
       panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
       GridBagConstraints gbc = new GridBagConstraints();
       gbc.insets = new Insets(5, 5, 5, 5);
       gbc.anchor = GridBagConstraints.WEST;
-      
+
       // Prefer Switches
       gbc.gridx = 0;
       gbc.gridy = 0;
@@ -584,27 +586,27 @@ public class Settings extends Properties implements ActionListener {
       this.preferSwitchesCheckBox = new JCheckBox("Prefer switch structures over if-elseif chains");
       this.preferSwitchesCheckBox.setToolTipText("When possible, generate switch statements instead of if-elseif chains for better readability");
       panel.add(this.preferSwitchesCheckBox, gbc);
-      
+
       // Strict Signatures
       gbc.gridy = 1;
       this.strictSignaturesCheckBox = new JCheckBox("Strict signatures (fail if any signature remains unknown)");
       this.strictSignaturesCheckBox.setToolTipText("Abort decompilation if any subroutine signature cannot be fully determined");
       panel.add(this.strictSignaturesCheckBox, gbc);
-      
+
       // Overwrite Files
       gbc.gridy = 2;
       this.overwriteFilesCheckBox = new JCheckBox("Overwrite existing files without prompting");
       this.overwriteFilesCheckBox.setToolTipText("Automatically overwrite existing output files without confirmation");
       panel.add(this.overwriteFilesCheckBox, gbc);
-      
+
       // Spacer
       gbc.gridy = 3;
       gbc.weighty = 1.0;
       panel.add(new JLabel(), gbc);
-      
+
       return panel;
    }
-   
+
    private JPanel createOutputSettingsPanel() {
       JPanel panel = new JPanel(new GridBagLayout());
       panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
@@ -612,7 +614,7 @@ public class Settings extends Properties implements ActionListener {
       gbc.insets = new Insets(5, 5, 5, 5);
       gbc.anchor = GridBagConstraints.WEST;
       gbc.fill = GridBagConstraints.HORIZONTAL;
-      
+
       // Encoding
       gbc.gridx = 0;
       gbc.gridy = 0;
@@ -626,7 +628,7 @@ public class Settings extends Properties implements ActionListener {
       this.encodingComboBox.setToolTipText("Character encoding for output files");
       this.encodingComboBox.setEditable(true);
       panel.add(this.encodingComboBox, gbc);
-      
+
       // File Extension
       gbc.gridx = 0;
       gbc.gridy = 1;
@@ -637,7 +639,7 @@ public class Settings extends Properties implements ActionListener {
       this.fileExtensionField = new JTextField(10);
       this.fileExtensionField.setToolTipText("Extension for output files (e.g., .nss)");
       panel.add(this.fileExtensionField, gbc);
-      
+
       // Filename Prefix
       gbc.gridx = 0;
       gbc.gridy = 2;
@@ -648,7 +650,7 @@ public class Settings extends Properties implements ActionListener {
       this.filenamePrefixField = new JTextField(20);
       this.filenamePrefixField.setToolTipText("Prefix to add to output filenames (e.g., \"decompiled_\")");
       panel.add(this.filenamePrefixField, gbc);
-      
+
       // Filename Suffix
       gbc.gridx = 0;
       gbc.gridy = 3;
@@ -659,23 +661,23 @@ public class Settings extends Properties implements ActionListener {
       this.filenameSuffixField = new JTextField(20);
       this.filenameSuffixField.setToolTipText("Suffix to add to output filenames (e.g., \"_decompiled\")");
       panel.add(this.filenameSuffixField, gbc);
-      
+
       // Spacer
       gbc.gridx = 0;
       gbc.gridy = 4;
       gbc.weighty = 1.0;
       panel.add(new JLabel(), gbc);
-      
+
       return panel;
    }
-   
+
    private JPanel createUISettingsPanel() {
       JPanel panel = new JPanel(new GridBagLayout());
       panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
       GridBagConstraints gbc = new GridBagConstraints();
       gbc.insets = new Insets(5, 5, 5, 5);
       gbc.anchor = GridBagConstraints.WEST;
-      
+
       // Link Scroll Bars
       gbc.gridx = 0;
       gbc.gridy = 0;
@@ -683,49 +685,273 @@ public class Settings extends Properties implements ActionListener {
       this.linkScrollBarsCheckBox = new JCheckBox("Link scroll bars between bytecode and decompiled code views");
       this.linkScrollBarsCheckBox.setToolTipText("Synchronize scrolling between original and decompiled bytecode views");
       panel.add(this.linkScrollBarsCheckBox, gbc);
-      
+
       // Spacer
       gbc.gridy = 1;
       gbc.weighty = 1.0;
       panel.add(new JLabel(), gbc);
-      
+
       return panel;
    }
-   
+
+   /**
+    * Finds the compiler executable using the same fallback logic as FileDecompiler.getCompilerFile().
+    * This ensures the settings window shows the compiler that will actually be used.
+    * 
+    * @param configuredPath The configured path from the settings field (may be empty)
+    * @return A CompilerResolutionResult containing the found compiler file and whether it's a fallback
+    */
+   private CompilerResolutionResult findCompilerFile(String configuredPath) {
+      // Priority order: primary first, then secondary, then others
+      String[] compilerNames = {
+         "nwnnsscomp.exe",              // Primary - generic name (highest priority)
+         "nwnnsscomp_kscript.exe",      // Secondary - KOTOR Scripting Tool
+         "nwnnsscomp_tslpatcher.exe",   // TSLPatcher variant
+         "nwnnsscomp_v1.exe"            // v1.3 first public release
+      };
+
+      String configuredPathTrimmed = configuredPath != null ? configuredPath.trim() : "";
+      boolean isConfigured = !configuredPathTrimmed.isEmpty();
+
+      // 1. Try configured path (if set) - all compiler filenames
+      if (isConfigured) {
+         File configuredDir = new File(configuredPathTrimmed);
+         if (configuredDir.isDirectory()) {
+            // If it's a directory, try all filenames in it
+            for (String name : compilerNames) {
+               File candidate = new File(configuredDir, name);
+               if (candidate.exists() && candidate.isFile()) {
+                  return new CompilerResolutionResult(candidate, false, "Configured directory: " + configuredPathTrimmed);
+               }
+            }
+         } else {
+            // If it's a file, check if it exists
+            if (configuredDir.exists() && configuredDir.isFile()) {
+               return new CompilerResolutionResult(configuredDir, false, "Configured path: " + configuredPathTrimmed);
+            }
+            // Also try other filenames in the same directory
+            File parent = configuredDir.getParentFile();
+            if (parent != null) {
+               for (String name : compilerNames) {
+                  File candidate = new File(parent, name);
+                  if (candidate.exists() && candidate.isFile()) {
+                     return new CompilerResolutionResult(candidate, true, "Fallback in configured directory: " + parent.getAbsolutePath());
+                  }
+               }
+            }
+         }
+      }
+
+      // 2. Try tools/ directory - all compiler filenames
+      File toolsDir = new File(System.getProperty("user.dir"), "tools");
+      for (String name : compilerNames) {
+         File candidate = new File(toolsDir, name);
+         if (candidate.exists() && candidate.isFile()) {
+            return new CompilerResolutionResult(candidate, true, "Fallback: tools/ directory");
+         }
+      }
+
+      // 3. Try current working directory - all compiler filenames
+      File cwd = new File(System.getProperty("user.dir"));
+      for (String name : compilerNames) {
+         File candidate = new File(cwd, name);
+         if (candidate.exists() && candidate.isFile()) {
+            return new CompilerResolutionResult(candidate, true, "Fallback: current directory");
+         }
+      }
+
+      // 4. Try NCSDecomp installation directory - all compiler filenames
+      File ncsDecompDir = getNCSDecompDirectory();
+      if (ncsDecompDir != null && !ncsDecompDir.equals(cwd)) {
+         for (String name : compilerNames) {
+            File candidate = new File(ncsDecompDir, name);
+            if (candidate.exists() && candidate.isFile()) {
+               return new CompilerResolutionResult(candidate, true, "Fallback: NCSDecomp directory");
+            }
+         }
+         // Also try tools/ subdirectory of NCSDecomp directory
+         File ncsToolsDir = new File(ncsDecompDir, "tools");
+         for (String name : compilerNames) {
+            File candidate = new File(ncsToolsDir, name);
+            if (candidate.exists() && candidate.isFile()) {
+               return new CompilerResolutionResult(candidate, true, "Fallback: NCSDecomp tools/ directory");
+            }
+         }
+      }
+
+      // Not found
+      return null;
+   }
+
+   /**
+    * Gets the NCSDecomp installation directory using the same logic as FileDecompiler.
+    */
+   private File getNCSDecompDirectory() {
+      try {
+         // Try to get the location of the jar/exe file
+         java.net.URL location = Settings.class.getProtectionDomain().getCodeSource().getLocation();
+         if (location != null) {
+            String path = location.getPath();
+            if (path != null) {
+               // Handle URL-encoded paths
+               if (path.startsWith("file:")) {
+                  path = path.substring(5);
+               }
+               // Decode URL encoding
+               try {
+                  path = java.net.URLDecoder.decode(path, "UTF-8");
+               } catch (java.io.UnsupportedEncodingException e) {
+                  // Fall through with original path
+               }
+               File jarFile = new File(path);
+               if (jarFile.exists()) {
+                  File parent = jarFile.getParentFile();
+                  if (parent != null) {
+                     return parent;
+                  }
+               }
+            }
+         }
+      } catch (Exception e) {
+         // Fall through to user.dir
+      }
+      // Fallback to user.dir if we can't determine jar location
+      return new File(System.getProperty("user.dir"));
+   }
+
+   /**
+    * Result of compiler file resolution.
+    */
+   private static class CompilerResolutionResult {
+      final File file;
+      final boolean isFallback;
+      final String source;
+
+      CompilerResolutionResult(File file, boolean isFallback, String source) {
+         this.file = file;
+         this.isFallback = isFallback;
+         this.source = source;
+      }
+   }
+
    /**
     * Updates the compiler info indicator based on the current nwnnsscomp path.
+    * Uses the same fallback logic as FileDecompiler to find the actual compiler that will be used.
     * Detects the compiler version by SHA256 hash and displays metadata.
     */
    private void updateCompilerInfo() {
-      String path = this.nwnnsscompPathField.getText().trim();
-      
-      if (path.isEmpty()) {
-         this.nwnnsscompInfoLabel.setText("");
-         this.nwnnsscompInfoLabel.setToolTipText("No compiler path specified");
-         return;
-      }
-      
-      File compilerFile = new File(path);
-      
-      if (!compilerFile.exists()) {
+      String configuredPath = this.nwnnsscompPathField.getText().trim();
+
+      // Find the compiler using the same fallback logic as FileDecompiler
+      CompilerResolutionResult result = findCompilerFile(configuredPath);
+
+      if (result == null) {
+         // No compiler found
          this.nwnnsscompInfoLabel.setText("❓");
-         this.nwnnsscompInfoLabel.setToolTipText("Compiler file not found: " + path);
+         StringBuilder tooltip = new StringBuilder();
+         tooltip.append("<html><b>Compiler Not Found</b><br>");
+         if (!configuredPath.isEmpty()) {
+            tooltip.append("Configured path: ").append(configuredPath).append("<br>");
+         }
+         tooltip.append("<br>Searched locations:<br>");
+         if (!configuredPath.isEmpty()) {
+            tooltip.append("• Configured path and directory<br>");
+         }
+         tooltip.append("• tools/ directory<br>");
+         tooltip.append("• Current working directory<br>");
+         tooltip.append("• NCSDecomp installation directory<br>");
+         tooltip.append("<br>Compiler filenames tried:<br>");
+         tooltip.append("• nwnnsscomp.exe<br>");
+         tooltip.append("• nwnnsscomp_kscript.exe<br>");
+         tooltip.append("• nwnnsscomp_tslpatcher.exe<br>");
+         tooltip.append("• nwnnsscomp_v1.exe<br>");
+         tooltip.append("</html>");
+         this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
          return;
       }
-      
-      if (!compilerFile.isFile()) {
-         this.nwnnsscompInfoLabel.setText("❌");
-         this.nwnnsscompInfoLabel.setToolTipText("Path is not a file: " + path);
-         return;
-      }
-      
+
+      File compilerFile = result.file;
+
       try {
          // Calculate SHA256 hash
          String sha256 = HashUtil.calculateSHA256(compilerFile);
-         
+
          // Look up compiler
          KnownExternalCompilers compiler = KnownExternalCompilers.fromSha256(sha256);
-         
+
+         if (compiler != null) {
+            // Format tooltip with metadata
+            StringBuilder tooltip = new StringBuilder();
+            tooltip.append("<html><b>").append(compiler.getName()).append("</b><br>");
+            tooltip.append("Path: ").append(compilerFile.getAbsolutePath()).append("<br>");
+            if (result.isFallback) {
+               tooltip.append("<i>Using fallback: ").append(result.source).append("</i><br>");
+            } else {
+               tooltip.append("<i>Using configured path</i><br>");
+            }
+            tooltip.append("<br>Author: ").append(compiler.getAuthor()).append("<br>");
+            tooltip.append("Release Date: ").append(compiler.getReleaseDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))).append("<br>");
+            tooltip.append("SHA256: ").append(sha256.substring(0, 16)).append("...<br>");
+            tooltip.append("<br><b>Compile Args:</b><br>");
+            String[] compileArgs = compiler.getCompileArgs();
+            if (compileArgs.length > 0) {
+               tooltip.append(String.join(" ", compileArgs));
+            } else {
+               tooltip.append("(not supported)");
+            }
+            tooltip.append("<br><br><b>Decompile Args:</b><br>");
+            if (compiler.supportsDecompilation()) {
+               tooltip.append(String.join(" ", compiler.getDecompileArgs()));
+            } else {
+               tooltip.append("(not supported)");
+            }
+            tooltip.append("</html>");
+
+            // Choose emoji based on compiler type
+            String emoji = getCompilerEmoji(compiler);
+            String label = emoji + " " + compiler.getName();
+            if (result.isFallback) {
+               label += " (fallback)";
+            }
+            this.nwnnsscompInfoLabel.setText(label);
+            this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
+         } else {
+            // Unknown compiler
+            this.nwnnsscompInfoLabel.setText("⚠️ Unknown");
+            StringBuilder tooltip = new StringBuilder();
+            tooltip.append("<html><b>Unknown Compiler</b><br>");
+            tooltip.append("Path: ").append(compilerFile.getAbsolutePath()).append("<br>");
+            if (result.isFallback) {
+               tooltip.append("<i>Using fallback: ").append(result.source).append("</i><br>");
+            } else {
+               tooltip.append("<i>Using configured path</i><br>");
+            }
+            tooltip.append("<br>SHA256: ").append(sha256).append("<br>");
+            tooltip.append("This compiler version is not recognized.<br>");
+            tooltip.append("It may not be fully supported.</html>");
+            this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
+         }
+      } catch (IOException e) {
+         this.nwnnsscompInfoLabel.setText("❌");
+         StringBuilder tooltip = new StringBuilder();
+         tooltip.append("<html><b>Error Reading Compiler</b><br>");
+         tooltip.append("Path: ").append(compilerFile.getAbsolutePath()).append("<br>");
+         if (result.isFallback) {
+            tooltip.append("<i>Using fallback: ").append(result.source).append("</i><br>");
+         } else {
+            tooltip.append("<i>Using configured path</i><br>");
+         }
+         tooltip.append("<br>Error: ").append(e.getMessage()).append("</html>");
+         this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
+      }
+
+      try {
+         // Calculate SHA256 hash
+         String sha256 = HashUtil.calculateSHA256(compilerFile);
+
+         // Look up compiler
+         KnownExternalCompilers compiler = KnownExternalCompilers.fromSha256(sha256);
+
          if (compiler != null) {
             // Format tooltip with metadata
             StringBuilder tooltip = new StringBuilder();
@@ -747,10 +973,10 @@ public class Settings extends Properties implements ActionListener {
                tooltip.append("(not supported)");
             }
             tooltip.append("</html>");
-            
+
             // Choose emoji based on compiler type
             String emoji = getCompilerEmoji(compiler);
-            
+
             this.nwnnsscompInfoLabel.setText(emoji + " " + compiler.getName());
             this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
          } else {
@@ -768,7 +994,7 @@ public class Settings extends Properties implements ActionListener {
          this.nwnnsscompInfoLabel.setToolTipText("Error reading compiler file: " + e.getMessage());
       }
    }
-   
+
    /**
     * Returns an emoji representing the compiler type.
     */
