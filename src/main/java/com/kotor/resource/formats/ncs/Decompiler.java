@@ -1538,6 +1538,54 @@ public class Decompiler
             System.out.println("Bytecode comparison not available: " + e.getMessage());
          }
 
+         // Try to populate round-trip panel if a recompiled NCS exists
+         // (e.g., if this file was previously saved and recompiled)
+         try {
+            java.awt.Component rightComp = decompSplitPane.getRightComponent();
+            if (rightComp instanceof JScrollPane) {
+               JScrollPane rightScrollPane = (JScrollPane)rightComp;
+               if (rightScrollPane.getViewport().getView() instanceof JTextPane) {
+                  JTextPane roundTripPane = (JTextPane)rightScrollPane.getViewport().getView();
+
+                  // Look for a saved NSS file in the same directory
+                  File parentDir = file.getParentFile();
+                  if (parentDir != null && parentDir.exists()) {
+                     String baseName = file.getName();
+                     if (baseName.toLowerCase().endsWith(".ncs")) {
+                        baseName = baseName.substring(0, baseName.length() - 4);
+                     }
+
+                     // Look for .nss file with same base name
+                     File[] nssFiles = parentDir.listFiles((dir, name) -> {
+                        String lowerName = name.toLowerCase();
+                        return lowerName.equals(baseName.toLowerCase() + ".nss") ||
+                           (lowerName.startsWith(baseName.toLowerCase() + "_") && lowerName.endsWith(".nss"));
+                     });
+
+                     if (nssFiles != null && nssFiles.length > 0) {
+                        File savedNssFile = nssFiles[0];
+                        String roundTripCode = getRoundTripDecompiledCode(savedNssFile);
+                        if (roundTripCode != null && !roundTripCode.trim().isEmpty()) {
+                           NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, true);
+                           roundTripPane.setText(roundTripCode);
+                           NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, false);
+                           NWScriptSyntaxHighlighter.applyHighlightingImmediate(roundTripPane);
+                        } else {
+                           roundTripPane.setText("// Round-trip decompiled code not available.\n// Save the file to trigger round-trip validation and decompilation.");
+                        }
+                     } else {
+                        roundTripPane.setText("// Round-trip decompiled code not available.\n// Save the file to trigger round-trip validation and decompilation.");
+                     }
+                  } else {
+                     roundTripPane.setText("// Round-trip decompiled code not available.\n// Save the file to trigger round-trip validation and decompilation.");
+                  }
+               }
+            }
+         } catch (Exception e) {
+            System.err.println("Error populating round-trip panel on initial load: " + e.getMessage());
+            e.printStackTrace();
+         }
+
          if (vars != null) {
             this.hash_Func2VarVec = vars;
             this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
@@ -2239,7 +2287,7 @@ public class Decompiler
                if (savedNssFile != null) {
                   roundTripCode = getRoundTripDecompiledCode(savedNssFile);
                }
-               if (roundTripCode != null) {
+               if (roundTripCode != null && !roundTripCode.trim().isEmpty()) {
                   NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, true);
                   roundTripPane.setText(roundTripCode);
                   NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, false);
