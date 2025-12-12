@@ -755,26 +755,53 @@ OutFile "${AppName}-${AppVersion}-Windows.exe"
 
 ; Function to extract parameters from command line (skip executable path)
 Function GetParameters
-    Push `$R0
+    Exch `$R0
     Push `$R1
     Push `$R2
-    StrCpy `$R0 `$CMDLINE
+    Push `$R3
+
+    ; Check if command line starts with quote
     StrCpy `$R1 `$R0 1
-    StrCmp `$R1 '"' 0 +3
-        StrCpy `$R1 `$R0 1 -1
-        StrCmp `$R1 '"' +2
-        StrCpy `$R0 `$R0 "" 1
-    StrCpy `$R1 0
-    loop:
-        StrCpy `$R2 `$R0 1 `$R1
-        StrCmp `$R2 "" done
-        StrCmp `$R2 " " found
-        IntOp `$R1 `$R1 + 1
-        Goto loop
-    found:
-        IntOp `$R1 `$R1 + 1
-        StrCpy `$R0 `$R0 "" `$R1
+    StrCmp `$R1 '"' quoted unquoted
+
+    quoted:
+        ; Find closing quote
+        StrCpy `$R1 1
+        loop_quote:
+            StrCpy `$R2 `$R0 1 `$R1
+            StrCmp `$R2 "" done_no_args
+            StrCmp `$R2 '"' found_close_quote
+            IntOp `$R1 `$R1 + 1
+            Goto loop_quote
+        found_close_quote:
+            IntOp `$R1 `$R1 + 1
+            ; Skip space after quote if present
+            StrCpy `$R2 `$R0 1 `$R1
+            StrCmp `$R2 " " +2
+            StrCpy `$R0 `$R0 "" `$R1
+            IntOp `$R1 `$R1 + 1
+            StrCpy `$R0 `$R0 "" `$R1
+            Goto done
+
+    unquoted:
+        ; Find first space
+        StrCpy `$R1 0
+        loop_space:
+            StrCpy `$R2 `$R0 1 `$R1
+            StrCmp `$R2 "" done_no_args
+            StrCmp `$R2 " " found_space
+            IntOp `$R1 `$R1 + 1
+            Goto loop_space
+        found_space:
+            IntOp `$R1 `$R1 + 1
+            StrCpy `$R0 `$R0 "" `$R1
+            Goto done
+
+    done_no_args:
+        StrCpy `$R0 ""
+
     done:
+        Pop `$R3
         Pop `$R2
         Pop `$R1
         Exch `$R0
@@ -793,9 +820,9 @@ Section "MainSection" SEC01
     ; Extract all files from the app directory
     File /r "${appImageName}\*.*"
 
-    ; Get command line arguments
-    ; `$CMDLINE contains full command line, we'll pass it and let Java parse it
-    ; Java will correctly handle the executable name as args[0] and skip it
+    ; Extract command line arguments (skip executable path)
+    ; `$CMDLINE format: "C:\path\to\exe.exe" args...
+    ; We need to extract everything after the first space (or after closing quote)
     Push `$CMDLINE
     Call GetParameters
     Pop `$R0
