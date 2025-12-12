@@ -956,15 +956,36 @@ public class FileDecompiler {
          String outname = this.getShortName(file) + ".ncs";
          File result = new File(outname).getAbsoluteFile();
 
+         // Ensure nwscript.nss is in the compiler's directory (like test does)
+         File compilerDir = compiler.getParentFile();
+         if (compilerDir != null) {
+            File compilerNwscript = new File(compilerDir, "nwscript.nss");
+            File nwscriptSource = k2
+               ? new File(new File(System.getProperty("user.dir"), "tools"), "tsl_nwscript.nss")
+               : new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss");
+            if (nwscriptSource.exists() && (!compilerNwscript.exists() || !compilerNwscript.getAbsolutePath().equals(nwscriptSource.getAbsolutePath()))) {
+               try {
+                  java.nio.file.Files.copy(nwscriptSource.toPath(), compilerNwscript.toPath(),
+                     java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+               } catch (java.io.IOException e) {
+                  // Log but don't fail - compiler might find nwscript.nss elsewhere
+                  System.err.println("[NCSDecomp] Warning: Could not copy nwscript.nss to compiler directory: " + e.getMessage());
+               }
+            }
+         }
+
          // Use compiler detection to get correct command-line arguments
          NwnnsscompConfig config = new NwnnsscompConfig(compiler, file, result, k2);
+
+         // For GUI compilation, match test behavior: don't use -i flags
+         // Test shows compilers work without -i when includes are in source directory or compiler directory
+         // All compilers expect nwscript.nss in compiler directory and includes in source directory
          String[] args = config.getCompileArgs(compiler.getAbsolutePath());
 
          System.out.println("[NCSDecomp] Using compiler: " + config.getChosenCompiler().getName() +
             " (SHA256: " + config.getSha256Hash().substring(0, 16) + "...)");
          System.out.println("[NCSDecomp] Input file: " + file.getAbsolutePath());
          System.out.println("[NCSDecomp] Expected output: " + result.getAbsolutePath());
-         System.out.println("[NCSDecomp] Note: nwscript.nss must be in the compiler's directory or source file directory");
 
          new FileDecompiler.WindowsExec().callExec(args);
 
@@ -986,6 +1007,25 @@ public class FileDecompiler {
          e.printStackTrace();
          return null;
       }
+   }
+
+   private List<File> buildIncludeDirs(boolean k2) {
+      List<File> dirs = new ArrayList<>();
+      File base = new File("test-work" + File.separator + "Vanilla_KOTOR_Script_Source");
+      File gameDir = new File(base, k2 ? "TSL" : "K1");
+      File scriptsBif = new File(gameDir, "Data" + File.separator + "scripts.bif");
+      if (scriptsBif.exists()) {
+         dirs.add(scriptsBif);
+      }
+      File rootOverride = new File(gameDir, "Override");
+      if (rootOverride.exists()) {
+         dirs.add(rootOverride);
+      }
+      // Fallback: allow includes relative to the game dir root.
+      if (gameDir.exists()) {
+         dirs.add(gameDir);
+      }
+      return dirs;
    }
 
    private void ensureActionsLoaded() throws DecompilerException {
@@ -2323,29 +2363,27 @@ public class FileDecompiler {
        */
       public void callExec(String[] args) {
          try {
-            // Build copy/paste-able command string with proper quoting
+            // Build copy-pasteable command string (exact format as test output)
             StringBuilder cmdStr = new StringBuilder();
-            for (String arg : args) {
-               if (cmdStr.length() > 0) {
+            for (int i = 0; i < args.length; i++) {
+               if (i > 0) {
                   cmdStr.append(" ");
                }
-               // Always quote arguments that contain spaces, backslashes, or special chars
-               if (arg.contains(" ") || arg.contains("\\") || arg.contains("\"") ||
-                   arg.contains("&") || arg.contains("|") || arg.contains("<") || arg.contains(">")) {
-                  // Use double quotes and escape internal quotes
+               String arg = args[i];
+               // Quote arguments that contain spaces
+               if (arg.contains(" ") || arg.contains("\"")) {
                   cmdStr.append("\"").append(arg.replace("\"", "\\\"")).append("\"");
                } else {
                   cmdStr.append(arg);
                }
             }
+            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            System.out.println("[NCSDecomp] Executing nwnnsscomp.exe:");
+            System.out.println("[NCSDecomp] Command: " + cmdStr.toString());
             System.out.println("");
-            System.out.println("================================================================================");
-            System.out.println("[NCSDecomp] Executing nwnnsscomp.exe");
-            System.out.println("[NCSDecomp] Copy/paste command:");
-            System.out.println("");
+            System.out.println("[NCSDecomp] Calling nwnnsscomp with command:");
             System.out.println(cmdStr.toString());
-            System.out.println("");
-            System.out.println("================================================================================");
+            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
             ProcessBuilder pb = new ProcessBuilder(args);
             Process proc = pb.start();
