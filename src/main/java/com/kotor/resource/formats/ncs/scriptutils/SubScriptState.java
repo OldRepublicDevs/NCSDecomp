@@ -340,22 +340,30 @@ public class SubScriptState {
 
                ScriptRootNode elseParent = parent;
 
-               if (AElse.class.isInstance(parent) && parent.size() == 1 && AIf.class.isInstance(parent.getLastChild())) {
-                  // This AIf is the only child of an AElse (else-if case)
-                  // The next AElse should be a sibling of this AElse, not nested
-                  ScriptRootNode grandParent = (ScriptRootNode) parent.parent();
-                  // Safety check: don't go above the root function
-                  if (grandParent != null && !ASub.class.isInstance(grandParent)) {
-                     elseParent = grandParent;
-                  } else {
-                     // If grandParent is root or null, keep parent as elseParent
-                     // This handles the case where the AElse is already at the function level
-                     elseParent = parent;
+               // Check if this AIf is inside an AElse (else-if chain case)
+               // If the parent is an AElse and the AIf is the last child,
+               // the next AElse should be a sibling of the parent AElse, not nested
+               if (AElse.class.isInstance(parent)) {
+                  // Check if this AIf is the last child of the AElse
+                  boolean isLastChild = parent.hasChildren() && parent.getLastChild() == this.current;
+                  if (isLastChild) {
+                     // This AIf is the last child of an AElse (else-if case)
+                     // The next AElse should be a sibling of this AElse, not nested
+                     ScriptRootNode grandParent = (ScriptRootNode) parent.parent();
+                     // Safety check: don't go above the root function
+                     if (grandParent != null && !ASub.class.isInstance(grandParent)) {
+                        elseParent = grandParent;
+                     } else {
+                        // If grandParent is root or null, keep parent as elseParent
+                        // This handles the case where the AElse is already at the function level
+                        elseParent = parent;
+                     }
                   }
+                  // If the AIf is not the last child, keep parent as elseParent (nested else)
                }
 
-               // Safety check: ensure elseParent is not null
-               if (elseParent == null) {
+               // Safety check: ensure elseParent is not null and is not the AIf itself
+               if (elseParent == null || elseParent == this.current) {
                   elseParent = this.root;
                }
 
