@@ -52,3 +52,44 @@ Please do not create .md documentation unless it delivers public-facing informat
 **Action Opcodes**: Action definitions in `src/main/resources/*_nwscript.nss` or `tools/*_nwscript.nss`. Format: `// N:` comment followed by function signature. Action index N maps to opcode N in bytecode. Search pattern: `^// (N):` where N is decimal action ID. Example: `// 120:` = `EffectDamageIncrease`, `// 57:` = `PauseGame`.
 
 **Common Mistakes**: Don't search for "action 120" in source files—look for `// 120:` comments. Don't assume `test_data/` exists—use `test-work/`. Don't use `NCSDecomp` class—use `NCSDecompCLI`. When bytecode mismatches, inspect decompiled output structure (missing spaces, malformed blocks) not just opcodes—structural issues cause wrong actions to be emitted.
+
+## Debug Statements
+
+**ALWAYS add comprehensive debug statements when working on control flow, bytecode processing, or complex logic issues.** Debug statements are valuable for diagnosing problems and should be added exhaustively and thoroughly throughout relevant code paths.
+
+**Pattern and Format**:
+- Use `System.err.println()` (not `System.out.println()`) to avoid interfering with normal output
+- Format: `System.err.println("DEBUG <methodName>: <key information>");`
+- Include relevant variables: positions (nodePos, destPos, currentEnd), state values, types, decisions being made
+- Be information-packed but not overly verbose—include multiple useful variables in a single statement when possible
+- Show both input values and decision outcomes (e.g., "returning true/false", "creating X", "updating Y from A to B")
+
+**Example patterns**:
+```java
+// Method entry with key parameters
+System.err.println("DEBUG transformJump: pos=" + nodePos + " (0x" + Integer.toHexString(nodePos) + 
+      "), destPos=" + destPos + ", state=" + this.state + ", current=" + this.current.getClass().getSimpleName() + 
+      ", currentEnd=" + this.current.getEnd() + ", destType=" + (dest != null ? dest.getClass().getSimpleName() : "null"));
+
+// Decision points
+System.err.println("DEBUG isAtIfEnd: nodePos=" + nodePos + ", current=" + this.current.getClass().getSimpleName() + 
+      ", currentEnd=" + this.current.getEnd());
+System.err.println("DEBUG isAtIfEnd: returning true (current is AIf)");
+
+// State changes
+System.err.println("DEBUG transformJZ: UPDATING AIf end from " + currentEnd + " to " + expectedEnd);
+
+// Conditional branches
+System.err.println("DEBUG checkEnd: destPos != aifEnd+6, creating else block");
+System.err.println("DEBUG checkEnd: AIf end=" + aifEnd + ", destPos=" + destPos + ", expectedElseStart=" + (aifEnd + 6));
+```
+
+**Where to add debug statements**:
+- Method entry points (show key parameters and current state)
+- Decision points (if/else branches, switch cases, return statements)
+- State changes (when `this.current` changes, when `this.state` changes, when node end positions are updated)
+- Loop iterations (when iterating through parent chains, processing children)
+- Error conditions or edge cases
+- Before and after critical operations (creating nodes, updating positions, transitioning states)
+
+**Keep debug statements in committed code**—they are valuable for future debugging and understanding control flow. They can be filtered out during normal operation using stderr redirection if needed.
