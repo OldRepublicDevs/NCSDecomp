@@ -231,7 +231,7 @@ public class Decompiler
       // Workspace cards to show empty state when no files are open
       this.workspaceCards = new JPanel(new CardLayout());
       this.emptyStateLabel = new JLabel(
-         "<html><div style='text-align:center;'><h2>Drop .ncs files here</h2><div>Or use File → Open to start decompiling</div></div></html>",
+         "<html><div style='text-align:center;'><h2>Drop .ncs or .nss files here</h2><div>Or use File → Open to start decompiling</div></div></html>",
          SwingConstants.CENTER
       );
       this.emptyStateLabel.setBorder(new EmptyBorder(32, 16, 32, 16));
@@ -1372,6 +1372,81 @@ public class Decompiler
       return tabComponents;
    }
 
+   /**
+    * Loads an NSS file directly (it's already source code, no decompilation needed).
+    *
+    * @param file The NSS file to load
+    */
+   private void loadNssFile(File file) {
+      this.status.append("Loading NSS file...");
+      this.statusScrollPane.getVerticalScrollBar().setValue(this.statusScrollPane.getVerticalScrollBar().getMaximum());
+      this.status.append(file.getName() + ": ");
+
+      String fileContent = null;
+      try {
+         // Read the file content
+         fileContent = new String(java.nio.file.Files.readAllBytes(file.toPath()),
+            java.nio.charset.StandardCharsets.UTF_8);
+      } catch (java.io.IOException e) {
+         this.status.append("error reading file: " + e.getMessage() + "\n");
+         JOptionPane.showMessageDialog(null, "Error reading NSS file: " + e.getMessage());
+         return;
+      }
+
+      // Create tab and display content
+      String baseName = file.getName();
+      int lastDot = baseName.lastIndexOf('.');
+      if (lastDot > 0) {
+         baseName = baseName.substring(0, lastDot);
+      }
+      this.panels = this.newNCSTab(baseName);
+
+      // Get the left side text pane from the split pane
+      if (this.panels[0] instanceof JSplitPane) {
+         JSplitPane decompSplitPane = (JSplitPane)this.panels[0];
+         java.awt.Component leftComp = decompSplitPane.getLeftComponent();
+         if (leftComp instanceof JScrollPane) {
+            JScrollPane leftScrollPane = (JScrollPane)leftComp;
+            JTextComponent codeArea = (JTextComponent)leftScrollPane.getViewport().getView();
+
+            // Disable highlighting during setText to prevent freeze
+            if (codeArea instanceof JTextPane) {
+               NWScriptSyntaxHighlighter.setSkipHighlighting((JTextPane)codeArea, true);
+            }
+
+            codeArea.setText(fileContent);
+
+            // Re-enable highlighting and apply immediately
+            if (codeArea instanceof JTextPane) {
+               JTextPane textPane = (JTextPane)codeArea;
+               NWScriptSyntaxHighlighter.setSkipHighlighting(textPane, false);
+               NWScriptSyntaxHighlighter.applyHighlightingImmediate(textPane);
+            }
+         }
+      }
+
+      // For NSS files, we don't have variable data from decompilation
+      // Create an empty tree model
+      this.hash_Func2VarVec = new Hashtable<>();
+      this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
+
+      // Map the file to the tab component
+      JComponent tabComponent = this.getSelectedTabComponent();
+      if (tabComponent != null) {
+         this.hash_TabComponent2File.put(tabComponent, file);
+         this.hash_TabComponent2Func2VarVec.put(tabComponent, this.hash_Func2VarVec);
+         this.hash_TabComponent2TreeModel.put(tabComponent, this.jTree.getModel());
+         if (tabComponent instanceof JPanel) {
+            this.updateTabLabel((JPanel)tabComponent, false);
+         }
+      }
+
+      this.status.append("loaded successfully\n");
+
+      // Update workspace visibility after adding a file
+      this.updateWorkspaceCard();
+   }
+
    private void decompile(File file) {
       this.status.append("Decompiling...");
       this.statusScrollPane.getVerticalScrollBar().setValue(this.statusScrollPane.getVerticalScrollBar().getMaximum());
@@ -1674,15 +1749,16 @@ public class Decompiler
       jFC.setFileFilter(new FileFilter() {
          @Override
          public boolean accept(File f) {
-            Decompiler var10000 = Decompiler.this;
-            String var10002 = f.getAbsolutePath();
-            var10000.temp = var10002;
-            return var10002.substring(Decompiler.this.temp.length() - 3).equalsIgnoreCase("ncs") || f.isDirectory();
+            if (f.isDirectory()) {
+               return true;
+            }
+            String name = f.getName().toLowerCase();
+            return name.endsWith(".ncs") || name.endsWith(".nss");
          }
 
          @Override
          public String getDescription() {
-            return ".ncs";
+            return "NWScript Files (*.ncs, *.nss)";
          }
       });
       switch (jFC.showDialog(null, "Open")) {
@@ -1706,21 +1782,27 @@ public class Decompiler
    void open(File[] files) {
       for (int j = 0; j < files.length; j++) {
          File fileToOpen = files[j];
-         if ((this.temp = fileToOpen.getName()).substring(this.temp.length() - 3).equalsIgnoreCase("ncs")) {
-            // Ensure we use the absolute path of the dropped/opened file
-            File absoluteFile = fileToOpen.getAbsoluteFile();
-            if (!absoluteFile.exists()) {
-               this.status.append("Warning: File does not exist: " + absoluteFile.getAbsolutePath() + "\n");
-               continue;
-            }
+         String fileName = fileToOpen.getName().toLowerCase();
 
-            // Update Open Directory setting to the file's parent directory
-            File parentDir = absoluteFile.getParentFile();
-            if (parentDir != null && parentDir.exists()) {
-               settings.setProperty("Open Directory", parentDir.getAbsolutePath());
-            }
+         // Ensure we use the absolute path of the dropped/opened file
+         File absoluteFile = fileToOpen.getAbsoluteFile();
+         if (!absoluteFile.exists()) {
+            this.status.append("Warning: File does not exist: " + absoluteFile.getAbsolutePath() + "\n");
+            continue;
+         }
 
+         // Update Open Directory setting to the file's parent directory
+         File parentDir = absoluteFile.getParentFile();
+         if (parentDir != null && parentDir.exists()) {
+            settings.setProperty("Open Directory", parentDir.getAbsolutePath());
+         }
+
+         if (fileName.endsWith(".ncs")) {
+            // Decompile NCS file
             this.decompile(absoluteFile);
+         } else if (fileName.endsWith(".nss")) {
+            // Load NSS file directly (it's already source code)
+            this.loadNssFile(absoluteFile);
          }
       }
    }
