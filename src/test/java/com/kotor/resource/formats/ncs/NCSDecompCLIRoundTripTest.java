@@ -3687,8 +3687,6 @@ public class NCSDecompCLIRoundTripTest {
 
                // Save resume point for next run
                if (useResume) {
-                  Path relPath = VANILLA_REPO_DIR.relativize(testCase.item.path);
-                  String displayPath = relPath.toString().replace('\\', '/');
                   saveResumePoint(displayPath);
                   System.out.println("Resume point saved. Next run will start from: " + displayPath);
                   System.out.println("(Use --no-resume to start from beginning)");
