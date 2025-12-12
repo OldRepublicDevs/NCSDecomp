@@ -604,7 +604,12 @@ public class FileDecompiler {
       if (!this.checkCompilerExists()) {
          System.out.println(
                "[NCSDecomp] nwnnsscomp.exe not found - skipping bytecode validation. Decompiled source will still be shown.");
-         System.out.println("[NCSDecomp] Looking for: " + this.getCompilerFile().getAbsolutePath());
+         File compiler = this.getCompilerFile();
+         if (compiler != null) {
+            System.out.println("[NCSDecomp] Looking for: " + compiler.getAbsolutePath());
+         } else {
+            System.out.println("[NCSDecomp] No compiler configured");
+         }
          return PARTIAL_COMPILE;
       }
 
@@ -952,8 +957,12 @@ public class FileDecompiler {
    private File externalDecompile(File in, boolean k2, File outputDir) {
       try {
          File compiler = getCompilerFile();
-         if (!compiler.exists()) {
-            System.out.println("[NCSDecomp] ERROR: Compiler not found: " + compiler.getAbsolutePath());
+         if (compiler == null || !compiler.exists()) {
+            if (compiler != null) {
+               System.out.println("[NCSDecomp] ERROR: Compiler not found: " + compiler.getAbsolutePath());
+            } else {
+               System.out.println("[NCSDecomp] ERROR: No compiler configured");
+            }
             return null;
          }
 
@@ -1072,8 +1081,12 @@ public class FileDecompiler {
    public File externalCompile(File file, boolean k2, File outputDir) {
       try {
          File compiler = getCompilerFile();
-         if (!compiler.exists()) {
-            System.out.println("[NCSDecomp] ERROR: Compiler not found: " + compiler.getAbsolutePath());
+         if (compiler == null || !compiler.exists()) {
+            if (compiler != null) {
+               System.out.println("[NCSDecomp] ERROR: Compiler not found: " + compiler.getAbsolutePath());
+            } else {
+               System.out.println("[NCSDecomp] ERROR: No compiler configured");
+            }
             return null;
          }
 

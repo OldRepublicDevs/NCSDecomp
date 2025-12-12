@@ -833,7 +833,7 @@ public class Settings extends Properties implements ActionListener {
     * Handles changes to the nwnnsscomp path field.
     * Extracts parent folder if a file path is entered, then populates the combobox.
     */
-   private void handlePathFieldChange() {
+   void handlePathFieldChange() {
       String path = this.nwnnsscompPathField.getText().trim();
       if (path.isEmpty()) {
          this.nwnnsscompComboBox.removeAllItems();
@@ -889,13 +889,13 @@ public class Settings extends Properties implements ActionListener {
          return;
       }
 
-      // Get all files in the directory that start with "nwnnsscomp" (excluding tslpatcher and v1 variants)
+      // Get all files in the directory that start with "nwnnsscomp" (maybe fix tslpatcher/v1 later)
       File[] files = folder.listFiles((dir, name) -> {
          String lowerName = name.toLowerCase();
          if (!lowerName.startsWith("nwnnsscomp") || !lowerName.endsWith(".exe")) {
             return false;
          }
-         // Exclude tslpatcher and v1 variants
+         // Exclude tslpatcher and v1 variants (maybe fix tslpatcher/v1 later)
          return !lowerName.contains("tslpatcher") && !lowerName.contains("_v1");
       });
 
