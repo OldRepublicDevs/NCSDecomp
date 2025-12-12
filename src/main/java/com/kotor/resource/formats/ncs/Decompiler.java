@@ -77,6 +77,10 @@ import javax.swing.text.Element;
 import javax.swing.tree.TreeModel;
 import javax.swing.tree.TreeNode;
 import javax.swing.tree.TreePath;
+import javax.swing.SwingUtilities;
+import java.io.PrintStream;
+import java.io.OutputStream;
+import java.io.IOException;
 
 /**
  * Swing GUI application for decompiling NCS scripts and viewing results.
@@ -136,6 +140,8 @@ public class Decompiler
    private JLabel emptyStateLabel;
    private static final String CARD_EMPTY = "empty";
    private static final String CARD_TABS = "tabs";
+   private PrintStream originalOut;
+   private PrintStream originalErr;
    private static final String PROJECT_URL = "https://bolabaden.org";
    private static final String GITHUB_URL = "https://github.com/bolabaden";
    private static final String SPONSOR_URL = "https://github.com/sponsors/th3w1zard1";
@@ -273,7 +279,252 @@ public class Decompiler
       this.addWindowListener(this);
       this.updateWorkspaceCard();
       this.updateMenuAndToolbarState();
+
+      // Redirect System.out and System.err to both terminal and GUI log area
+      this.setupStreamRedirection();
+
       this.setVisible(true);
+   }
+
+   /**
+    * Sets up redirection of System.out and System.err to both the terminal
+    * and the GUI log area. This ensures all debug output appears in both places.
+    */
+   private void setupStreamRedirection() {
+      // Store original streams
+      this.originalOut = System.out;
+      this.originalErr = System.err;
+
+      // Create dual-output streams
+      DualOutputPrintStream dualOut = new DualOutputPrintStream(this.originalOut, this.status);
+      DualOutputPrintStream dualErr = new DualOutputPrintStream(this.originalErr, this.status);
+
+      // Replace System.out and System.err
+      System.setOut(dualOut);
+      System.setErr(dualErr);
+   }
+
+   /**
+    * A PrintStream that writes to both the original stream (terminal) and the GUI log area.
+    * This ensures all output appears in both places.
+    */
+   private static class DualOutputPrintStream extends PrintStream {
+      private final PrintStream original;
+      private final JTextArea guiLog;
+
+      public DualOutputPrintStream(PrintStream original, JTextArea guiLog) {
+         super(new DualOutputStream(original, guiLog), true);
+         this.original = original;
+         this.guiLog = guiLog;
+      }
+      
+      /**
+       * Thread-safe method to append text to the GUI log area.
+       * Uses SwingUtilities.invokeLater to ensure updates happen on the EDT.
+       */
+      private void appendToGui(String text) {
+         if (text != null && guiLog != null) {
+            SwingUtilities.invokeLater(() -> {
+               guiLog.append(text);
+               // Auto-scroll to bottom
+               guiLog.setCaretPosition(guiLog.getDocument().getLength());
+            });
+         }
+      }
+
+      /**
+       * Custom OutputStream that writes to both the original PrintStream and the GUI log area.
+       */
+      private static class DualOutputStream extends OutputStream {
+         private final PrintStream original;
+         private final JTextArea guiLog;
+         private final StringBuilder lineBuffer = new StringBuilder();
+
+         public DualOutputStream(PrintStream original, JTextArea guiLog) {
+            this.original = original;
+            this.guiLog = guiLog;
+         }
+
+         @Override
+         public void write(int b) throws IOException {
+            original.write(b);
+            char c = (char) b;
+            lineBuffer.append(c);
+            if (c == '\n') {
+               flushLine();
+            }
+         }
+
+         @Override
+         public void write(byte[] b, int off, int len) throws IOException {
+            original.write(b, off, len);
+            String text = new String(b, off, len);
+            lineBuffer.append(text);
+            if (text.contains("\n")) {
+               flushLine();
+            }
+         }
+
+         @Override
+         public void flush() throws IOException {
+            original.flush();
+            flushLine();
+         }
+
+         @Override
+         public void close() throws IOException {
+            flushLine();
+            // Don't close the original stream - it's System.out/err
+         }
+
+         private void flushLine() {
+            if (lineBuffer.length() > 0) {
+               String line = lineBuffer.toString();
+               lineBuffer.setLength(0);
+               appendToGui(line);
+            }
+         }
+
+         private void appendToGui(String text) {
+            if (text != null && guiLog != null) {
+               SwingUtilities.invokeLater(() -> {
+                  guiLog.append(text);
+                  // Auto-scroll to bottom
+                  guiLog.setCaretPosition(guiLog.getDocument().getLength());
+               });
+            }
+         }
+      }
+
+      @Override
+      public void print(String s) {
+         if (s != null) {
+            original.print(s);
+            appendToGui(s);
+         }
+      }
+
+      @Override
+      public void println(String x) {
+         original.println(x);
+         appendToGui(x != null ? x : "null");
+         appendToGui("\n");
+      }
+
+      @Override
+      public void println() {
+         original.println();
+         appendToGui("\n");
+      }
+
+      @Override
+      public void print(boolean b) {
+         original.print(b);
+         appendToGui(String.valueOf(b));
+      }
+
+      @Override
+      public void print(char c) {
+         original.print(c);
+         appendToGui(String.valueOf(c));
+      }
+
+      @Override
+      public void print(int i) {
+         original.print(i);
+         appendToGui(String.valueOf(i));
+      }
+
+      @Override
+      public void print(long l) {
+         original.print(l);
+         appendToGui(String.valueOf(l));
+      }
+
+      @Override
+      public void print(float f) {
+         original.print(f);
+         appendToGui(String.valueOf(f));
+      }
+
+      @Override
+      public void print(double d) {
+         original.print(d);
+         appendToGui(String.valueOf(d));
+      }
+
+      @Override
+      public void print(char[] s) {
+         original.print(s);
+         if (s != null) {
+            appendToGui(new String(s));
+         }
+      }
+
+      @Override
+      public void print(Object obj) {
+         original.print(obj);
+         appendToGui(String.valueOf(obj));
+      }
+
+      @Override
+      public void println(boolean x) {
+         original.println(x);
+         appendToGui(String.valueOf(x));
+         appendToGui("\n");
+      }
+
+      @Override
+      public void println(char x) {
+         original.println(x);
+         appendToGui(String.valueOf(x));
+         appendToGui("\n");
+      }
+
+      @Override
+      public void println(int x) {
+         original.println(x);
+         appendToGui(String.valueOf(x));
+         appendToGui("\n");
+      }
+
+      @Override
+      public void println(long x) {
+         original.println(x);
+         appendToGui(String.valueOf(x));
+         appendToGui("\n");
+      }
+
+      @Override
+      public void println(float x) {
+         original.println(x);
+         appendToGui(String.valueOf(x));
+         appendToGui("\n");
+      }
+
+      @Override
+      public void println(double x) {
+         original.println(x);
+         appendToGui(String.valueOf(x));
+         appendToGui("\n");
+      }
+
+      @Override
+      public void println(char[] x) {
+         original.println(x);
+         if (x != null) {
+            appendToGui(new String(x));
+         }
+         appendToGui("\n");
+      }
+
+      @Override
+      public void println(Object x) {
+         original.println(x);
+         appendToGui(String.valueOf(x));
+         appendToGui("\n");
+      }
+
    }
 
    public static void main(String[] args) {
@@ -412,12 +663,12 @@ public class Decompiler
       }
       this.updateMenuAndToolbarState();
    }
-   
+
    private void updateMenuAndToolbarState() {
       boolean hasTabs = this.jTB.getTabCount() > 0;
       int selectedIndex = this.jTB.getSelectedIndex();
       boolean hasSelection = selectedIndex >= 0 && selectedIndex < this.jTB.getTabCount();
-      
+
       JMenuBar menuBar = this.getJMenuBar();
       if (menuBar != null && menuBar.getMenuCount() > 0) {
          JMenu fileMenu = menuBar.getMenu(0);
@@ -436,7 +687,7 @@ public class Decompiler
             }
          }
       }
-      
+
       // Update toolbar buttons
       if (this.commandBar != null) {
          for (java.awt.Component comp : this.commandBar.getComponents()) {
@@ -472,7 +723,7 @@ public class Decompiler
          label.setText(unsaved ? clean + " *" : clean);
       }
    }
-   
+
    /**
     * Safely gets the tab component for the currently selected tab.
     * @return The tab component, or null if no valid tab is selected
@@ -604,24 +855,24 @@ public class Decompiler
       if (selectedIndex < 0 || selectedIndex >= this.jTB.getTabCount()) {
          return; // No valid tab selected
       }
-      
+
       JComponent tabComponent = (JComponent)this.jTB.getTabComponentAt(selectedIndex);
       if (tabComponent == null) {
          return; // Tab component is null
       }
-      
+
       if (arg0.getSource() instanceof JTree) {
          TreePath changedPath = ((JTree)arg0.getSource()).getSelectionPath();
          File file = this.hash_TabComponent2File.get(tabComponent);
          if (file == null) {
             return; // File not found for this tab
          }
-         
+
          Object clientProperty = this.jTB.getClientProperty(tabComponent);
          if (!(clientProperty instanceof JComponent[])) {
             return; // Invalid client property
          }
-         
+
          JComponent[] panels = (JComponent[])clientProperty;
             if (changedPath != null && changedPath.getPathCount() == 2) {
                Hashtable<String, Vector<Variable>> func2VarVec = this.fileDecompiler.updateSubName(file, this.currentNodeString, changedPath.getLastPathComponent().toString());
@@ -805,28 +1056,28 @@ public class Decompiler
       if (!Boolean.parseBoolean(settings.getProperty("Link Scroll Bars"))) {
          return;
       }
-      
+
       java.awt.Component selectedComponent = this.jTB.getSelectedComponent();
       if (selectedComponent == null || !(selectedComponent instanceof JSplitPane)) {
          return; // No valid component selected
       }
-      
+
       JSplitPane splitPane = (JSplitPane)selectedComponent;
       Object linkProperty = this.jTB.getClientProperty(selectedComponent);
       if (linkProperty == null) {
          return; // No link property set
       }
-      
+
       java.awt.Component leftComp = splitPane.getLeftComponent();
       java.awt.Component rightComp = splitPane.getRightComponent();
-      
+
       if (!(leftComp instanceof JScrollPane) || !(rightComp instanceof JScrollPane)) {
          return; // Invalid component structure
       }
-      
+
       JScrollPane leftScroll = (JScrollPane)leftComp;
       JScrollPane rightScroll = (JScrollPane)rightComp;
-      
+
       if (linkProperty.equals("left")) {
          rightScroll.getVerticalScrollBar().setValue(leftScroll.getVerticalScrollBar().getValue());
       } else {
@@ -840,27 +1091,27 @@ public class Decompiler
       if (selectedIndex < 0 || selectedIndex >= this.jTB.getTabCount()) {
          return; // No tab selected or invalid index
       }
-      
+
       JComponent tabComponent = (JComponent)this.jTB.getTabComponentAt(selectedIndex);
       if (tabComponent == null) {
          return; // Tab component is null
       }
-      
+
       Object clientProperty = this.jTB.getClientProperty(tabComponent);
       if (!(clientProperty instanceof JComponent[])) {
          return; // Invalid client property
       }
-      
+
       JComponent[] panels = (JComponent[])clientProperty;
       if (panels.length == 0 || !(panels[0] instanceof JPanel)) {
          return; // Invalid panel structure
       }
-      
+
       JPanel panel = (JPanel)panels[0];
       if (!(panel.getBorder() instanceof TitledBorder)) {
          return; // Invalid border type
       }
-      
+
       this.jTA = (JTextArea)arg0.getSource();
       this.mark = this.jTA.getCaretPosition();
       this.rootElement = this.jTA.getDocument().getDefaultRootElement();
@@ -977,13 +1228,13 @@ public class Decompiler
                         "void main() {\n    // No decompiled code\n}\n";
          result = 2;
       }
-      
+
       // Now we're guaranteed to have code - always show it
       {
          this.panels = this.newNCSTab(file.getName().substring(0, file.getName().length() - 4));
          JTextArea codeArea = (JTextArea)((JScrollPane)((JPanel)this.panels[0]).getComponent(0)).getViewport().getView();
          codeArea.append(generatedCode);
-         
+
          // Try to get bytecode if available
          try {
             String origByteCode = this.fileDecompiler.getOriginalByteCode(file);
@@ -1039,7 +1290,7 @@ public class Decompiler
             this.status.append("unknown result code: " + result + "\n");
             break;
       }
-      
+
       // Update workspace visibility after adding a file
       this.updateWorkspaceCard();
    }
@@ -1079,7 +1330,7 @@ public class Decompiler
                charset = java.nio.charset.StandardCharsets.UTF_8;
             }
          }
-         
+
          BufferedWriter bw = new BufferedWriter(
             new java.io.OutputStreamWriter(
                new java.io.FileOutputStream(canonicalPath),
@@ -1101,7 +1352,7 @@ public class Decompiler
 
       return null;
    }
-   
+
    /**
     * Builds output filename using settings for prefix, suffix, and extension.
     */
@@ -1121,29 +1372,29 @@ public class Decompiler
       if (selectedIndex < 0 || selectedIndex >= this.jTB.getTabCount()) {
          return; // No tab selected or invalid index
       }
-      
+
       JComponent tabComponent = (JComponent)this.jTB.getTabComponentAt(selectedIndex);
       if (tabComponent == null) {
          return; // Tab component is null
       }
-      
+
       Object clientProperty = this.jTB.getClientProperty(tabComponent);
       if (!(clientProperty instanceof JComponent[])) {
          return; // Invalid client property
       }
-      
+
       JComponent[] panels = (JComponent[])clientProperty;
       if (index < 0 || index >= panels.length || panels[index] == null) {
          return; // Invalid panel index
       }
-      
+
       // If switching to bytecode view (index 1), populate bytecode data if available
       if (index == 1 && panels[1] instanceof JSplitPane) {
          try {
             File file = this.hash_TabComponent2File.get(tabComponent);
             if (file != null) {
                JSplitPane byteCodePane = (JSplitPane)panels[1];
-               
+
                // Get left component (original bytecode)
                java.awt.Component leftComp = byteCodePane.getLeftComponent();
                if (leftComp instanceof JScrollPane) {
@@ -1157,7 +1408,7 @@ public class Decompiler
                      }
                   }
                }
-               
+
                // Get right component (recompiled bytecode)
                java.awt.Component rightComp = byteCodePane.getRightComponent();
                if (rightComp instanceof JScrollPane) {
@@ -1199,7 +1450,7 @@ public class Decompiler
             }
          }
       }
-      
+
       this.jTB.setComponentAt(selectedIndex, panels[index]);
       this.repaint();
    }
@@ -1254,13 +1505,13 @@ public class Decompiler
                this.status.append("Warning: File does not exist: " + absoluteFile.getAbsolutePath() + "\n");
                continue;
             }
-            
+
             // Update Open Directory setting to the file's parent directory
             File parentDir = absoluteFile.getParentFile();
             if (parentDir != null && parentDir.exists()) {
                settings.setProperty("Open Directory", parentDir.getAbsolutePath());
             }
-            
+
             this.decompile(absoluteFile);
          }
       }
@@ -1329,56 +1580,56 @@ public class Decompiler
       if (index < 0 || index >= this.jTB.getTabCount()) {
          return; // Invalid index
       }
-      
+
       JComponent tabComponent = (JComponent)this.jTB.getTabComponentAt(index);
       if (tabComponent == null) {
          return; // Tab component is null
       }
-      
+
       Object clientProperty = this.jTB.getClientProperty(tabComponent);
       if (!(clientProperty instanceof JComponent[])) {
          return; // Invalid client property
       }
-      
+
       JComponent[] panels = (JComponent[])clientProperty;
       if (panels.length == 0 || !(panels[0] instanceof JPanel)) {
          return; // Invalid panel structure
       }
-      
+
       JPanel panel = (JPanel)panels[0];
       if (panel.getComponentCount() == 0 || !(panel.getComponent(0) instanceof JScrollPane)) {
          return; // Invalid component structure
       }
-      
+
       JScrollPane scrollPane = (JScrollPane)panel.getComponent(0);
       if (!(scrollPane.getViewport().getView() instanceof JTextArea)) {
          return; // Invalid view type
       }
-      
+
       JTextArea textArea = (JTextArea)scrollPane.getViewport().getView();
       if (!(tabComponent instanceof JPanel)) {
          return; // Tab component is not a panel
       }
-      
+
       JPanel tabPanel = (JPanel)tabComponent;
       if (tabPanel.getComponentCount() == 0 || !(tabPanel.getComponent(0) instanceof JLabel)) {
          return; // Invalid tab label structure
       }
-      
+
       String fileName = ((JLabel)tabPanel.getComponent(0)).getText();
       // Remove unsaved marker if present
       if (fileName.endsWith(" *")) {
          fileName = fileName.substring(0, fileName.length() - 2);
       }
-      
+
       // Remove any existing extension to avoid double extensions
       int lastDot = fileName.lastIndexOf('.');
       if (lastDot > 0) {
          fileName = fileName.substring(0, lastDot);
       }
-      
+
       this.file = this.hash_TabComponent2File.get(tabComponent);
-      
+
       // Determine output file path
       File newFile;
       if (this.file != null && this.file.exists()) {
@@ -1409,13 +1660,13 @@ public class Decompiler
             }
          }
       }
-      
+
       newFile = this.saveBuffer(textArea, newFile.getAbsolutePath());
       if (newFile == null) {
          // saveBuffer failed (e.g., directory doesn't exist)
          return;
       }
-      
+
       // If file was null or didn't exist, update the mapping to point to the newly saved file
       if (this.file == null || !this.file.exists()) {
          this.file = newFile;
@@ -1428,7 +1679,7 @@ public class Decompiler
          this.status.append("Saved " + newFile.getName() + " to " + newFile.getParent() + "\n");
          return;
       }
-      
+
       // Only do round-trip validation if the original file exists
       if (unsavedFiles.contains(this.file)) {
          this.status.append("Recompiling..." + this.file.getName() + ": ");
@@ -1450,7 +1701,7 @@ public class Decompiler
                   try {
                      String origByteCode = this.fileDecompiler.getOriginalByteCode(this.file);
                      String newByteCode = this.fileDecompiler.getNewByteCode(this.file);
-                     
+
                      JSplitPane byteCodePane = (JSplitPane)this.panels[1];
                      java.awt.Component leftComp = byteCodePane.getLeftComponent();
                      if (leftComp instanceof JScrollPane) {
@@ -1459,7 +1710,7 @@ public class Decompiler
                            this.origByteCodeJTA.setText(origByteCode != null ? origByteCode : "// Original bytecode not available");
                         }
                      }
-                     
+
                      java.awt.Component rightComp = byteCodePane.getRightComponent();
                      if (rightComp instanceof JScrollPane) {
                         this.newByteCodeJTA = (JTextArea)((JScrollPane)rightComp).getViewport().getView();
@@ -1467,7 +1718,7 @@ public class Decompiler
                            this.newByteCodeJTA.setText(newByteCode != null ? newByteCode : "// Recompiled bytecode not available");
                         }
                      }
-                     
+
                      if (this.origByteCodeJTA != null && this.newByteCodeJTA != null) {
                         if (this.origByteCodeJTA.getLineCount() >= this.newByteCodeJTA.getLineCount()) {
                            this.jTB.putClientProperty(this.panels[1], "left");
@@ -1528,7 +1779,7 @@ public class Decompiler
                   try {
                      String origByteCode = this.fileDecompiler.getOriginalByteCode(this.file);
                      String newByteCode = this.fileDecompiler.getNewByteCode(this.file);
-                     
+
                      JSplitPane byteCodePane = (JSplitPane)this.panels[1];
                      java.awt.Component leftComp = byteCodePane.getLeftComponent();
                      if (leftComp instanceof JScrollPane) {
@@ -1537,7 +1788,7 @@ public class Decompiler
                            this.origByteCodeJTA.setText(origByteCode != null ? origByteCode : "// Original bytecode not available");
                         }
                      }
-                     
+
                      java.awt.Component rightComp = byteCodePane.getRightComponent();
                      if (rightComp instanceof JScrollPane) {
                         this.newByteCodeJTA = (JTextArea)((JScrollPane)rightComp).getViewport().getView();
@@ -1545,7 +1796,7 @@ public class Decompiler
                            this.newByteCodeJTA.setText(newByteCode != null ? newByteCode : "// Recompiled bytecode not available");
                         }
                      }
-                     
+
                      if (this.origByteCodeJTA != null && this.newByteCodeJTA != null) {
                         if (this.origByteCodeJTA.getLineCount() >= this.newByteCodeJTA.getLineCount()) {
                            this.jTB.putClientProperty(this.panels[1], "left");
@@ -1585,7 +1836,7 @@ public class Decompiler
          if (tabComponent == null) {
             continue;
          }
-         
+
          String fileName = ((JLabel)((JPanel)tabComponent).getComponent(0)).getText();
          // Remove unsaved marker if present
          if (fileName.endsWith(" *")) {
@@ -1596,9 +1847,9 @@ public class Decompiler
          if (lastDot > 0) {
             fileName = fileName.substring(0, lastDot);
          }
-         
+
          File file = this.hash_TabComponent2File.get(tabComponent);
-         
+
          // Determine output file path (same logic as save())
          File newFile;
          if (file != null && file.exists()) {
@@ -1627,19 +1878,19 @@ public class Decompiler
                outputDirFile.mkdirs();
             }
          }
-         
+
          JTextArea textArea = (JTextArea)((JScrollPane)((JComponent[])this.jTB.getClientProperty(tabComponent))[0].getComponent(0)).getViewport().getView();
          newFile = this.saveBuffer(textArea, newFile.getAbsolutePath());
          if (newFile == null) {
             continue; // saveBuffer failed
          }
-         
+
          // If file was null or didn't exist, update the mapping
          if (file == null || !file.exists()) {
             file = newFile;
             this.hash_TabComponent2File.put(tabComponent, file);
          }
-         
+
          int result = 2;
 
          // Only do round-trip validation if the original file exists
