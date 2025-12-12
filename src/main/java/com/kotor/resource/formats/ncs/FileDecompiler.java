@@ -386,6 +386,50 @@ public class FileDecompiler {
    }
 
    /**
+    * Captures and stores bytecode from a compiled NCS file for an NSS source file.
+    * This is used when loading NSS files to enable bytecode view.
+    *
+    * @param nssFile     The original NSS source file
+    * @param compiledNcs  The compiled NCS file to extract bytecode from
+    * @param isK2        Whether this is KotOR 2 (TSL)
+    * @return true if bytecode was successfully captured and stored
+    */
+   public boolean captureBytecodeForNssFile(File nssFile, File compiledNcs, boolean isK2) {
+      try {
+         if (compiledNcs == null || !compiledNcs.exists()) {
+            return false;
+         }
+
+         // Decompile the compiled NCS to bytecode (pcode)
+         File pcodeFile = this.externalDecompile(compiledNcs, isK2, null);
+         if (pcodeFile == null || !pcodeFile.exists()) {
+            return false;
+         }
+
+         // Read the bytecode
+         String bytecode = this.readFile(pcodeFile);
+         if (bytecode == null || bytecode.trim().isEmpty()) {
+            return false;
+         }
+
+         // Create or get FileScriptData entry for the NSS file
+         FileDecompiler.FileScriptData nssData = this.filedata.get(nssFile);
+         if (nssData == null) {
+            nssData = new FileDecompiler.FileScriptData();
+            this.filedata.put(nssFile, nssData);
+         }
+
+         // Store compiled bytecode as "new bytecode" (since NSS files don't have "original" bytecode)
+         nssData.setNewByteCode(bytecode);
+         return true;
+      } catch (Exception e) {
+         System.err.println("DEBUG captureBytecodeForNssFile: Error capturing bytecode: " + e.getMessage());
+         e.printStackTrace();
+         return false;
+      }
+   }
+
+   /**
     * Compiles an NSS file to NCS without performing comparison or cleanup. This is
     * useful for round-trip display where the compiled NCS needs to persist.
     *

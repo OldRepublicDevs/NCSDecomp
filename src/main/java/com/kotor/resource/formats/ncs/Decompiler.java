@@ -1777,6 +1777,16 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                            if (compiledNcs.exists()) {
                               System.err.println(
                                     "DEBUG loadNssFile: Compiled NCS exists at: " + compiledNcs.getAbsolutePath());
+
+                              // Capture bytecode from the compiled NCS for bytecode view
+                              // For NSS files, the compiled bytecode is stored as "new bytecode"
+                              boolean bytecodeCaptured = this.fileDecompiler.captureBytecodeForNssFile(file, compiledNcs, isK2);
+                              if (bytecodeCaptured) {
+                                 System.err.println("DEBUG loadNssFile: Successfully captured bytecode from compiled NCS");
+                              } else {
+                                 System.err.println("DEBUG loadNssFile: Warning - Could not capture bytecode (bytecode view will show placeholder)");
+                              }
+
                               // Decompile the compiled NCS
                               String gameFlag = isK2 ? "k2" : "k1";
                               String roundTripCode = RoundTripUtil.decompileNcsToNss(compiledNcs, gameFlag);
