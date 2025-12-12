@@ -330,6 +330,14 @@ public class SubScriptState {
                // Check if this AIf is inside an AElse (else-if chain)
                // If so, create the next AElse as a sibling of the parent AElse, not nested
                ScriptRootNode parent = (ScriptRootNode) this.current.parent();
+               
+               // Safety check: don't create AElse if AIf is at root level (shouldn't happen, but protect against it)
+               if (parent == null || ASub.class.isInstance(this.current)) {
+                  // AIf is at root level - this shouldn't happen, but if it does, don't create orphaned AElse
+                  dest = null;
+                  return;
+               }
+               
                ScriptRootNode elseParent = parent;
                
                if (AElse.class.isInstance(parent) && parent.size() == 1 && AIf.class.isInstance(parent.getLastChild())) {
