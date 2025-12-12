@@ -130,6 +130,25 @@ $tslSource = Join-Path $nwscriptSource "tsl_nwscript.nss"
 $k1Tools = Join-Path $toolsDir "k1_nwscript.nss"
 $tslTools = Join-Path $toolsDir "tsl_nwscript.nss"
 
+# Copy compiler tools from tools/ directory
+$toolsPublishDir = Join-Path $publishDir "tools"
+New-Item -ItemType Directory -Path $toolsPublishDir -Force | Out-Null
+
+$compilerTools = @(
+    "nwnnsscomp_kscript.exe",
+    "nwnnsscomp_tslpatcher.exe"
+)
+
+foreach ($tool in $compilerTools) {
+    $toolPath = Join-Path $toolsDir $tool
+    if (Test-Path $toolPath) {
+        Copy-Item $toolPath (Join-Path $toolsPublishDir $tool)
+        Write-Host "  - Copied $tool to tools/" -ForegroundColor Cyan
+    } else {
+        Write-Host "  Warning: $tool not found at $toolPath" -ForegroundColor Yellow
+    }
+}
+
 if (Test-Path $k1Source) {
     Copy-Item $k1Source $publishDir
     Write-Host "  - Copied k1_nwscript.nss" -ForegroundColor Cyan
