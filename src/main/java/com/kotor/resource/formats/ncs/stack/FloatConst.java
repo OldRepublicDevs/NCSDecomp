@@ -25,7 +25,18 @@ public class FloatConst extends Const {
 
    @Override
    public String toString() {
-      return this.value.toString();
+      // Format float to avoid scientific notation (E- or E+) which the lexer/compiler doesn't support well
+      // Use DecimalFormat to ensure we get decimal notation, not scientific
+      java.text.DecimalFormat df = new java.text.DecimalFormat("0.0##############");
+      df.setMaximumFractionDigits(15); // Float has ~7 decimal digits of precision
+      df.setMinimumFractionDigits(0);
+      df.setGroupingUsed(false);
+      String result = df.format(this.value);
+      // Ensure we have at least one digit after the decimal point for very small numbers
+      if (result.indexOf('.') == -1 && Math.abs(this.value) < 1.0 && this.value != 0.0) {
+         result = "0." + result;
+      }
+      return result;
    }
 }
 

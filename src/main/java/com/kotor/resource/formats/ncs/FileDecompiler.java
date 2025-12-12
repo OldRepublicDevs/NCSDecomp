@@ -39,8 +39,6 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Vector;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
 
 /**
  * Core coordinator for decompiling and recompiling KotOR/TSL NSS scripts.
@@ -1201,8 +1199,11 @@ public class FileDecompiler {
 
          // Decode bytecode - wrap in try-catch to handle corrupted files
          try {
+            System.err.println("DEBUG decompileNcs: starting decode for " + file.getName());
             commands = new Decoder(new BufferedInputStream(new FileInputStream(file)), this.actions).decode();
+            System.err.println("DEBUG decompileNcs: decode successful, commands length=" + (commands != null ? commands.length() : 0));
          } catch (Exception decodeEx) {
+            System.err.println("DEBUG decompileNcs: decode FAILED - " + decodeEx.getMessage());
             System.out.println("Error during bytecode decoding: " + decodeEx.getMessage());
             // Create comprehensive fallback stub for decoding errors
             long fileSize = file.exists() ? file.length() : -1;
@@ -1223,8 +1224,11 @@ public class FileDecompiler {
 
          // Parse commands - wrap in try-catch to handle parse errors, but try to recover
          try {
+            System.err.println("DEBUG decompileNcs: starting parse, commands length=" + (commands != null ? commands.length() : 0));
             ast = new Parser(new Lexer(new PushbackReader(new StringReader(commands), 1024))).parse();
+            System.err.println("DEBUG decompileNcs: parse successful");
          } catch (Exception parseEx) {
+            System.err.println("DEBUG decompileNcs: parse FAILED - " + parseEx.getMessage());
             System.out.println("Error during parsing: " + parseEx.getMessage());
             System.out.println("Attempting to recover by trying partial parsing strategies...");
 
@@ -1326,12 +1330,17 @@ public class FileDecompiler {
 
          try {
          subdata.splitOffSubroutines(ast);
+         System.err.println("DEBUG splitOffSubroutines: success, numSubs=" + subdata.numSubs());
          } catch (Exception e) {
+            System.err.println("DEBUG splitOffSubroutines: ERROR - " + e.getMessage());
+            e.printStackTrace(System.err);
             System.out.println("Error splitting subroutines, attempting to continue: " + e.getMessage());
             // Try to get main sub at least
             try {
                mainsub = subdata.getMainSub();
+               System.err.println("DEBUG splitOffSubroutines: recovered mainsub=" + (mainsub != null ? "found" : "null"));
             } catch (Exception e2) {
+               System.err.println("DEBUG splitOffSubroutines: could not recover mainsub - " + e2.getMessage());
                System.out.println("Could not recover main subroutine: " + e2.getMessage());
             }
          }
@@ -1499,16 +1508,22 @@ public class FileDecompiler {
          dotypes = null;
          nodedata.clearProtoData();
 
+         System.err.println("DEBUG decompileNcs: iterating subroutines, numSubs=" + subdata.numSubs());
+         int subCount = 0;
          for (ASubroutine iterSub : this.subIterable(subdata)) {
+            subCount++;
+            System.err.println("DEBUG decompileNcs: processing subroutine " + subCount + " at pos=" + nodedata.getPos(iterSub));
             try {
                mainpass = new MainPass(subdata.getState(iterSub), nodedata, subdata, this.actions);
                iterSub.apply(mainpass);
                cleanpass = new CleanupPass(mainpass.getScriptRoot(), nodedata, subdata, mainpass.getState());
                cleanpass.apply();
                data.addSub(mainpass.getState());
+               System.err.println("DEBUG decompileNcs: successfully added subroutine " + subCount);
                mainpass.done();
                cleanpass.done();
             } catch (Exception e) {
+               System.err.println("DEBUG decompileNcs: ERROR processing subroutine " + subCount + " - " + e.getMessage());
                System.out.println("Error while processing subroutine: " + e);
                e.printStackTrace(System.out);
                // Try to add partial subroutine state even if processing failed
@@ -1530,9 +1545,12 @@ public class FileDecompiler {
          }
 
          // Generate code for main subroutine - recover if this fails
+         System.err.println("DEBUG decompileNcs: mainsub=" + (mainsub != null ? "found at pos=" + nodedata.getPos(mainsub) : "null"));
          if (mainsub != null) {
             try {
+               System.err.println("DEBUG decompileNcs: creating MainPass for mainsub");
                mainpass = new MainPass(subdata.getState(mainsub), nodedata, subdata, this.actions);
+               System.err.println("DEBUG decompileNcs: applying mainpass to mainsub");
                mainsub.apply(mainpass);
 
                try {

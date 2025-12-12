@@ -338,7 +338,17 @@ public final class NodeUtils {
       if (type.byteValue() != 4) {
          throw new RuntimeException("Expected float const type (4), got " + type);
       }
-      return Float.parseFloat(((AFloatConstant)pconst).getFloatConstant().getText());
+      // Handle case where parser created AIntConstant instead of AFloatConstant
+      // This can happen when the float value is a whole number or due to parser quirks
+      if (AIntConstant.class.isInstance(pconst)) {
+         // Parse as integer first, then convert to float
+         long intValue = Long.parseLong(((AIntConstant)pconst).getIntegerConstant().getText());
+         return (float)intValue;
+      } else if (AFloatConstant.class.isInstance(pconst)) {
+         return Float.parseFloat(((AFloatConstant)pconst).getFloatConstant().getText());
+      } else {
+         throw new RuntimeException("Expected AFloatConstant or AIntConstant, got " + pconst.getClass().getSimpleName());
+      }
    }
 
    public static String getStringConstValue(AConstCommand node) {
