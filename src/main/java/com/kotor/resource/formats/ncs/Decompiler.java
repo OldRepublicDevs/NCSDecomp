@@ -1830,8 +1830,7 @@ public class Decompiler
                   NWScriptSyntaxHighlighter.applyHighlightingImmediate(textPane);
                }
 
-               // File is now loaded, remove from loading set
-               filesBeingLoaded.remove(file);
+               // NOTE: Do NOT remove from filesBeingLoaded yet - keep file protected until fully loaded
             }
          }
 
@@ -2008,6 +2007,10 @@ public class Decompiler
                this.updateTabLabel((JPanel)tabComponent, false);
             }
          }
+
+         // NOW remove file from filesBeingLoaded - AFTER all setup is complete
+         // This prevents the file from being marked as dirty during initial load
+         filesBeingLoaded.remove(file);
       }
 
       // Update status based on result - code is already shown above
