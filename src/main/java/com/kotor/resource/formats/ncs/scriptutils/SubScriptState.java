@@ -789,7 +789,7 @@ public class SubScriptState {
       } else {
          int loc = NodeUtils.stackOffsetToPos(node.getOffset());
          StackEntry sourceEntry = this.stack.get(loc);
-         
+
          // For constants: when copying a constant that's already the last child,
          // we're likely doing short-circuit evaluation (e.g., for || or &&).
          // In this case, don't add a duplicate child - the duplicate is only
@@ -809,7 +809,7 @@ public class SubScriptState {
                }
             }
          }
-         
+
          AExpression varref = this.getVarToCopy(node);
          this.current.addChild((ScriptNode) varref);
       }
