@@ -1778,16 +1778,15 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                               System.err.println(
                                     "DEBUG loadNssFile: Compiled NCS exists at: " + compiledNcs.getAbsolutePath());
 
-                              // Capture bytecode from the compiled NCS for bytecode view
-                              // For NSS files, the compiled bytecode is stored as "new bytecode"
-                              boolean bytecodeCaptured = this.fileDecompiler.captureBytecodeForNssFile(file, compiledNcs, isK2);
-                              if (bytecodeCaptured) {
-                                 System.err.println("DEBUG loadNssFile: Successfully captured bytecode from compiled NCS");
+                              // Capture bytecode from the first compiled NCS (NSS->NCS) as "original bytecode" (left panel)
+                              boolean firstBytecodeCaptured = this.fileDecompiler.captureBytecodeForNssFile(file, compiledNcs, isK2, true);
+                              if (firstBytecodeCaptured) {
+                                 System.err.println("DEBUG loadNssFile: Successfully captured first bytecode from compiled NCS (left panel)");
                               } else {
-                                 System.err.println("DEBUG loadNssFile: Warning - Could not capture bytecode (bytecode view will show placeholder)");
+                                 System.err.println("DEBUG loadNssFile: Warning - Could not capture first bytecode (left panel will show placeholder)");
                               }
 
-                              // Decompile the compiled NCS
+                              // Decompile the compiled NCS to get round-trip NSS
                               String gameFlag = isK2 ? "k2" : "k1";
                               String roundTripCode = RoundTripUtil.decompileNcsToNss(compiledNcs, gameFlag);
                               System.err.println("DEBUG loadNssFile: Round-trip code result: "
@@ -1799,6 +1798,38 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                                  roundTripPane.setText(roundTripCode);
                                  NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, false);
                                  NWScriptSyntaxHighlighter.applyHighlightingImmediate(roundTripPane);
+
+                                 // Now compile the round-trip NSS to get second NCS, then capture its bytecode (right panel)
+                                 try {
+                                    // Write round-trip NSS to temp file
+                                    File tempDir = new File(System.getProperty("java.io.tmpdir"), "ncsdecomp_roundtrip");
+                                    if (!tempDir.exists()) {
+                                       tempDir.mkdirs();
+                                    }
+                                    String baseName = file.getName();
+                                    if (baseName.endsWith(".nss")) {
+                                       baseName = baseName.substring(0, baseName.length() - 4);
+                                    }
+                                    File roundTripNssFile = new File(tempDir, baseName + "_roundtrip.nss");
+                                    java.nio.file.Files.write(roundTripNssFile.toPath(), roundTripCode.getBytes());
+
+                                    // Compile the round-trip NSS to NCS
+                                    File secondCompiledNcs = this.fileDecompiler.compileNssToNcs(roundTripNssFile, tempDir);
+                                    if (secondCompiledNcs != null && secondCompiledNcs.exists()) {
+                                       // Capture bytecode from second compiled NCS (NSS->NCS->NSS->NCS) as "new bytecode" (right panel)
+                                       boolean secondBytecodeCaptured = this.fileDecompiler.captureBytecodeForNssFile(file, secondCompiledNcs, isK2, false);
+                                       if (secondBytecodeCaptured) {
+                                          System.err.println("DEBUG loadNssFile: Successfully captured second bytecode from round-trip compiled NCS (right panel)");
+                                       } else {
+                                          System.err.println("DEBUG loadNssFile: Warning - Could not capture second bytecode (right panel will show placeholder)");
+                                       }
+                                    } else {
+                                       System.err.println("DEBUG loadNssFile: Round-trip NSS compilation failed, cannot capture second bytecode");
+                                    }
+                                 } catch (Exception secondBytecodeEx) {
+                                    System.err.println("DEBUG loadNssFile: Error capturing second bytecode: " + secondBytecodeEx.getMessage());
+                                    // Continue - right panel will show placeholder
+                                 }
                               } else {
                                  System.err.println("DEBUG loadNssFile: Round-trip code is null or empty");
                                  roundTripPane.setText(
@@ -2011,6 +2042,14 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                               + (recompiledNcs != null && recompiledNcs.exists()));
 
                         if (recompiledNcs != null && recompiledNcs.exists()) {
+                           // Capture bytecode from recompiled NCS (NCS->NSS->NCS) as "new bytecode" (right panel)
+                           boolean newBytecodeCaptured = this.fileDecompiler.captureBytecodeFromNcs(file, recompiledNcs, FileDecompiler.isK2Selected, false);
+                           if (newBytecodeCaptured) {
+                              System.err.println("DEBUG decompile: Successfully captured new bytecode from recompiled NCS (right panel)");
+                           } else {
+                              System.err.println("DEBUG decompile: Warning - Could not capture new bytecode (right panel will show placeholder)");
+                           }
+
                            // Decompile the recompiled NCS to show round-trip result
                            String gameFlag = FileDecompiler.isK2Selected ? "k2" : "k1";
                            System.err.println("DEBUG decompile: Decompiling recompiled NCS with gameFlag: " + gameFlag);

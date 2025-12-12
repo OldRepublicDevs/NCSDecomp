@@ -388,13 +388,29 @@ public class FileDecompiler {
    /**
     * Captures and stores bytecode from a compiled NCS file for an NSS source file.
     * This is used when loading NSS files to enable bytecode view.
+    * Convenience wrapper around captureBytecodeFromNcs.
     *
     * @param nssFile     The original NSS source file
-    * @param compiledNcs  The compiled NCS file to extract bytecode from
+    * @param compiledNcs The compiled NCS file to extract bytecode from
     * @param isK2        Whether this is KotOR 2 (TSL)
+    * @param asOriginal  If true, store as "original bytecode" (left panel), otherwise store as "new bytecode" (right panel)
     * @return true if bytecode was successfully captured and stored
     */
-   public boolean captureBytecodeForNssFile(File nssFile, File compiledNcs, boolean isK2) {
+   public boolean captureBytecodeForNssFile(File nssFile, File compiledNcs, boolean isK2, boolean asOriginal) {
+      return this.captureBytecodeFromNcs(nssFile, compiledNcs, isK2, asOriginal);
+   }
+
+   /**
+    * Captures and stores bytecode from a compiled NCS file for any source file (NSS or NCS).
+    * This is used to populate bytecode views.
+    *
+    * @param sourceFile The original source file (NSS or NCS)
+    * @param compiledNcs The compiled NCS file to extract bytecode from
+    * @param isK2       Whether this is KotOR 2 (TSL)
+    * @param asOriginal If true, store as "original bytecode" (left panel), otherwise store as "new bytecode" (right panel)
+    * @return true if bytecode was successfully captured and stored
+    */
+   public boolean captureBytecodeFromNcs(File sourceFile, File compiledNcs, boolean isK2, boolean asOriginal) {
       try {
          if (compiledNcs == null || !compiledNcs.exists()) {
             return false;
@@ -412,18 +428,22 @@ public class FileDecompiler {
             return false;
          }
 
-         // Create or get FileScriptData entry for the NSS file
-         FileDecompiler.FileScriptData nssData = this.filedata.get(nssFile);
-         if (nssData == null) {
-            nssData = new FileDecompiler.FileScriptData();
-            this.filedata.put(nssFile, nssData);
+         // Create or get FileScriptData entry for the source file
+         FileDecompiler.FileScriptData data = this.filedata.get(sourceFile);
+         if (data == null) {
+            data = new FileDecompiler.FileScriptData();
+            this.filedata.put(sourceFile, data);
          }
 
-         // Store compiled bytecode as "new bytecode" (since NSS files don't have "original" bytecode)
-         nssData.setNewByteCode(bytecode);
+         // Store bytecode as either "original" or "new"
+         if (asOriginal) {
+            data.setOriginalByteCode(bytecode);
+         } else {
+            data.setNewByteCode(bytecode);
+         }
          return true;
       } catch (Exception e) {
-         System.err.println("DEBUG captureBytecodeForNssFile: Error capturing bytecode: " + e.getMessage());
+         System.err.println("DEBUG captureBytecodeFromNcs: Error capturing bytecode: " + e.getMessage());
          e.printStackTrace();
          return false;
       }
