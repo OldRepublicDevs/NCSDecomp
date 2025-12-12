@@ -884,7 +884,7 @@ public class FileDecompiler {
          }
 
          String outname = this.getShortName(in) + ".pcode";
-         File result = new File(outname);
+         File result = new File(outname).getAbsoluteFile();
          if (result.exists()) {
             result.delete();
          }
@@ -925,12 +925,12 @@ public class FileDecompiler {
     */
    private File writeCode(String code) {
       try {
-         File out = new File("_generatedcode.nss");
+         File out = new File("_generatedcode.nss").getAbsoluteFile();
          out.createNewFile();
          FileWriter writer = new FileWriter(out);
          writer.write(code);
          writer.close();
-         File result = new File("_generatedcode.ncs");
+         File result = new File("_generatedcode.ncs").getAbsoluteFile();
          if (result.exists()) {
             result.delete();
          }
@@ -954,7 +954,7 @@ public class FileDecompiler {
          }
 
          String outname = this.getShortName(file) + ".ncs";
-         File result = new File(outname);
+         File result = new File(outname).getAbsoluteFile();
 
          // Use compiler detection to get correct command-line arguments
          NwnnsscompConfig config = new NwnnsscompConfig(compiler, file, result, k2);

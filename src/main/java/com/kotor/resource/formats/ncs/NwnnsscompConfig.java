@@ -44,9 +44,11 @@ public class NwnnsscompConfig {
    public NwnnsscompConfig(File compilerPath, File sourceFile, File outputFile, boolean isK2)
          throws IOException {
       this.sourceFile = sourceFile;
-      this.outputFile = outputFile;
-      this.outputDir = outputFile.getParentFile();
-      this.outputName = outputFile.getName();
+      // Convert to absolute path to ensure parent directory is always available
+      File absoluteOutputFile = outputFile.getAbsoluteFile();
+      this.outputFile = absoluteOutputFile;
+      this.outputDir = absoluteOutputFile.getParentFile();
+      this.outputName = absoluteOutputFile.getName();
       this.isK2 = isK2;
 
       // Calculate hash of the compiler executable
