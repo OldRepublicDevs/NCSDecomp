@@ -648,11 +648,23 @@ public class SubScriptState {
          // Ensure there's a decl to attach; if none, create a placeholder
          Variable retVar = this.stack.size() >= 1 ? (Variable) this.stack.get(1) : new Variable(new Type((byte)0));
          AVarDecl decl;
-         if (this.current.hasChildren() && AVarDecl.class.isInstance(this.current.getLastChild())) {
-            decl = (AVarDecl) this.current.getLastChild();
-         } else {
-            decl = new AVarDecl(retVar);
-            this.current.addChild(decl);
+         // Check if variable is already declared to prevent duplicates
+         decl = this.vardecs.get(retVar);
+         if (decl == null) {
+            // Also check if last child is a matching AVarDecl
+            if (this.current.hasChildren() && AVarDecl.class.isInstance(this.current.getLastChild())) {
+               AVarDecl lastDecl = (AVarDecl) this.current.getLastChild();
+               if (lastDecl.var() == retVar) {
+                  decl = lastDecl;
+                  this.vardecs.put(retVar, decl);
+               }
+            }
+            if (decl == null) {
+               decl = new AVarDecl(retVar);
+               this.updateVarCount(retVar);
+               this.current.addChild(decl);
+               this.vardecs.put(retVar, decl);
+            }
          }
          decl.isFcnReturn(true);
          decl.initializeExp(jsr);
