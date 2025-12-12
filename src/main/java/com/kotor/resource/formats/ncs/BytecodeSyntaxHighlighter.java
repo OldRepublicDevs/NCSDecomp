@@ -6,8 +6,11 @@ package com.kotor.resource.formats.ncs;
 
 import javax.swing.JTextPane;
 import javax.swing.SwingUtilities;
+import javax.swing.Timer;
 import javax.swing.text.*;
 import java.awt.Color;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -171,6 +174,65 @@ public class BytecodeSyntaxHighlighter {
             }
          });
       }
+   }
+
+   // Debounce delay in milliseconds (300ms = highlight after user stops typing for 300ms)
+   private static final int HIGHLIGHT_DELAY_MS = 300;
+
+   /**
+    * Creates a DocumentListener that re-applies highlighting when the document changes.
+    * Uses debouncing to avoid excessive highlighting operations that could freeze the UI.
+    * The highlighting is deferred and only runs after changes stop.
+    */
+   public static javax.swing.event.DocumentListener createHighlightingListener(JTextPane textPane) {
+      // Use a Timer for debouncing - restart timer on each change
+      Timer[] debounceTimer = new Timer[1];
+
+      ActionListener highlightAction = new ActionListener() {
+         @Override
+         public void actionPerformed(ActionEvent e) {
+            // Only highlight if the text pane is still valid and visible
+            if (textPane != null && textPane.isDisplayable()) {
+               SwingUtilities.invokeLater(() -> {
+                  try {
+                     applyHighlighting(textPane);
+                  } catch (Exception ex) {
+                     // Silently ignore errors during highlighting to prevent UI freeze
+                     System.err.println("DEBUG BytecodeSyntaxHighlighter: Error during highlighting: " + ex.getMessage());
+                  }
+               });
+            }
+         }
+      };
+
+      return new javax.swing.event.DocumentListener() {
+         @Override
+         public void insertUpdate(javax.swing.event.DocumentEvent e) {
+            scheduleHighlighting();
+         }
+
+         @Override
+         public void removeUpdate(javax.swing.event.DocumentEvent e) {
+            scheduleHighlighting();
+         }
+
+         @Override
+         public void changedUpdate(javax.swing.event.DocumentEvent e) {
+            scheduleHighlighting();
+         }
+
+         private void scheduleHighlighting() {
+            // Cancel any pending timer
+            if (debounceTimer[0] != null && debounceTimer[0].isRunning()) {
+               debounceTimer[0].stop();
+            }
+
+            // Create and start new timer
+            debounceTimer[0] = new Timer(HIGHLIGHT_DELAY_MS, highlightAction);
+            debounceTimer[0].setRepeats(false);
+            debounceTimer[0].start();
+         }
+      };
    }
 }
 

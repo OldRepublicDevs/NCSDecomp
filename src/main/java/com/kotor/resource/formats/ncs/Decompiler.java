@@ -1569,6 +1569,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
 
       this.dropTarget = new DropTarget(origByteCodeArea, this);
       origByteCodeArea.putClientProperty("dropTarget", this.dropTarget);
+      origByteCodeArea.getDocument().addDocumentListener(BytecodeSyntaxHighlighter.createHighlightingListener(origByteCodeArea));
 
       JScrollPane origScrollPane = new JScrollPane(origByteCodeArea);
       origScrollPane.setBorder(new TitledBorder("Original Byte Code"));
@@ -1597,6 +1598,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
 
       this.dropTarget = new DropTarget(newByteCodeArea, this);
       newByteCodeArea.putClientProperty("dropTarget", this.dropTarget);
+      newByteCodeArea.getDocument().addDocumentListener(BytecodeSyntaxHighlighter.createHighlightingListener(newByteCodeArea));
 
       JScrollPane newScrollPane = new JScrollPane(newByteCodeArea);
       newScrollPane.setBorder(new TitledBorder("Recompiled Byte Code"));
