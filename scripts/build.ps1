@@ -595,9 +595,81 @@ if ($BuildExecutable) {
                     }
                 }
 
+                # Install NSIS if not found
                 if (-not $makensisPath) {
-                    Write-Host "  Warning: NSIS not found. Skipping single-file packaging for $AppName" -ForegroundColor Yellow
-                    Write-Host "  Install NSIS from https://nsis.sourceforge.io/ or use winget: winget install NSIS.NSIS" -ForegroundColor Gray
+                    Write-Host "  NSIS not found. Attempting to install..." -ForegroundColor Yellow
+
+                    # Try winget first
+                    $wingetPath = Get-Command "winget.exe" -ErrorAction SilentlyContinue
+                    $wingetSucceeded = $false
+                    if ($wingetPath) {
+                        Write-Host "  Installing NSIS via winget..." -ForegroundColor Gray
+                        try {
+                            $process = Start-Process -FilePath "winget" -ArgumentList "install", "--id", "NSIS.NSIS", "--accept-package-agreements", "--accept-source-agreements", "--silent" -Wait -PassThru -NoNewWindow
+                            if ($process.ExitCode -eq 0) {
+                                Write-Host "  NSIS installed successfully via winget" -ForegroundColor Green
+                                $wingetSucceeded = $true
+                                # Wait a moment for installation to complete
+                                Start-Sleep -Seconds 3
+                                # Refresh PATH
+                                $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+                                # Check PATH first
+                                $makensisInPath = Get-Command $makensisExe -ErrorAction SilentlyContinue
+                                if ($makensisInPath) {
+                                    $makensisPath = $makensisInPath.Source
+                                } else {
+                                    # Check common installation paths
+                                    foreach ($path in $nsisPaths) {
+                                        if (Test-Path $path) {
+                                            $makensisPath = $path
+                                            break
+                                        }
+                                    }
+                                }
+                            } else {
+                                Write-Host "  Winget installation failed (exit code: $($process.ExitCode)), trying direct download..." -ForegroundColor Yellow
+                            }
+                        } catch {
+                            Write-Host "  Winget installation failed: $_, trying direct download..." -ForegroundColor Yellow
+                        }
+                    }
+
+                    # Fallback: Download and install NSIS directly (only if winget didn't succeed)
+                    if (-not $makensisPath -and -not $wingetSucceeded) {
+                        Write-Host "  Downloading NSIS installer..." -ForegroundColor Gray
+                        $nsisInstallerUrl = "https://downloads.sourceforge.net/project/nsis/NSIS%203/3.11/nsis-3.11-setup.exe"
+                        $installerPath = Join-Path $env:TEMP "nsis-3.11-setup.exe"
+
+                        try {
+                            Invoke-WebRequest -Uri $nsisInstallerUrl -OutFile $installerPath -UseBasicParsing
+                            Write-Host "  Installing NSIS (silent mode)..." -ForegroundColor Gray
+                            $process = Start-Process -FilePath $installerPath -ArgumentList "/S" -Wait -PassThru -NoNewWindow
+                            Remove-Item -Path $installerPath -Force -ErrorAction SilentlyContinue
+
+                            # Refresh PATH and check again
+                            $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+                            Start-Sleep -Seconds 2
+
+                            $makensisInPath = Get-Command $makensisExe -ErrorAction SilentlyContinue
+                            if ($makensisInPath) {
+                                $makensisPath = $makensisInPath.Source
+                            } else {
+                                foreach ($path in $nsisPaths) {
+                                    if (Test-Path $path) {
+                                        $makensisPath = $path
+                                        break
+                                    }
+                                }
+                            }
+                        } catch {
+                            Write-Host "  Error installing NSIS: $_" -ForegroundColor Red
+                        }
+                    }
+                }
+
+                if (-not $makensisPath) {
+                    Write-Host "  Error: Could not install NSIS. Skipping single-file packaging for $AppName" -ForegroundColor Red
+                    Write-Host "  Please install NSIS manually from https://nsis.sourceforge.io/" -ForegroundColor Yellow
                     return $null
                 }
 
@@ -639,6 +711,33 @@ AutoCloseWindow true
 ; Output file
 OutFile "${AppName}-${AppVersion}-Windows.exe"
 
+; Function to extract parameters from command line (skip executable path)
+Function GetParameters
+    Push `$R0
+    Push `$R1
+    Push `$R2
+    StrCpy `$R0 `$CMDLINE
+    StrCpy `$R1 `$R0 1
+    StrCmp `$R1 '"' 0 +3
+        StrCpy `$R1 `$R0 1 -1
+        StrCmp `$R1 '"' +2
+        StrCpy `$R0 `$R0 "" 1
+    StrCpy `$R1 0
+    loop:
+        StrCpy `$R2 `$R0 1 `$R1
+        StrCmp `$R2 "" done
+        StrCmp `$R2 " " found
+        IntOp `$R1 `$R1 + 1
+        Goto loop
+    found:
+        IntOp `$R1 `$R1 + 1
+        StrCpy `$R0 `$R0 "" `$R1
+    done:
+        Pop `$R2
+        Pop `$R1
+        Exch `$R0
+FunctionEnd
+
 ; Installer sections
 Section "MainSection" SEC01
     ; Create unique temp directory for this execution
@@ -652,14 +751,21 @@ Section "MainSection" SEC01
     ; Extract all files from the app directory
     File /r "${appImageName}\*.*"
 
-    ; Find and execute the main executable
+    ; Get command line arguments
+    ; `$CMDLINE contains full command line, we'll pass it and let Java parse it
+    ; Java will correctly handle the executable name as args[0] and skip it
+    Push `$CMDLINE
+    Call GetParameters
+    Pop `$R0
+
+    ; Find and execute the main executable with arguments
     ; Try common locations
     IfFileExists "`$0\${appImageName}\${AppName}.exe" 0 +3
-    ExecWait '"`$0\${appImageName}\${AppName}.exe" `$CMDLINE'
+    ExecWait '"`$0\${appImageName}\${AppName}.exe" `$R0'
     Goto cleanup
 
     IfFileExists "`$0\${AppName}.exe" 0 +3
-    ExecWait '"`$0\${AppName}.exe" `$CMDLINE'
+    ExecWait '"`$0\${AppName}.exe" `$R0'
     Goto cleanup
 
     ; Cleanup and exit if executable not found
