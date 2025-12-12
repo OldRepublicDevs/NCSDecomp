@@ -3437,12 +3437,76 @@ public class NCSDecompCLIRoundTripTest {
 
    /**
     * Entry point for running the round-trip suite.
+    *
+    * Usage:
+    *   java NCSDecompCLIRoundTripTest                    - Run all tests
+    *   java NCSDecompCLIRoundTripTest <filename>         - Test single file (e.g., "k_def_buff.nss")
+    *   java NCSDecompCLIRoundTripTest <filename> <game>  - Test single file with game flag (k1/k2)
     */
    public static void main(String[] args) {
       NCSDecompCLIRoundTripTest runner = new NCSDecompCLIRoundTripTest();
-      int exitCode = runner.runRoundTripSuite();
+      int exitCode;
+
+      if (args.length > 0) {
+         // Single file test mode
+         String filename = args[0];
+         String gameFlag = args.length > 1 ? args[1] : "k1";
+         exitCode = runner.testSingleFile(filename, gameFlag);
+      } else {
+         // Full suite
+         exitCode = runner.runRoundTripSuite();
+      }
+
       if (exitCode != 0) {
          System.exit(exitCode);
+      }
+   }
+
+   /**
+    * Test a single file by name (searches in Vanilla_KOTOR_Script_Source).
+    * Returns 0 on success, 1 on failure.
+    */
+   private int testSingleFile(String filename, String gameFlag) {
+      try {
+         Path searchDir = "k1".equals(gameFlag) || "K1".equals(gameFlag)
+            ? VANILLA_REPO_DIR.resolve("K1")
+            : VANILLA_REPO_DIR.resolve("TSL");
+
+         Path foundFile = null;
+         try (java.util.stream.Stream<Path> stream = Files.walk(searchDir)) {
+            foundFile = stream
+               .filter(Files::isRegularFile)
+               .filter(p -> p.getFileName().toString().equals(filename))
+               .findFirst()
+               .orElse(null);
+         }
+
+         if (foundFile == null) {
+            System.err.println("ERROR: File not found: " + filename);
+            System.err.println("Searched in: " + searchDir);
+            return 1;
+         }
+
+         System.out.println("=== Testing Single File ===");
+         System.out.println("File: " + foundFile);
+         System.out.println("Game: " + gameFlag);
+         System.out.println();
+
+         Path scratchRoot = TEST_WORK_DIR.resolve("roundtrip-work").resolve(gameFlag.toLowerCase());
+         roundTripSingle(foundFile, gameFlag.toLowerCase(), scratchRoot);
+
+         System.out.println();
+         System.out.println("✓ PASSED - Round-trip successful (bytecode matches)");
+         return 0;
+      } catch (SourceCompilationException e) {
+         System.err.println("⊘ SKIPPED: " + e.getMessage());
+         return 0; // Not a decompiler issue
+      } catch (Exception e) {
+         System.err.println();
+         System.err.println("✗ FAILED");
+         System.err.println();
+         e.printStackTrace();
+         return 1;
       }
    }
 
@@ -3498,24 +3562,39 @@ public class NCSDecompCLIRoundTripTest {
             } catch (Exception ex) {
                System.out.println("  ✗ FAILED");
                System.out.println();
-               System.out.println("═══════════════════════════════════════════════════════════");
-               System.out.println("FAILURE: " + testCase.displayName);
-               System.out.println("═══════════════════════════════════════════════════════════");
-               System.out.println("Exception: " + ex.getClass().getSimpleName());
+
+               // Print the full error message (already formatted by assertBytecodeEqual)
                String message = ex.getMessage();
                if (message != null && !message.isEmpty()) {
-                  String diff = extractAndFormatDiff(message);
-                  if (diff != null) {
-                     System.out.println("\nDiff:");
-                     System.out.println(diff);
+                  // If message already contains formatted output (starts with ═══), print it as-is
+                  if (message.contains("═══════════════════════════════════════════════════════════════")) {
+                     System.out.println(message);
                   } else {
-                     System.out.println("Message: " + message);
+                     // Otherwise, format it nicely
+                     System.out.println("═══════════════════════════════════════════════════════════════");
+                     System.out.println("FAILURE: " + testCase.displayName);
+                     System.out.println("═══════════════════════════════════════════════════════════════");
+                     System.out.println("Exception: " + ex.getClass().getSimpleName());
+                     String diff = extractAndFormatDiff(message);
+                     if (diff != null) {
+                        System.out.println("\nDiff:");
+                        System.out.println(diff);
+                     } else {
+                        System.out.println("Message:\n" + message);
+                     }
+                     if (ex.getCause() != null && ex.getCause() != ex) {
+                        System.out.println("\nCause: " + ex.getCause().getMessage());
+                     }
+                     System.out.println("═══════════════════════════════════════════════════════════════");
                   }
+               } else {
+                  System.out.println("═══════════════════════════════════════════════════════════════");
+                  System.out.println("FAILURE: " + testCase.displayName);
+                  System.out.println("═══════════════════════════════════════════════════════════════");
+                  System.out.println("Exception: " + ex.getClass().getSimpleName());
+                  ex.printStackTrace();
+                  System.out.println("═══════════════════════════════════════════════════════════════");
                }
-               if (ex.getCause() != null && ex.getCause() != ex) {
-                  System.out.println("Cause: " + ex.getCause().getMessage());
-               }
-               System.out.println("═══════════════════════════════════════════════════════════");
                System.out.println();
 
                // Fast-fail: exit immediately on first failure
@@ -3624,22 +3703,138 @@ public class NCSDecompCLIRoundTripTest {
          return;
       }
 
+      // Get action names for better debugging
+      String originalAction = getActionNameAtOffset(originalNcs, diff.offset, gameFlag);
+      String roundTripAction = getActionNameAtOffset(roundTripNcs, diff.offset, gameFlag);
+
+      // Get file paths for easy access
+      Path decompiledNss = roundTripNcs.getParent().resolve(
+         roundTripNcs.getFileName().toString().replace(".rt.ncs", ".dec.nss"));
+      String decompiledPath = decompiledNss.toString();
+      boolean decompiledExists = Files.exists(decompiledNss);
+
       StringBuilder message = new StringBuilder();
-      message.append("Bytecode mismatch for ").append(displayName);
-      message.append("\nOffset: ").append(diff.offset);
-      message.append("\nOriginal length: ").append(diff.originalLength).append(" bytes");
-      message.append("\nRound-trip length: ").append(diff.roundTripLength).append(" bytes");
-      message.append("\nOriginal byte: ").append(formatByteValue(diff.originalByte));
-      message.append("\nRound-trip byte: ").append(formatByteValue(diff.roundTripByte));
-      message.append("\nOriginal context: ").append(diff.originalContext);
-      message.append("\nRound-trip context: ").append(diff.roundTripContext);
+      message.append("═══════════════════════════════════════════════════════════════\n");
+      message.append("BYTECODE MISMATCH: ").append(displayName).append("\n");
+      message.append("═══════════════════════════════════════════════════════════════\n");
+      message.append("\n");
+      message.append("LOCATION:\n");
+      message.append("  Offset: ").append(diff.offset).append(" (0x").append(Long.toHexString(diff.offset)).append(")\n");
+      message.append("  Original: ").append(formatByteValue(diff.originalByte));
+      if (originalAction != null) {
+         message.append(" → ").append(originalAction);
+      }
+      message.append("\n");
+      message.append("  Round-trip: ").append(formatByteValue(diff.roundTripByte));
+      if (roundTripAction != null) {
+         message.append(" → ").append(roundTripAction);
+      }
+      message.append("\n");
+      message.append("\n");
+      message.append("FILES:\n");
+      message.append("  Original NCS: ").append(originalNcs).append("\n");
+      message.append("  Round-trip NCS: ").append(roundTripNcs).append("\n");
+      if (decompiledExists) {
+         message.append("  Decompiled NSS: ").append(decompiledPath).append("\n");
+      }
+      message.append("\n");
+      message.append("BYTECODE CONTEXT:\n");
+      message.append("  Original:  ").append(diff.originalContext).append("\n");
+      message.append("  Round-trip: ").append(diff.roundTripContext).append("\n");
+      message.append("\n");
+      message.append("FILE SIZES:\n");
+      message.append("  Original: ").append(diff.originalLength).append(" bytes\n");
+      message.append("  Round-trip: ").append(diff.roundTripLength).append(" bytes\n");
 
       String pcodeDiff = diffPcodeListings(originalNcs, roundTripNcs, gameFlag);
-      if (pcodeDiff != null) {
-         message.append("\nP-code diff:\n").append(pcodeDiff);
+      if (pcodeDiff != null && !pcodeDiff.trim().isEmpty()) {
+         message.append("\n");
+         message.append("P-CODE DIFF (first 50 lines):\n");
+         String[] lines = pcodeDiff.split("\n");
+         int showLines = Math.min(50, lines.length);
+         for (int i = 0; i < showLines; i++) {
+            message.append(lines[i]).append("\n");
+         }
+         if (lines.length > 50) {
+            message.append("... (").append(lines.length - 50).append(" more lines)\n");
+         }
       }
 
+      if (decompiledExists) {
+         try {
+            String decompiledContent = Files.readString(decompiledNss, StandardCharsets.UTF_8);
+            String[] decompiledLines = decompiledContent.split("\n");
+            message.append("\n");
+            message.append("DECOMPILED OUTPUT (first 30 lines):\n");
+            int showLines = Math.min(30, decompiledLines.length);
+            for (int i = 0; i < showLines; i++) {
+               message.append(String.format("%4d: %s%n", i + 1, decompiledLines[i]));
+            }
+            if (decompiledLines.length > 30) {
+               message.append("... (").append(decompiledLines.length - 30).append(" more lines)\n");
+            }
+         } catch (Exception e) {
+            message.append("\n(Unable to read decompiled file: ").append(e.getMessage()).append(")\n");
+         }
+      }
+
+      message.append("\n");
+      message.append("═══════════════════════════════════════════════════════════════\n");
+
       throw new IllegalStateException(message.toString());
+   }
+
+   /**
+    * Attempts to identify the action name at a given bytecode offset.
+    * Returns null if unable to determine.
+    */
+   private static String getActionNameAtOffset(Path ncsFile, long offset, String gameFlag) {
+      try {
+         byte[] bytes = Files.readAllBytes(ncsFile);
+         int offsetInt = (int) offset;
+         if (offsetInt < 0 || offsetInt >= bytes.length) {
+            return null;
+         }
+
+         // Action opcodes are typically at specific positions
+         // Look backwards for the action ID byte (usually 1-2 bytes before the action parameters)
+         // This is a heuristic - actual parsing would require full NCS structure analysis
+         if (offsetInt > 0 && (bytes[offsetInt] & 0xFF) < 200) {
+            // Likely an action ID - try to look it up
+            int actionId = bytes[offsetInt] & 0xFF;
+            try {
+               Path nwscript = "k1".equals(gameFlag)
+                  ? Paths.get("src/main/resources/k1_nwscript.nss")
+                  : Paths.get("src/main/resources/tsl_nwscript.nss");
+               if (Files.exists(nwscript)) {
+                  String content = Files.readString(nwscript, StandardCharsets.UTF_8);
+                  // Look for "// actionId:" pattern (with or without description)
+                  String pattern = "// " + actionId + ":";
+                  int idx = content.indexOf(pattern);
+                  if (idx >= 0) {
+                     // Find the function signature after the comment
+                     // Format: "// 120: Description\n// ...\nvoid FunctionName(...);"
+                     int searchStart = idx + pattern.length();
+                     int searchEnd = Math.min(searchStart + 500, content.length()); // Look ahead up to 500 chars
+                     String section = content.substring(searchStart, searchEnd);
+
+                     // Look for function signature pattern: "void FunctionName" or "int FunctionName" etc.
+                     java.util.regex.Pattern funcPattern = java.util.regex.Pattern.compile(
+                        "\\b(void|int|float|string|object|location|effect|talent|action|itemproperty|vector)\\s+(\\w+)\\s*\\(");
+                     java.util.regex.Matcher matcher = funcPattern.matcher(section);
+                     if (matcher.find()) {
+                        return matcher.group(2); // Return function name
+                     }
+                  }
+               }
+            } catch (Exception e) {
+               // Ignore lookup failures
+            }
+         }
+      } catch (Exception e) {
+         // Ignore
+      }
+      return null;
    }
 
    private static BytecodeDiffResult findBytecodeDiff(Path originalNcs, Path roundTripNcs) throws IOException {

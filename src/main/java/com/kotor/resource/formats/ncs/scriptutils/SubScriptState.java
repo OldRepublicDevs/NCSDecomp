@@ -347,23 +347,29 @@ public class SubScriptState {
                ScriptRootNode elseParent = parent;
 
                // Check if this AIf is inside an AElse (else-if chain case)
-               // If the parent is an AElse and the AIf is the last child,
+               // If the parent is an AElse and the AIf is the last/only child,
                // the next AElse should be a sibling of the parent AElse, not nested
                if (AElse.class.isInstance(parent)) {
                   // Check if this AIf is the last child of the AElse
                   boolean isLastChild = parent.hasChildren() && parent.getLastChild() == this.current;
                   if (isLastChild) {
-                     // This AIf is the last child of an AElse (else-if case)
-                     // The next AElse should be a sibling of this AElse, not nested
-                     ScriptRootNode grandParent = (ScriptRootNode) parent.parent();
-                     // Safety check: don't go above the root function
-                     if (grandParent != null && !ASub.class.isInstance(grandParent)) {
-                        elseParent = grandParent;
-                     } else {
-                        // If grandParent is root or null, keep parent as elseParent
-                        // This handles the case where the AElse is already at the function level
-                        elseParent = parent;
+                     // Check if this is a pure else-if chain (AIf's else ends at parent AElse's end)
+                     // or a nested if-else (there's more content in parent AElse after this AIf's else)
+                     //
+                     // For pure else-if: destPos is at or past parent's end → use grandParent (siblings)
+                     // For nested: destPos is before parent's end → use parent (keep nested)
+                     int parentEnd = parent.getEnd();
+
+                     // If the JMP destination is at or past the parent AElse's end,
+                     // this is a continuation of the else-if chain at the same level
+                     if (destPos >= parentEnd) {
+                        ScriptRootNode grandParent = (ScriptRootNode) parent.parent();
+                        if (grandParent != null) {
+                           elseParent = grandParent;
+                        }
                      }
+                     // Otherwise, the else block is nested inside the parent AElse (has siblings)
+                     // Keep elseParent = parent
                   }
                   // If the AIf is not the last child, keep parent as elseParent (nested else)
                }
@@ -781,6 +787,29 @@ public class SubScriptState {
       if (this.state == 5) {
          this.state = 0;
       } else {
+         int loc = NodeUtils.stackOffsetToPos(node.getOffset());
+         StackEntry sourceEntry = this.stack.get(loc);
+         
+         // For constants: when copying a constant that's already the last child,
+         // we're likely doing short-circuit evaluation (e.g., for || or &&).
+         // In this case, don't add a duplicate child - the duplicate is only
+         // needed for stack simulation (the JZ/JNZ check), not for AST building.
+         // The LOGORII/LOGANDII will consume the original constant from children,
+         // leaving the correct expression (e.g., function result) for EQUAL.
+         if (Const.class.isInstance(sourceEntry) && this.current.hasChildren()) {
+            ScriptNode last = this.current.getLastChild();
+            if (AConst.class.isInstance(last)) {
+               AConst lastConst = (AConst) last;
+               // Check if we're copying the exact same Const object
+               // stackentry() returns the Const for AConst nodes
+               if (lastConst.stackentry() == sourceEntry) {
+                  // Short-circuit pattern: don't add duplicate to children
+                  this.checkEnd(node);
+                  return;
+               }
+            }
+         }
+         
          AExpression varref = this.getVarToCopy(node);
          this.current.addChild((ScriptNode) varref);
       }
@@ -813,6 +842,23 @@ public class SubScriptState {
             AExpression expr = null;
             if (AModifyExp.class.isInstance(last)) {
                expr = (AModifyExp) this.removeLastExp(true);
+            } else if (AVarDecl.class.isInstance(last) && ((AVarDecl) last).isFcnReturn() && ((AVarDecl) last).exp() != null) {
+               // Function return value - extract the expression and convert to statement
+               // However, don't extract function calls (AActionExp) as standalone statements
+               // when in assignment context, as they're almost always part of a larger expression
+               // (e.g., GetGlobalNumber("X") == value, or function calls in binary operations).
+               AExpression funcExp = ((AVarDecl) last).exp();
+               if (AActionExp.class.isInstance(funcExp)) {
+                  // Don't extract function calls as statements in assignment context
+                  // They're almost always part of a larger expression being built
+                  // Leave the AVarDecl in place - it will be used by EQUAL/other operations
+                  // NEVER extract function calls as statements when state == 1 (assignment context)
+                  expr = null; // Don't extract as statement
+               } else {
+                  // Non-function-call expressions can be extracted
+                  expr = ((AVarDecl) last).removeExp();
+                  this.current.removeLastChild(); // Remove the AVarDecl
+               }
             } else if (AUnaryModExp.class.isInstance(last) || AExpression.class.isInstance(last)) {
                // Gracefully handle postfix/prefix inc/dec and other loose expressions.
                // However, don't extract function calls (AActionExp) as standalone statements
@@ -830,31 +876,6 @@ public class SubScriptState {
                   // Function calls in assignment context are almost never standalone statements
                   this.current.addChild((ScriptNode) expr);
                   expr = null; // Don't extract as statement
-               }
-            } else if (AVarDecl.class.isInstance(last) && ((AVarDecl) last).isFcnReturn() && ((AVarDecl) last).exp() != null) {
-               // Function return value - extract the expression and convert to statement
-               // However, don't extract function calls (AActionExp) as standalone statements
-               // when in assignment context, as they're almost always part of a larger expression
-               // (e.g., GetGlobalNumber("X") == value, or function calls in binary operations).
-               AExpression funcExp = ((AVarDecl) last).exp();
-               if (AActionExp.class.isInstance(funcExp)) {
-                  // Don't extract function calls as statements in assignment context
-                  // They're almost always part of a larger expression being built
-                  // Leave the AVarDecl in place - it will be used by EQUAL/other operations
-                  // Check if we're at the last command - if not, there are more operations coming
-                  // and the function call is definitely part of a larger expression
-                  if (!this.atLastCommand(node)) {
-                     // More operations coming - definitely part of larger expression
-                     expr = null; // Don't extract as statement
-                  } else {
-                     // At last command - still don't extract in assignment context
-                     // Function calls in assignments are almost never standalone
-                     expr = null; // Don't extract as statement
-                  }
-               } else {
-                  // Non-function-call expressions can be extracted
-                  expr = ((AVarDecl) last).removeExp();
-                  this.current.removeLastChild(); // Remove the AVarDecl
                }
             } else {
                System.out.println("uh-oh... not a modify exp at " + this.nodedata.getPos(node) + ", " + last);
@@ -1558,4 +1579,5 @@ public class SubScriptState {
       return this.nodedata.getPos(this.nodedata.getDestination(node)) - 2;
    }
 }
+
 
