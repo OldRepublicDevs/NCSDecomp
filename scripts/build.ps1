@@ -717,12 +717,14 @@ if ($BuildExecutable) {
 
                 Write-Host "  Creating single-file executable for $AppName using NSIS..." -ForegroundColor Gray
 
-                # Create temporary directory for NSIS build
-                $nsisBuildDir = Join-Path $tmpDir "nsis-build-$(Get-Random)"
+                # Create temporary directory for NSIS build (use absolute path)
+                $tmpDirAbsolute = if (Test-Path $tmpDir) { (Resolve-Path $tmpDir).Path } else { $tmpDir }
+                $nsisBuildDir = Join-Path $tmpDirAbsolute "nsis-build-$(Get-Random)"
                 if (Test-Path $nsisBuildDir) {
                     Remove-Item -Recurse -Force $nsisBuildDir
                 }
                 New-Item -ItemType Directory -Path $nsisBuildDir -Force | Out-Null
+                $nsisBuildDir = if (Test-Path $nsisBuildDir) { (Resolve-Path $nsisBuildDir).Path } else { $nsisBuildDir }
 
                 # Copy app image to NSIS build directory
                 $appImageName = Split-Path $AppImagePath -Leaf
@@ -851,9 +853,12 @@ SectionEnd
                 $nsiContent | Out-File $nsisScriptPath -Encoding ASCII
 
                 # Build the executable
-                $outputExe = Join-Path $singleFileDir "${AppName}-${AppVersion}-Windows.exe"
+                $singleFileDirAbsolute = if (Test-Path $singleFileDir) { (Resolve-Path $singleFileDir).Path } else { $singleFileDir }
+                $outputExe = Join-Path $singleFileDirAbsolute "${AppName}-${AppVersion}-Windows.exe"
+                $currentLocation = Get-Location
                 Push-Location $nsisBuildDir
                 try {
+                    # NSIS script is in current directory, so just use relative path
                     & $makensisPath /NOCD /V2 package.nsi 2>&1 | Out-Null
                     if ($LASTEXITCODE -eq 0) {
                         # Find the output file (NSIS creates it in the script directory)
