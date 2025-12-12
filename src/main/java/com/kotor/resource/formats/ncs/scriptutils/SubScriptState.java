@@ -335,7 +335,20 @@ public class SubScriptState {
                if (AElse.class.isInstance(parent) && parent.size() == 1 && AIf.class.isInstance(parent.getLastChild())) {
                   // This AIf is the only child of an AElse (else-if case)
                   // The next AElse should be a sibling of this AElse, not nested
-                  elseParent = (ScriptRootNode) parent.parent();
+                  ScriptRootNode grandParent = (ScriptRootNode) parent.parent();
+                  // Safety check: don't go above the root function
+                  if (grandParent != null && !ASub.class.isInstance(grandParent)) {
+                     elseParent = grandParent;
+                  } else {
+                     // If grandParent is root or null, keep parent as elseParent
+                     // This handles the case where the AElse is already at the function level
+                     elseParent = parent;
+                  }
+               }
+               
+               // Safety check: ensure elseParent is not null
+               if (elseParent == null) {
+                  elseParent = this.root;
                }
                
                AElse aelse = new AElse(this.current.getEnd() + 6,
