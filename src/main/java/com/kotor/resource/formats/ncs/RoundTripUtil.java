@@ -53,6 +53,12 @@ public class RoundTripUtil {
          try {
             // Use the same decompile method as the test
             FileDecompiler decompiler = new FileDecompiler();
+            // Ensure actions are loaded before decompiling (required for decompilation)
+            try {
+               decompiler.loadActionsData("k2".equals(gameFlag));
+            } catch (DecompilerException e) {
+               throw new DecompilerException("Failed to load actions data: " + e.getMessage(), e);
+            }
             try {
                decompiler.decompileToFile(ncsFile, tempNssFile, StandardCharsets.UTF_8, true);
             } catch (java.io.IOException e) {
@@ -118,6 +124,8 @@ public class RoundTripUtil {
 
          // Use the same decompile method as the test
          FileDecompiler decompiler = new FileDecompiler();
+         // Ensure actions are loaded before decompiling (required for decompilation)
+         decompiler.loadActionsData("k2".equals(gameFlag));
          decompiler.decompileToFile(ncsFile, nssOutputFile, charset, true);
 
          if (!nssOutputFile.exists()) {
