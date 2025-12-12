@@ -958,19 +958,13 @@ public class FileDecompiler {
 
          // Use compiler detection to get correct command-line arguments
          NwnnsscompConfig config = new NwnnsscompConfig(compiler, file, result, k2);
-         List<File> includeDirs = this.buildIncludeDirs(k2);
-         String[] args = config.getCompileArgs(compiler.getAbsolutePath(), includeDirs);
+         String[] args = config.getCompileArgs(compiler.getAbsolutePath());
 
          System.out.println("[NCSDecomp] Using compiler: " + config.getChosenCompiler().getName() +
             " (SHA256: " + config.getSha256Hash().substring(0, 16) + "...)");
          System.out.println("[NCSDecomp] Input file: " + file.getAbsolutePath());
          System.out.println("[NCSDecomp] Expected output: " + result.getAbsolutePath());
-         if (includeDirs != null && !includeDirs.isEmpty()) {
-            System.out.println("[NCSDecomp] Include directories: " + includeDirs.size());
-            for (File includeDir : includeDirs) {
-               System.out.println("[NCSDecomp]   - " + includeDir.getAbsolutePath());
-            }
-         }
+         System.out.println("[NCSDecomp] Note: nwscript.nss must be in the compiler's directory or source file directory");
 
          new FileDecompiler.WindowsExec().callExec(args);
 
@@ -992,25 +986,6 @@ public class FileDecompiler {
          e.printStackTrace();
          return null;
       }
-   }
-
-   private List<File> buildIncludeDirs(boolean k2) {
-      List<File> dirs = new ArrayList<>();
-      File base = new File("test-work" + File.separator + "Vanilla_KOTOR_Script_Source");
-      File gameDir = new File(base, k2 ? "TSL" : "K1");
-      File scriptsBif = new File(gameDir, "Data" + File.separator + "scripts.bif");
-      if (scriptsBif.exists()) {
-         dirs.add(scriptsBif);
-      }
-      File rootOverride = new File(gameDir, "Override");
-      if (rootOverride.exists()) {
-         dirs.add(rootOverride);
-      }
-      // Fallback: allow includes relative to the game dir root.
-      if (gameDir.exists()) {
-         dirs.add(gameDir);
-      }
-      return dirs;
    }
 
    private void ensureActionsLoaded() throws DecompilerException {
@@ -2348,22 +2323,29 @@ public class FileDecompiler {
        */
       public void callExec(String[] args) {
          try {
+            // Build copy/paste-able command string with proper quoting
             StringBuilder cmdStr = new StringBuilder();
             for (String arg : args) {
                if (cmdStr.length() > 0) {
                   cmdStr.append(" ");
                }
-               // Quote arguments that contain spaces
-               if (arg.contains(" ") || arg.contains("\"")) {
+               // Always quote arguments that contain spaces, backslashes, or special chars
+               if (arg.contains(" ") || arg.contains("\\") || arg.contains("\"") ||
+                   arg.contains("&") || arg.contains("|") || arg.contains("<") || arg.contains(">")) {
+                  // Use double quotes and escape internal quotes
                   cmdStr.append("\"").append(arg.replace("\"", "\\\"")).append("\"");
                } else {
                   cmdStr.append(arg);
                }
             }
-            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            System.out.println("[NCSDecomp] Executing nwnnsscomp.exe:");
-            System.out.println("[NCSDecomp] Command: " + cmdStr.toString());
-            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            System.out.println("");
+            System.out.println("================================================================================");
+            System.out.println("[NCSDecomp] Executing nwnnsscomp.exe");
+            System.out.println("[NCSDecomp] Copy/paste command:");
+            System.out.println("");
+            System.out.println(cmdStr.toString());
+            System.out.println("");
+            System.out.println("================================================================================");
 
             ProcessBuilder pb = new ProcessBuilder(args);
             Process proc = pb.start();
