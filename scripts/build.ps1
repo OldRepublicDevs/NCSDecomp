@@ -748,10 +748,6 @@ SetCompressorDictSize 32
 ; Request execution level (no admin required)
 RequestExecutionLevel user
 
-; Silent mode (no UI)
-SilentInstall silent
-AutoCloseWindow true
-
 ; Output file
 OutFile "${AppName}-${AppVersion}-Windows.exe"
 
@@ -850,12 +846,23 @@ SectionEnd
                     $nsiContent = $nsiContent -replace 'cleanup:\s+RMDir /r "`$0"', 'end:'
                 }
 
+                # For CLI apps, disable SilentInstall to allow console output
+                # For GUI apps, keep SilentInstall to hide extraction window
+                if (-not $IsGui) {
+                    # Remove SilentInstall for CLI - this allows the installer to attach to parent console
+                    $nsiContent = $nsiContent -replace 'SilentInstall silent', '; SilentInstall silent  ; Disabled for CLI to allow console output'
+                    $nsiContent = $nsiContent -replace 'AutoCloseWindow true', '; AutoCloseWindow true  ; Disabled for CLI'
+                    # Keep ExecWait for CLI (it will wait and show output in console)
+                    # The extraction window will show briefly but then console output will work
+                } else {
+                    # For GUI, keep SilentInstall (already in template)
+                }
+
                 $nsiContent | Out-File $nsisScriptPath -Encoding ASCII
 
                 # Build the executable
                 $singleFileDirAbsolute = if (Test-Path $singleFileDir) { (Resolve-Path $singleFileDir).Path } else { $singleFileDir }
                 $outputExe = Join-Path $singleFileDirAbsolute "${AppName}-${AppVersion}-Windows.exe"
-                $currentLocation = Get-Location
                 Push-Location $nsisBuildDir
                 try {
                     # NSIS script is in current directory, so just use relative path
