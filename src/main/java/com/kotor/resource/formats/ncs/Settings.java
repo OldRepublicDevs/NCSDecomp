@@ -33,6 +33,7 @@ import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 
 /**
  * Persisted user preferences for the NCSDecomp GUI.
@@ -60,7 +61,7 @@ public class Settings extends Properties implements ActionListener {
    private JButton browseOpenDirButton;
    private JTextField nwnnsscompPathField;
    private JButton browseNwnnsscompButton;
-   private JLabel nwnnsscompInfoLabel;
+   private JComboBox<String> nwnnsscompComboBox;
    private JTextField k1NwscriptPathField;
    private JButton browseK1NwscriptButton;
    private JTextField k2NwscriptPathField;
@@ -146,23 +147,25 @@ public class Settings extends Properties implements ActionListener {
             this.k2NwscriptPathField.setText(chooser.getSelectedFile().getAbsolutePath());
          }
       } else if (src == this.browseNwnnsscompButton) {
-         JFileChooser chooser = new JFileChooser();
-         chooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
-         chooser.setDialogTitle("Select nwnnsscomp.exe");
-         chooser.setFileFilter(new javax.swing.filechooser.FileFilter() {
-            @Override
-            public boolean accept(File f) {
-               return f.isDirectory() || f.getName().toLowerCase().endsWith(".exe");
+         // Browse for directory (folder)
+         String currentPath = this.nwnnsscompPathField.getText().trim();
+         File currentDir = null;
+         if (!currentPath.isEmpty()) {
+            File currentFile = new File(currentPath);
+            if (currentFile.isFile()) {
+               // If it's a file, use its parent directory
+               currentDir = currentFile.getParentFile();
+            } else if (currentFile.isDirectory()) {
+               currentDir = currentFile;
             }
-
-            @Override
-            public String getDescription() {
-               return "Executable Files (*.exe)";
-            }
-         });
+         }
+         JFileChooser chooser = new JFileChooser(currentDir);
+         chooser.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+         chooser.setDialogTitle("Select nwnnsscomp Directory");
          if (chooser.showOpenDialog(this.frame) == JFileChooser.APPROVE_OPTION) {
-            this.nwnnsscompPathField.setText(chooser.getSelectedFile().getAbsolutePath());
-            updateCompilerInfo();
+            File selectedDir = chooser.getSelectedFile();
+            this.nwnnsscompPathField.setText(selectedDir.getAbsolutePath());
+            populateCompilerComboBox(selectedDir);
             updateCompilerInfo();
          }
       }
@@ -172,11 +175,31 @@ public class Settings extends Properties implements ActionListener {
       // File/Directory Settings
       this.setProperty("Output Directory", this.outputDirectoryField.getText());
       this.setProperty("Open Directory", this.openDirectoryField.getText());
-      String nwnnsscompPath = this.nwnnsscompPathField.getText().trim();
-      if (nwnnsscompPath.isEmpty()) {
-         this.remove("nwnnsscomp Path");
+
+      // Save the full path to the selected compiler (from combobox selection)
+      String selectedCompiler = (String) this.nwnnsscompComboBox.getSelectedItem();
+      String folderPath = this.nwnnsscompPathField.getText().trim();
+      if (!folderPath.isEmpty() && selectedCompiler != null && !selectedCompiler.isEmpty()) {
+         File folder = new File(folderPath);
+         if (folder.isFile()) {
+            folder = folder.getParentFile();
+         }
+         if (folder != null && folder.isDirectory()) {
+            File compilerFile = new File(folder, selectedCompiler);
+            String fullPath = compilerFile.getAbsolutePath();
+            this.setProperty("nwnnsscomp Path", fullPath);
+            FileDecompiler.nwnnsscompPath = fullPath;
+         } else {
+            // Fallback: just save the folder path
+            this.setProperty("nwnnsscomp Path", folderPath);
+            FileDecompiler.nwnnsscompPath = folderPath;
+         }
+      } else if (!folderPath.isEmpty()) {
+         this.setProperty("nwnnsscomp Path", folderPath);
+         FileDecompiler.nwnnsscompPath = folderPath;
       } else {
-         this.setProperty("nwnnsscomp Path", nwnnsscompPath);
+         this.remove("nwnnsscomp Path");
+         FileDecompiler.nwnnsscompPath = null;
       }
       String k1NwscriptPath = this.k1NwscriptPathField.getText().trim();
       if (k1NwscriptPath.isEmpty()) {
@@ -228,12 +251,27 @@ public class Settings extends Properties implements ActionListener {
       this.outputDirectoryField.setText(this.getProperty("Output Directory", defaultOutputDir));
       this.openDirectoryField.setText(this.getProperty("Open Directory", System.getProperty("user.dir")));
 
-      // Default nwnnsscomp path: tools/ directory + filename
-      String defaultNwnnsscompPath = new File(new File(System.getProperty("user.dir"), "tools"), "nwnnsscomp.exe").getAbsolutePath();
+      // Default nwnnsscomp path: tools/ directory
+      String defaultNwnnsscompPath = new File(System.getProperty("user.dir"), "tools").getAbsolutePath();
       // Check FileDecompiler.nwnnsscompPath first to ensure synchronization with actual runtime state
       String nwnnsscompPath = FileDecompiler.nwnnsscompPath != null ? FileDecompiler.nwnnsscompPath : this.getProperty("nwnnsscomp Path", defaultNwnnsscompPath);
+
+      // If path is a file, extract parent directory
+      File pathFile = new File(nwnnsscompPath);
+      if (pathFile.isFile()) {
+         File parent = pathFile.getParentFile();
+         if (parent != null) {
+            nwnnsscompPath = parent.getAbsolutePath();
+         }
+      }
+
       this.nwnnsscompPathField.setText(nwnnsscompPath);
-      // Update compiler info after setting the path
+      // Populate combobox and update compiler info after setting the path
+      File folder = new File(nwnnsscompPath);
+      if (folder.isDirectory() || (folder.isFile() && folder.getParentFile() != null)) {
+         File actualFolder = folder.isDirectory() ? folder : folder.getParentFile();
+         populateCompilerComboBox(actualFolder);
+      }
       updateCompilerInfo();
 
       // Default nwscript paths: tools/ directory + filename
@@ -448,20 +486,20 @@ public class Settings extends Properties implements ActionListener {
       gbc.gridx = 1;
       gbc.weightx = 1.0;
       this.nwnnsscompPathField = new JTextField(30);
-      this.nwnnsscompPathField.setToolTipText("Path to nwnnsscomp.exe for bytecode validation and round-trip testing");
-      // Add document listener to update compiler info when path changes
+      this.nwnnsscompPathField.setToolTipText("Directory containing nwnnsscomp.exe files");
+      // Add document listener to update compiler combobox when path changes
       this.nwnnsscompPathField.getDocument().addDocumentListener(new DocumentListener() {
          @Override
          public void insertUpdate(DocumentEvent e) {
-            updateCompilerInfo();
+            handlePathFieldChange();
          }
          @Override
          public void removeUpdate(DocumentEvent e) {
-            updateCompilerInfo();
+            handlePathFieldChange();
          }
          @Override
          public void changedUpdate(DocumentEvent e) {
-            updateCompilerInfo();
+            handlePathFieldChange();
          }
       });
       panel.add(this.nwnnsscompPathField, gbc);
@@ -471,12 +509,35 @@ public class Settings extends Properties implements ActionListener {
       this.browseNwnnsscompButton.addActionListener(this);
       panel.add(this.browseNwnnsscompButton, gbc);
 
-      // Compiler info indicator (emoji + tooltip)
+      // Compiler selection combobox
       gbc.gridx = 3;
       gbc.weightx = 0.0;
-      this.nwnnsscompInfoLabel = new JLabel("");
-      this.nwnnsscompInfoLabel.setToolTipText("Compiler information will appear here");
-      panel.add(this.nwnnsscompInfoLabel, gbc);
+      this.nwnnsscompComboBox = new JComboBox<>();
+      this.nwnnsscompComboBox.setToolTipText("Select which nwnnsscomp.exe to use");
+      this.nwnnsscompComboBox.addActionListener(e -> {
+         if (e.getSource() == this.nwnnsscompComboBox && this.nwnnsscompComboBox.getSelectedItem() != null) {
+            String selectedCompiler = (String) this.nwnnsscompComboBox.getSelectedItem();
+            String folderPath = this.nwnnsscompPathField.getText().trim();
+            if (!folderPath.isEmpty() && !selectedCompiler.isEmpty()) {
+               // Update the path to point to the selected compiler
+               File folder = new File(folderPath);
+               if (folder.isFile()) {
+                  folder = folder.getParentFile();
+               }
+               if (folder != null && folder.isDirectory()) {
+                  File compilerFile = new File(folder, selectedCompiler);
+                  // Save the full path to the compiler file
+                  String fullPath = compilerFile.getAbsolutePath();
+                  // Update FileDecompiler to use this specific compiler
+                  FileDecompiler.nwnnsscompPath = fullPath;
+                  // Save to settings
+                  this.setProperty("nwnnsscomp Path", fullPath);
+                  updateCompilerInfo();
+               }
+            }
+         }
+      });
+      panel.add(this.nwnnsscompComboBox, gbc);
 
       // K1 nwscript Path
       gbc.gridx = 0;
@@ -697,7 +758,7 @@ public class Settings extends Properties implements ActionListener {
    /**
     * Finds the compiler executable using the same fallback logic as FileDecompiler.getCompilerFile().
     * This ensures the settings window shows the compiler that will actually be used.
-    * 
+    *
     * @param configuredPath The configured path from the settings field (may be empty)
     * @return A CompilerResolutionResult containing the found compiler file and whether it's a fallback
     */
@@ -835,42 +896,123 @@ public class Settings extends Properties implements ActionListener {
    }
 
    /**
-    * Updates the compiler info indicator based on the current nwnnsscomp path.
-    * Uses the same fallback logic as FileDecompiler to find the actual compiler that will be used.
-    * Detects the compiler version by SHA256 hash and displays metadata.
+    * Handles changes to the nwnnsscomp path field.
+    * Extracts parent folder if a file path is entered, then populates the combobox.
     */
-   private void updateCompilerInfo() {
-      String configuredPath = this.nwnnsscompPathField.getText().trim();
-
-      // Find the compiler using the same fallback logic as FileDecompiler
-      CompilerResolutionResult result = findCompilerFile(configuredPath);
-
-      if (result == null) {
-         // No compiler found
-         this.nwnnsscompInfoLabel.setText("❓");
-         StringBuilder tooltip = new StringBuilder();
-         tooltip.append("<html><b>Compiler Not Found</b><br>");
-         if (!configuredPath.isEmpty()) {
-            tooltip.append("Configured path: ").append(configuredPath).append("<br>");
-         }
-         tooltip.append("<br>Searched locations:<br>");
-         if (!configuredPath.isEmpty()) {
-            tooltip.append("• Configured path and directory<br>");
-         }
-         tooltip.append("• tools/ directory<br>");
-         tooltip.append("• Current working directory<br>");
-         tooltip.append("• NCSDecomp installation directory<br>");
-         tooltip.append("<br>Compiler filenames tried:<br>");
-         tooltip.append("• nwnnsscomp.exe<br>");
-         tooltip.append("• nwnnsscomp_kscript.exe<br>");
-         tooltip.append("• nwnnsscomp_tslpatcher.exe<br>");
-         tooltip.append("• nwnnsscomp_v1.exe<br>");
-         tooltip.append("</html>");
-         this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
+   private void handlePathFieldChange() {
+      String path = this.nwnnsscompPathField.getText().trim();
+      if (path.isEmpty()) {
+         this.nwnnsscompComboBox.removeAllItems();
          return;
       }
 
-      File compilerFile = result.file;
+      File pathFile = new File(path);
+      final File folder;
+
+      if (pathFile.isFile()) {
+         // If it's a file, extract parent folder
+         File parentFolder = pathFile.getParentFile();
+         folder = parentFolder;
+         // Update the field to show the folder path
+         if (parentFolder != null) {
+            final String folderPath = parentFolder.getAbsolutePath();
+            SwingUtilities.invokeLater(() -> {
+               if (!this.nwnnsscompPathField.getText().equals(folderPath)) {
+                  this.nwnnsscompPathField.setText(folderPath);
+               }
+            });
+         } else {
+            this.nwnnsscompComboBox.removeAllItems();
+            return;
+         }
+      } else if (pathFile.isDirectory()) {
+         folder = pathFile;
+      } else {
+         this.nwnnsscompComboBox.removeAllItems();
+         return;
+      }
+
+      if (folder != null && folder.exists()) {
+         populateCompilerComboBox(folder);
+      } else {
+         this.nwnnsscompComboBox.removeAllItems();
+      }
+      updateCompilerInfo();
+   }
+
+   /**
+    * Populates the compiler combobox with detected nwnnsscomp.exe files in the specified folder.
+    * Only includes files that start with "nwnnsscomp" prefix.
+    */
+   private void populateCompilerComboBox(File folder) {
+      if (folder == null || !folder.isDirectory()) {
+         this.nwnnsscompComboBox.removeAllItems();
+         return;
+      }
+
+      // Get all files in the directory that start with "nwnnsscomp"
+      File[] files = folder.listFiles((dir, name) -> {
+         String lowerName = name.toLowerCase();
+         return lowerName.startsWith("nwnnsscomp") && lowerName.endsWith(".exe");
+      });
+
+      String currentSelection = (String) this.nwnnsscompComboBox.getSelectedItem();
+      this.nwnnsscompComboBox.removeAllItems();
+
+      if (files != null && files.length > 0) {
+         // Sort files by name for consistent display
+         java.util.Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+
+         for (File file : files) {
+            this.nwnnsscompComboBox.addItem(file.getName());
+         }
+
+         // Try to restore previous selection if it still exists
+         if (currentSelection != null) {
+            for (int i = 0; i < this.nwnnsscompComboBox.getItemCount(); i++) {
+               if (this.nwnnsscompComboBox.getItemAt(i).equals(currentSelection)) {
+                  this.nwnnsscompComboBox.setSelectedIndex(i);
+                  return;
+               }
+            }
+         }
+
+         // If no previous selection or it doesn't exist, select the first item
+         if (this.nwnnsscompComboBox.getItemCount() > 0) {
+            this.nwnnsscompComboBox.setSelectedIndex(0);
+         }
+      }
+   }
+
+   /**
+    * Updates the compiler combobox tooltip based on the selected compiler.
+    * Detects the compiler version by SHA256 hash and displays metadata.
+    */
+   private void updateCompilerInfo() {
+      String selectedCompiler = (String) this.nwnnsscompComboBox.getSelectedItem();
+      String folderPath = this.nwnnsscompPathField.getText().trim();
+
+      if (selectedCompiler == null || selectedCompiler.isEmpty() || folderPath.isEmpty()) {
+         this.nwnnsscompComboBox.setToolTipText("No compiler selected");
+         return;
+      }
+
+      File folder = new File(folderPath);
+      if (folder.isFile()) {
+         folder = folder.getParentFile();
+      }
+
+      if (folder == null || !folder.isDirectory()) {
+         this.nwnnsscompComboBox.setToolTipText("Invalid directory: " + folderPath);
+         return;
+      }
+
+      File compilerFile = new File(folder, selectedCompiler);
+
+      if (!compilerFile.exists() || !compilerFile.isFile()) {
+         this.nwnnsscompComboBox.setToolTipText("Compiler file not found: " + compilerFile.getAbsolutePath());
+         return;
+      }
 
       try {
          // Calculate SHA256 hash
@@ -884,11 +1026,6 @@ public class Settings extends Properties implements ActionListener {
             StringBuilder tooltip = new StringBuilder();
             tooltip.append("<html><b>").append(compiler.getName()).append("</b><br>");
             tooltip.append("Path: ").append(compilerFile.getAbsolutePath()).append("<br>");
-            if (result.isFallback) {
-               tooltip.append("<i>Using fallback: ").append(result.source).append("</i><br>");
-            } else {
-               tooltip.append("<i>Using configured path</i><br>");
-            }
             tooltip.append("<br>Author: ").append(compiler.getAuthor()).append("<br>");
             tooltip.append("Release Date: ").append(compiler.getReleaseDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))).append("<br>");
             tooltip.append("SHA256: ").append(sha256.substring(0, 16)).append("...<br>");
@@ -907,91 +1044,19 @@ public class Settings extends Properties implements ActionListener {
             }
             tooltip.append("</html>");
 
-            // Choose emoji based on compiler type
-            String emoji = getCompilerEmoji(compiler);
-            String label = emoji + " " + compiler.getName();
-            if (result.isFallback) {
-               label += " (fallback)";
-            }
-            this.nwnnsscompInfoLabel.setText(label);
-            this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
+            this.nwnnsscompComboBox.setToolTipText(tooltip.toString());
          } else {
             // Unknown compiler
-            this.nwnnsscompInfoLabel.setText("⚠️ Unknown");
             StringBuilder tooltip = new StringBuilder();
             tooltip.append("<html><b>Unknown Compiler</b><br>");
             tooltip.append("Path: ").append(compilerFile.getAbsolutePath()).append("<br>");
-            if (result.isFallback) {
-               tooltip.append("<i>Using fallback: ").append(result.source).append("</i><br>");
-            } else {
-               tooltip.append("<i>Using configured path</i><br>");
-            }
             tooltip.append("<br>SHA256: ").append(sha256).append("<br>");
             tooltip.append("This compiler version is not recognized.<br>");
             tooltip.append("It may not be fully supported.</html>");
-            this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
+            this.nwnnsscompComboBox.setToolTipText(tooltip.toString());
          }
       } catch (IOException e) {
-         this.nwnnsscompInfoLabel.setText("❌");
-         StringBuilder tooltip = new StringBuilder();
-         tooltip.append("<html><b>Error Reading Compiler</b><br>");
-         tooltip.append("Path: ").append(compilerFile.getAbsolutePath()).append("<br>");
-         if (result.isFallback) {
-            tooltip.append("<i>Using fallback: ").append(result.source).append("</i><br>");
-         } else {
-            tooltip.append("<i>Using configured path</i><br>");
-         }
-         tooltip.append("<br>Error: ").append(e.getMessage()).append("</html>");
-         this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
-      }
-
-      try {
-         // Calculate SHA256 hash
-         String sha256 = HashUtil.calculateSHA256(compilerFile);
-
-         // Look up compiler
-         KnownExternalCompilers compiler = KnownExternalCompilers.fromSha256(sha256);
-
-         if (compiler != null) {
-            // Format tooltip with metadata
-            StringBuilder tooltip = new StringBuilder();
-            tooltip.append("<html><b>").append(compiler.getName()).append("</b><br>");
-            tooltip.append("Author: ").append(compiler.getAuthor()).append("<br>");
-            tooltip.append("Release Date: ").append(compiler.getReleaseDate().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))).append("<br>");
-            tooltip.append("SHA256: ").append(sha256.substring(0, 16)).append("...<br>");
-            tooltip.append("<br><b>Compile Args:</b><br>");
-            String[] compileArgs = compiler.getCompileArgs();
-            if (compileArgs.length > 0) {
-               tooltip.append(String.join(" ", compileArgs));
-            } else {
-               tooltip.append("(not supported)");
-            }
-            tooltip.append("<br><br><b>Decompile Args:</b><br>");
-            if (compiler.supportsDecompilation()) {
-               tooltip.append(String.join(" ", compiler.getDecompileArgs()));
-            } else {
-               tooltip.append("(not supported)");
-            }
-            tooltip.append("</html>");
-
-            // Choose emoji based on compiler type
-            String emoji = getCompilerEmoji(compiler);
-
-            this.nwnnsscompInfoLabel.setText(emoji + " " + compiler.getName());
-            this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
-         } else {
-            // Unknown compiler
-            this.nwnnsscompInfoLabel.setText("⚠️ Unknown");
-            StringBuilder tooltip = new StringBuilder();
-            tooltip.append("<html><b>Unknown Compiler</b><br>");
-            tooltip.append("SHA256: ").append(sha256).append("<br>");
-            tooltip.append("This compiler version is not recognized.<br>");
-            tooltip.append("It may not be fully supported.</html>");
-            this.nwnnsscompInfoLabel.setToolTipText(tooltip.toString());
-         }
-      } catch (IOException e) {
-         this.nwnnsscompInfoLabel.setText("❌");
-         this.nwnnsscompInfoLabel.setToolTipText("Error reading compiler file: " + e.getMessage());
+         this.nwnnsscompComboBox.setToolTipText("Error reading compiler file: " + e.getMessage());
       }
    }
 
