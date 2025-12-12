@@ -883,10 +883,11 @@ public class Decompiler
                Hashtable<String, Vector<Variable>> func2VarVec = this.fileDecompiler.updateSubName(file, this.currentNodeString, changedPath.getLastPathComponent().toString());
                this.hash_TabComponent2Func2VarVec.put(tabComponent, func2VarVec);
                this.hash_TabComponent2TreeModel.put(tabComponent, this.jTree.getModel());
-               if (panels.length > 0 && panels[0] instanceof JPanel) {
-                  JPanel panel = (JPanel)panels[0];
-                  if (panel.getComponentCount() > 0 && panel.getComponent(0) instanceof JScrollPane) {
-                     JScrollPane scrollPane = (JScrollPane)panel.getComponent(0);
+               if (panels.length > 0 && panels[0] instanceof JSplitPane) {
+                  JSplitPane decompSplitPane = (JSplitPane)panels[0];
+                  java.awt.Component leftComp = decompSplitPane.getLeftComponent();
+                  if (leftComp instanceof JScrollPane) {
+                     JScrollPane scrollPane = (JScrollPane)leftComp;
                      if (scrollPane.getViewport().getView() instanceof JTextComponent) {
                         this.jTA = (JTextComponent)scrollPane.getViewport().getView();
                         // Disable highlighting during setText to prevent freeze
@@ -916,10 +917,11 @@ public class Decompiler
                      if (nodeIndex >= 0 && nodeIndex < variables.size()) {
                         Variable changedVar = variables.get(nodeIndex);
                         changedVar.name(changedPath.getLastPathComponent().toString());
-                        if (panels.length > 0 && panels[0] instanceof JPanel) {
-                           JPanel panel = (JPanel)panels[0];
-                           if (panel.getComponentCount() > 0 && panel.getComponent(0) instanceof JScrollPane) {
-                              JScrollPane scrollPane = (JScrollPane)panel.getComponent(0);
+                        if (panels.length > 0 && panels[0] instanceof JSplitPane) {
+                           JSplitPane decompSplitPane = (JSplitPane)panels[0];
+                           java.awt.Component leftComp = decompSplitPane.getLeftComponent();
+                           if (leftComp instanceof JScrollPane) {
+                              JScrollPane scrollPane = (JScrollPane)leftComp;
                               if (scrollPane.getViewport().getView() instanceof JTextComponent) {
                                  this.jTA = (JTextComponent)scrollPane.getViewport().getView();
                                  // Disable highlighting during setText to prevent freeze
@@ -1136,15 +1138,25 @@ public class Decompiler
          return; // Invalid panel structure
       }
 
-      JPanel panel = (JPanel)panels[0];
-      if (!(panel.getBorder() instanceof TitledBorder)) {
+      // Line number display is now on the scroll pane border, not the split pane
+      // Get the left scroll pane from the split pane
+      if (!(panels[0] instanceof JSplitPane)) {
+         return;
+      }
+      JSplitPane decompSplitPane = (JSplitPane)panels[0];
+      java.awt.Component leftComp = decompSplitPane.getLeftComponent();
+      if (!(leftComp instanceof JScrollPane)) {
+         return;
+      }
+      JScrollPane leftScrollPane = (JScrollPane)leftComp;
+      if (!(leftScrollPane.getBorder() instanceof TitledBorder)) {
          return; // Invalid border type
       }
 
       this.jTA = (JTextComponent)arg0.getSource();
       this.mark = this.jTA.getCaretPosition();
       this.rootElement = this.jTA.getDocument().getDefaultRootElement();
-      this.titledBorder = (TitledBorder)panel.getBorder();
+      this.titledBorder = (TitledBorder)leftScrollPane.getBorder();
       if (!(this.temp = Integer.toString(this.rootElement.getElementIndex(this.mark) + 1)).equals(this.titledBorder.getTitle())) {
          this.titledBorder.setTitle(this.temp);
          this.repaint();
@@ -1166,16 +1178,12 @@ public class Decompiler
       // Array for holding the panels: [0] = Decompilation panel, [1] = Bytecode split view
       JComponent[] tabComponents = new JComponent[2];
 
-      // --- Decompiled Code Panel ---
-      JPanel decompPanel = new JPanel(new BorderLayout());
+      // --- Decompiled Code Split Pane ---
+      JSplitPane decompSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
+      decompSplitPane.setDividerLocation(500);
+      decompSplitPane.setDividerSize(5);
 
-      // Line number display as a titled border
-      TitledBorder border = new TitledBorder("1");
-      border.setTitlePosition(TitledBorder.BELOW_TOP);
-      border.setTitleJustification(TitledBorder.RIGHT);
-      decompPanel.setBorder(border);
-
-      // Main code-editing area
+      // ---- Left: Original Decompiled Code Panel (Editable) ----
       JTextPane textPane = new JTextPane();
       textPane.setFont(new Font("Monospaced", Font.PLAIN, 12));
       textPane.setEditable(true);
@@ -1251,7 +1259,10 @@ public class Decompiler
       textPane.getDocument().addDocumentListener(NWScriptSyntaxHighlighter.createHighlightingListener(textPane));
 
       JScrollPane codeScrollPane = new JScrollPane(textPane);
-      decompPanel.add(codeScrollPane, BorderLayout.CENTER);
+      codeScrollPane.setBorder(new TitledBorder("Decompiled Code"));
+      codeScrollPane.getVerticalScrollBar().addAdjustmentListener(this);
+
+      decompSplitPane.setLeftComponent(codeScrollPane);
 
       // Context menu for switching to bytecode view
       JPopupMenu codePopupMenu = new JPopupMenu();
@@ -1260,7 +1271,29 @@ public class Decompiler
       codePopupMenu.add(viewByteCodeItem);
       textPane.setComponentPopupMenu(codePopupMenu);
 
-      tabComponents[0] = decompPanel;
+      // ---- Right: Round-Trip Decompiled Code Panel (Read-Only) ----
+      JTextPane roundTripTextPane = new JTextPane();
+      roundTripTextPane.setFont(new Font("Monospaced", Font.PLAIN, 12));
+      roundTripTextPane.setEditable(false);
+
+      this.dropTarget = new DropTarget(roundTripTextPane, this);
+      roundTripTextPane.putClientProperty("dropTarget", this.dropTarget);
+      roundTripTextPane.getDocument().addDocumentListener(NWScriptSyntaxHighlighter.createHighlightingListener(roundTripTextPane));
+
+      JScrollPane roundTripScrollPane = new JScrollPane(roundTripTextPane);
+      roundTripScrollPane.setBorder(new TitledBorder("Round-Trip Decompiled Code"));
+      roundTripScrollPane.getVerticalScrollBar().addAdjustmentListener(this);
+
+      decompSplitPane.setRightComponent(roundTripScrollPane);
+
+      // Context menu for round-trip pane
+      JPopupMenu roundTripPopupMenu = new JPopupMenu();
+      JMenuItem viewByteCodeItem2 = new JMenuItem("View Byte Code");
+      viewByteCodeItem2.addActionListener(this);
+      roundTripPopupMenu.add(viewByteCodeItem2);
+      roundTripTextPane.setComponentPopupMenu(roundTripPopupMenu);
+
+      tabComponents[0] = decompSplitPane;
 
       // --- Bytecode Comparison Split Pane ---
       JSplitPane byteCodeSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT);
@@ -1375,20 +1408,29 @@ public class Decompiler
       // Now we're guaranteed to have code - always show it
       {
          this.panels = this.newNCSTab(file.getName().substring(0, file.getName().length() - 4));
-         JTextComponent codeArea = (JTextComponent)((JScrollPane)((JPanel)this.panels[0]).getComponent(0)).getViewport().getView();
 
-         // Disable highlighting during setText to prevent freeze
-         if (codeArea instanceof JTextPane) {
-            NWScriptSyntaxHighlighter.setSkipHighlighting((JTextPane)codeArea, true);
-         }
+         // Get the left side text pane from the split pane
+         if (this.panels[0] instanceof JSplitPane) {
+            JSplitPane decompSplitPane = (JSplitPane)this.panels[0];
+            java.awt.Component leftComp = decompSplitPane.getLeftComponent();
+            if (leftComp instanceof JScrollPane) {
+               JScrollPane leftScrollPane = (JScrollPane)leftComp;
+               JTextComponent codeArea = (JTextComponent)leftScrollPane.getViewport().getView();
 
-         codeArea.setText(generatedCode);
+               // Disable highlighting during setText to prevent freeze
+               if (codeArea instanceof JTextPane) {
+                  NWScriptSyntaxHighlighter.setSkipHighlighting((JTextPane)codeArea, true);
+               }
 
-         // Re-enable highlighting and apply immediately
-         if (codeArea instanceof JTextPane) {
-            JTextPane textPane = (JTextPane)codeArea;
-            NWScriptSyntaxHighlighter.setSkipHighlighting(textPane, false);
-            NWScriptSyntaxHighlighter.applyHighlightingImmediate(textPane);
+               codeArea.setText(generatedCode);
+
+               // Re-enable highlighting and apply immediately
+               if (codeArea instanceof JTextPane) {
+                  JTextPane textPane = (JTextPane)codeArea;
+                  NWScriptSyntaxHighlighter.setSkipHighlighting(textPane, false);
+                  NWScriptSyntaxHighlighter.applyHighlightingImmediate(textPane);
+               }
+            }
          }
 
          // Try to get bytecode if available
@@ -1762,12 +1804,16 @@ public class Decompiler
          return; // Invalid panel structure
       }
 
-      JPanel panel = (JPanel)panels[0];
-      if (panel.getComponentCount() == 0 || !(panel.getComponent(0) instanceof JScrollPane)) {
+      if (!(panels[0] instanceof JSplitPane)) {
+         return; // Invalid component structure
+      }
+      JSplitPane decompSplitPane = (JSplitPane)panels[0];
+      java.awt.Component leftComp = decompSplitPane.getLeftComponent();
+      if (!(leftComp instanceof JScrollPane)) {
          return; // Invalid component structure
       }
 
-      JScrollPane scrollPane = (JScrollPane)panel.getComponent(0);
+      JScrollPane scrollPane = (JScrollPane)leftComp;
       if (!(scrollPane.getViewport().getView() instanceof JTextComponent)) {
          return; // Invalid view type
       }
@@ -1869,9 +1915,9 @@ public class Decompiler
                      String newByteCode = this.fileDecompiler.getNewByteCode(this.file);
 
                      JSplitPane byteCodePane = (JSplitPane)this.panels[1];
-                     java.awt.Component leftComp = byteCodePane.getLeftComponent();
-                     if (leftComp instanceof JScrollPane) {
-                        this.origByteCodeJTA = (JTextPane)((JScrollPane)leftComp).getViewport().getView();
+                     java.awt.Component leftComp1 = byteCodePane.getLeftComponent();
+                     if (leftComp1 instanceof JScrollPane) {
+                        this.origByteCodeJTA = (JTextPane)((JScrollPane)leftComp1).getViewport().getView();
                         if (this.origByteCodeJTA != null) {
                            String code = origByteCode != null ? origByteCode : "// Original bytecode not available";
                            this.origByteCodeJTA.setText(code);
@@ -1879,9 +1925,9 @@ public class Decompiler
                         }
                      }
 
-                     java.awt.Component rightComp = byteCodePane.getRightComponent();
-                     if (rightComp instanceof JScrollPane) {
-                        this.newByteCodeJTA = (JTextPane)((JScrollPane)rightComp).getViewport().getView();
+                     java.awt.Component rightComp1 = byteCodePane.getRightComponent();
+                     if (rightComp1 instanceof JScrollPane) {
+                        this.newByteCodeJTA = (JTextPane)((JScrollPane)rightComp1).getViewport().getView();
                         if (this.newByteCodeJTA != null) {
                            String code = newByteCode != null ? newByteCode : "// Recompiled bytecode not available";
                            this.newByteCodeJTA.setText(code);
@@ -1920,9 +1966,9 @@ public class Decompiler
                   try {
                      String origByteCode = this.fileDecompiler.getOriginalByteCode(this.file);
                      JSplitPane byteCodePane = (JSplitPane)this.panels[1];
-                     java.awt.Component leftComp = byteCodePane.getLeftComponent();
-                     if (leftComp instanceof JScrollPane) {
-                        this.origByteCodeJTA = (JTextPane)((JScrollPane)leftComp).getViewport().getView();
+                     java.awt.Component leftComp2 = byteCodePane.getLeftComponent();
+                     if (leftComp2 instanceof JScrollPane) {
+                        this.origByteCodeJTA = (JTextPane)((JScrollPane)leftComp2).getViewport().getView();
                         if (this.origByteCodeJTA != null) {
                            String code = origByteCode != null ? origByteCode : "// Original bytecode not available";
                            this.origByteCodeJTA.setText(code);
@@ -1935,8 +1981,8 @@ public class Decompiler
                   }
                }
 
-               // Refresh decompiled code view with newly generated code
-               this.refreshDecompiledCodeView(index);
+               // Refresh decompiled code view with newly generated code and round-trip code
+               this.refreshDecompiledCodeView(index, newFile);
 
                this.hash_Func2VarVec = this.fileDecompiler.getVariableData(this.file);
                this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
@@ -1966,9 +2012,9 @@ public class Decompiler
                      String newByteCode = this.fileDecompiler.getNewByteCode(this.file);
 
                      JSplitPane byteCodePane = (JSplitPane)this.panels[1];
-                     java.awt.Component leftComp = byteCodePane.getLeftComponent();
-                     if (leftComp instanceof JScrollPane) {
-                        this.origByteCodeJTA = (JTextPane)((JScrollPane)leftComp).getViewport().getView();
+                     java.awt.Component leftComp3 = byteCodePane.getLeftComponent();
+                     if (leftComp3 instanceof JScrollPane) {
+                        this.origByteCodeJTA = (JTextPane)((JScrollPane)leftComp3).getViewport().getView();
                         if (this.origByteCodeJTA != null) {
                            String code = origByteCode != null ? origByteCode : "// Original bytecode not available";
                            this.origByteCodeJTA.setText(code);
@@ -1976,9 +2022,9 @@ public class Decompiler
                         }
                      }
 
-                     java.awt.Component rightComp = byteCodePane.getRightComponent();
-                     if (rightComp instanceof JScrollPane) {
-                        this.newByteCodeJTA = (JTextPane)((JScrollPane)rightComp).getViewport().getView();
+                     java.awt.Component rightComp3 = byteCodePane.getRightComponent();
+                     if (rightComp3 instanceof JScrollPane) {
+                        this.newByteCodeJTA = (JTextPane)((JScrollPane)rightComp3).getViewport().getView();
                         if (this.newByteCodeJTA != null) {
                            String code = newByteCode != null ? newByteCode : "// Recompiled bytecode not available";
                            this.newByteCodeJTA.setText(code);
@@ -1998,8 +2044,8 @@ public class Decompiler
                   }
                }
 
-               // Refresh decompiled code view with newly generated code
-               this.refreshDecompiledCodeView(index);
+               // Refresh decompiled code view with newly generated code and round-trip code
+               this.refreshDecompiledCodeView(index, newFile);
 
                this.hash_Func2VarVec = this.fileDecompiler.getVariableData(this.file);
                this.jTree.setModel(TreeModelFactory.createTreeModel(this.hash_Func2VarVec));
@@ -2032,10 +2078,12 @@ public class Decompiler
 
    /**
     * Refreshes the decompiled code view with the newly generated code after save/recompilation.
+    * Also populates the round-trip decompiled code on the right side.
     *
     * @param index The tab index to refresh
+    * @param savedNssFile The saved NSS file (used to find the recompiled NCS for round-trip decompilation)
     */
-   private void refreshDecompiledCodeView(int index) {
+   private void refreshDecompiledCodeView(int index, File savedNssFile) {
       try {
          JComponent tabComponent = (JComponent)this.jTB.getTabComponentAt(index);
          if (tabComponent == null) {
@@ -2053,21 +2101,22 @@ public class Decompiler
          }
 
          JComponent[] panels = (JComponent[])clientProperty;
-         if (panels.length == 0 || !(panels[0] instanceof JPanel)) {
+         if (panels.length == 0 || !(panels[0] instanceof JSplitPane)) {
             return;
          }
 
-         JPanel panel = (JPanel)panels[0];
-         if (panel.getComponentCount() == 0 || !(panel.getComponent(0) instanceof JScrollPane)) {
+         JSplitPane decompSplitPane = (JSplitPane)panels[0];
+
+         // Get left side (original decompiled code)
+         java.awt.Component leftComp = decompSplitPane.getLeftComponent();
+         if (!(leftComp instanceof JScrollPane)) {
             return;
          }
-
-         JScrollPane scrollPane = (JScrollPane)panel.getComponent(0);
-         if (!(scrollPane.getViewport().getView() instanceof JTextPane)) {
+         JScrollPane leftScrollPane = (JScrollPane)leftComp;
+         if (!(leftScrollPane.getViewport().getView() instanceof JTextPane)) {
             return;
          }
-
-         JTextPane codePane = (JTextPane)scrollPane.getViewport().getView();
+         JTextPane codePane = (JTextPane)leftScrollPane.getViewport().getView();
 
          // Get the newly generated code
          String generatedCode = this.fileDecompiler.getGeneratedCode(file);
@@ -2095,10 +2144,45 @@ public class Decompiler
                undoManager.discardAllEdits();
             }
          }
+
+         // Get right side (round-trip decompiled code)
+         java.awt.Component rightComp = decompSplitPane.getRightComponent();
+         if (rightComp instanceof JScrollPane) {
+            JScrollPane rightScrollPane = (JScrollPane)rightComp;
+            if (rightScrollPane.getViewport().getView() instanceof JTextPane) {
+               JTextPane roundTripPane = (JTextPane)rightScrollPane.getViewport().getView();
+
+               // Get round-trip decompiled code using shared utility (same logic as test)
+               String roundTripCode = null;
+               if (savedNssFile != null) {
+                  roundTripCode = getRoundTripDecompiledCode(savedNssFile);
+               }
+               if (roundTripCode != null) {
+                  NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, true);
+                  roundTripPane.setText(roundTripCode);
+                  NWScriptSyntaxHighlighter.setSkipHighlighting(roundTripPane, false);
+                  NWScriptSyntaxHighlighter.applyHighlightingImmediate(roundTripPane);
+               } else {
+                  roundTripPane.setText("// Round-trip decompiled code not available.\n// Save the file to trigger round-trip validation and decompilation.");
+               }
+            }
+         }
       } catch (Exception e) {
          System.err.println("Error refreshing decompiled code view: " + e.getMessage());
          e.printStackTrace();
       }
+   }
+
+   /**
+    * Gets the round-trip decompiled code using the shared RoundTripUtil.
+    * This ensures we use the exact same logic as the test suite.
+    *
+    * @param savedNssFile The saved NSS file (after compilation, this should have a corresponding .ncs file)
+    * @return Round-trip decompiled NSS code, or null if not available
+    */
+   private String getRoundTripDecompiledCode(File savedNssFile) {
+      String gameFlag = FileDecompiler.isK2Selected ? "k2" : "k1";
+      return RoundTripUtil.getRoundTripDecompiledCode(savedNssFile, gameFlag);
    }
 
    private void saveAll() {

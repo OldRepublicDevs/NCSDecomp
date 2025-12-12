@@ -1797,23 +1797,23 @@ public class NCSDecompCLIRoundTripTest {
    }
 
    private static void runDecompile(Path ncsPath, Path nssOut, String gameFlag) throws Exception {
-      FileDecompiler.isK2Selected = "k2".equals(gameFlag);
       System.out.print(" (game=" + gameFlag + ", output=" + nssOut.getFileName() + ")");
 
       try {
-         FileDecompiler fd = new FileDecompiler();
          File ncsFile = ncsPath.toFile();
          File nssFile = nssOut.toFile();
 
-         Files.createDirectories(nssFile.getParentFile().toPath());
-
-         fd.decompileToFile(ncsFile, nssFile, StandardCharsets.UTF_8, true);
+         // Use shared utility for consistency with GUI and CLI
+         RoundTripUtil.decompileNcsToNssFile(ncsFile, nssFile, gameFlag, StandardCharsets.UTF_8);
 
          if (!Files.isRegularFile(nssOut)) {
             System.out.println(" ✗ FAILED - no output file created");
             throw new RuntimeException("Decompile did not produce output: " + displayPath(nssOut));
          }
       } catch (DecompilerException ex) {
+         System.out.println(" ✗ FAILED - " + ex.getMessage());
+         throw new RuntimeException("Decompile failed for " + displayPath(ncsPath) + ": " + ex.getMessage(), ex);
+      } catch (java.io.IOException ex) {
          System.out.println(" ✗ FAILED - " + ex.getMessage());
          throw new RuntimeException("Decompile failed for " + displayPath(ncsPath) + ": " + ex.getMessage(), ex);
       }
