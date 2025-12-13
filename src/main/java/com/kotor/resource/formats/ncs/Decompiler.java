@@ -1730,127 +1730,17 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                            FileDecompiler.isK2Selected = isK2;
                            System.err.println("DEBUG loadNssFile: Compiling NSS with isK2: " + isK2 + " (from Settings: " + gameVariant + ")");
 
-                           // Ensure nwscript.nss is in compiler directory
-                           File compilerDir = compiler.getParentFile();
-                           if (compilerDir != null) {
-                              File compilerNwscript = new File(compilerDir, "nwscript.nss");
-                              File nwscriptSource = null;
-                              
-                              if (isK2) {
-                                 nwscriptSource = new File(new File(System.getProperty("user.dir"), "tools"), "tsl_nwscript.nss");
-                              } else {
-                                 // For K1, check if script needs ASC nwscript (ActionStartConversation with 11 params)
-                                 boolean needsAsc = false;
-                                 try {
-                                    String sourceContent = new String(java.nio.file.Files.readAllBytes(file.toPath()), java.nio.charset.StandardCharsets.UTF_8);
-                                    // Look for ActionStartConversation calls with 11 parameters (10 commas)
-                                    java.util.regex.Pattern ascPattern = java.util.regex.Pattern.compile(
-                                          "ActionStartConversation\\s*\\(([^,)]*,\\s*){10}[^)]*\\)",
-                                          java.util.regex.Pattern.MULTILINE);
-                                    needsAsc = ascPattern.matcher(sourceContent).find();
-                                    if (needsAsc) {
-                                       System.err.println("DEBUG loadNssFile: Script needs ASC nwscript (ActionStartConversation with 11 params)");
-                                    }
-                                 } catch (Exception e) {
-                                    System.err.println("DEBUG loadNssFile: Failed to check for ASC nwscript requirement: " + e.getMessage());
-                                 }
-                                 
-                                 if (needsAsc) {
-                                    // Try k1_asc_nwscript.nss first, then k1_asc_donotuse_nwscript.nss
-                                    File ascNwscript = new File(new File(System.getProperty("user.dir"), "tools"), "k1_asc_nwscript.nss");
-                                    if (!ascNwscript.exists()) {
-                                       ascNwscript = new File(new File(System.getProperty("user.dir"), "tools"), "k1_asc_donotuse_nwscript.nss");
-                                    }
-                                    if (ascNwscript.exists()) {
-                                       nwscriptSource = ascNwscript;
-                                       System.err.println("DEBUG loadNssFile: Using ASC nwscript: " + nwscriptSource.getAbsolutePath());
-                                    } else {
-                                       System.err.println("DEBUG loadNssFile: Warning: ASC nwscript not found, falling back to regular k1_nwscript.nss");
-                                       nwscriptSource = new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss");
-                                    }
-                                 } else {
-                                    nwscriptSource = new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss");
-                                 }
-                              }
-                              
-                              if (nwscriptSource != null && nwscriptSource.exists() && (!compilerNwscript.exists()
-                                    || !compilerNwscript.getAbsolutePath().equals(nwscriptSource.getAbsolutePath()))) {
-                                 try {
-                                    java.nio.file.Files.copy(nwscriptSource.toPath(), compilerNwscript.toPath(),
-                                          java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                                    System.err.println("DEBUG loadNssFile: Copied nwscript.nss to compiler directory: " + nwscriptSource.getName());
-                                 } catch (java.io.IOException e) {
-                                    System.err.println(
-                                          "DEBUG loadNssFile: Warning: Could not copy nwscript.nss: " + e.getMessage());
-                                 }
-                              } else if (nwscriptSource == null || !nwscriptSource.exists()) {
-                                 System.err.println("DEBUG loadNssFile: Warning: nwscript.nss source not found: " + 
-                                       (nwscriptSource != null ? nwscriptSource.getAbsolutePath() : "null"));
-                              }
-                           }
+                           // nwscript.nss handling is now done by CompilerExecutionWrapper.prepareExecutionEnvironment()
 
-                           NwnnsscompConfig config = new NwnnsscompConfig(compiler, file, compiledNcs, isK2);
+                           // Use unified compiler execution wrapper - abstracts ALL compiler quirks
+                           CompilerExecutionWrapper wrapper = new CompilerExecutionWrapper(compiler, file, compiledNcs, isK2);
+                           
                            // Include the source file's parent directory for relative #include resolution
                            java.util.List<File> includeDirs = new java.util.ArrayList<>();
                            includeDirs.add(file.getParentFile());
                            
-                           // For KOTOR Tool and KOTOR Scripting Tool, copy include files to source directory (they don't support -i flag)
-                           java.util.List<File> copiedIncludeFiles = new java.util.ArrayList<>();
-                           KnownExternalCompilers extCompiler = config.getChosenCompiler();
-                           if ((extCompiler == KnownExternalCompilers.KOTOR_TOOL || extCompiler == KnownExternalCompilers.KOTOR_SCRIPTING_TOOL) && !includeDirs.isEmpty()) {
-                              File sourceDir = file.getParentFile();
-                              
-                              // Parse source file to find which includes are needed
-                              java.util.Set<String> neededIncludes = new java.util.HashSet<>();
-                              try {
-                                 String sourceContent = new String(java.nio.file.Files.readAllBytes(file.toPath()), java.nio.charset.StandardCharsets.UTF_8);
-                                 java.util.regex.Pattern includePattern = java.util.regex.Pattern.compile("#include\\s+[\"<]([^\">]+)[\">]");
-                                 java.util.regex.Matcher matcher = includePattern.matcher(sourceContent);
-                                 while (matcher.find()) {
-                                    String includeName = matcher.group(1);
-                                    // Normalize: add .nss extension if missing
-                                    if (!includeName.endsWith(".nss") && !includeName.endsWith(".h")) {
-                                       includeName = includeName + ".nss";
-                                    }
-                                    neededIncludes.add(includeName);
-                                 }
-                              } catch (Exception e) {
-                                 System.err.println("DEBUG loadNssFile: Failed to parse includes from source: " + e.getMessage());
-                              }
-                              
-                              // Copy needed include files from include directories to source directory
-                              for (String includeName : neededIncludes) {
-                                 File destFile = new File(sourceDir, includeName);
-                                 // Skip if already exists in source directory
-                                 if (destFile.exists()) {
-                                    continue;
-                                 }
-                                 
-                                 // Search for include file in include directories
-                                 boolean found = false;
-                                 for (File includeDir : includeDirs) {
-                                    if (includeDir != null && includeDir.exists()) {
-                                       File includeFile = new File(includeDir, includeName);
-                                       if (includeFile.exists() && includeFile.isFile()) {
-                                          try {
-                                             java.nio.file.Files.copy(includeFile.toPath(), destFile.toPath(),
-                                                   java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-                                             copiedIncludeFiles.add(destFile);
-                                             System.err.println("DEBUG loadNssFile: Copied include file for KOTOR Tool: " + includeName + " from " + includeFile.getAbsolutePath());
-                                             found = true;
-                                             break;
-                                          } catch (java.io.IOException e) {
-                                             System.err.println("DEBUG loadNssFile: Failed to copy include file " + includeName + ": " + e.getMessage());
-                                          }
-                                       }
-                                    }
-                                 }
-                                 
-                                 if (!found) {
-                                    System.err.println("DEBUG loadNssFile: Warning: Include file not found: " + includeName);
-                                 }
-                              }
-                           }
+                           // Prepare execution environment (handles include files, nwscript.nss, etc.)
+                           wrapper.prepareExecutionEnvironment(includeDirs);
                            
                            // Declare variables outside try block so they're accessible in finally
                            StringBuilder output = new StringBuilder();
@@ -1858,11 +1748,13 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                            Process proc = null;
                            
                            try {
-                              String[] cmd = config.getCompileArgs(compiler.getAbsolutePath(), includeDirs);
+                              // Get unified command arguments
+                              String[] cmd = wrapper.getCompileArgs(includeDirs);
 
                               System.err.println("DEBUG loadNssFile: Running compiler: " + java.util.Arrays.toString(cmd));
                               ProcessBuilder pb = new ProcessBuilder(cmd);
-                              pb.directory(file.getParentFile());
+                              // Use unified working directory
+                              pb.directory(wrapper.getWorkingDirectory());
                               pb.redirectErrorStream(true);
                               proc = pb.start();
 
@@ -1978,17 +1870,8 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                               roundTripPane.setText(errorMsg.toString());
                            }
                            } finally {
-                              // Clean up copied include files (for KOTOR Tool) - always run
-                              for (File copiedFile : copiedIncludeFiles) {
-                                 try {
-                                    if (copiedFile.exists()) {
-                                       copiedFile.delete();
-                                       System.err.println("DEBUG loadNssFile: Cleaned up copied include file: " + copiedFile.getName());
-                                    }
-                                 } catch (Exception e) {
-                                    System.err.println("DEBUG loadNssFile: Failed to clean up copied include file " + copiedFile.getName() + ": " + e.getMessage());
-                                 }
-                              }
+                              // Clean up all temporary files (include files, nwscript.nss, etc.)
+                              wrapper.cleanup();
                            }
                         } else {
                            System.err.println("DEBUG loadNssFile: Compiler not found");

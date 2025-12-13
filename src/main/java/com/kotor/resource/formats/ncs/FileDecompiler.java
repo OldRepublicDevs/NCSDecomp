@@ -1110,56 +1110,45 @@ public class FileDecompiler {
          }
          File result = new File(actualOutputDir, baseName + ".ncs");
 
-         // Ensure nwscript.nss is in the compiler's directory (like test does)
-         File compilerDir = compiler.getParentFile();
-         if (compilerDir != null) {
-            File compilerNwscript = new File(compilerDir, "nwscript.nss");
-            File nwscriptSource = k2 ? new File(new File(System.getProperty("user.dir"), "tools"), "tsl_nwscript.nss")
-                  : new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss");
-            if (nwscriptSource.exists() && (!compilerNwscript.exists()
-                  || !compilerNwscript.getAbsolutePath().equals(nwscriptSource.getAbsolutePath()))) {
-               try {
-                  java.nio.file.Files.copy(nwscriptSource.toPath(), compilerNwscript.toPath(),
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-               } catch (java.io.IOException e) {
-                  // Log but don't fail - compiler might find nwscript.nss elsewhere
-                  System.err.println(
-                        "[NCSDecomp] Warning: Could not copy nwscript.nss to compiler directory: " + e.getMessage());
-               }
-            }
-         }
-
-         // Use compiler detection to get correct command-line arguments
-         NwnnsscompConfig config = new NwnnsscompConfig(compiler, file, result, k2);
-
-         // For GUI compilation, match test behavior: don't use -i flags
-         // Test shows compilers work without -i when includes are in source directory or
-         // compiler directory
-         // All compilers expect nwscript.nss in compiler directory and includes in
-         // source directory
-         String[] args = config.getCompileArgs(compiler.getAbsolutePath());
-
-         System.out.println("[NCSDecomp] Using compiler: " + config.getChosenCompiler().getName() + " (SHA256: "
-               + config.getSha256Hash().substring(0, 16) + "...)");
-         System.out.println("[NCSDecomp] Input file: " + file.getAbsolutePath());
-         System.out.println("[NCSDecomp] Expected output: " + result.getAbsolutePath());
-
+         // Use unified compiler execution wrapper - abstracts ALL compiler quirks
+         CompilerExecutionWrapper wrapper = new CompilerExecutionWrapper(compiler, file, result, k2);
+         
+         // Prepare execution environment (handles include files, nwscript.nss, etc.)
+         // For FileDecompiler, we typically don't have include directories, but wrapper handles it gracefully
+         wrapper.prepareExecutionEnvironment(new java.util.ArrayList<>());
+         
          try {
-            new FileDecompiler.WindowsExec().callExec(args);
-         } catch (IOException ioEx) {
-            // Elevation errors are already logged in callExec with helpful messages
-            // Re-throw to be caught by outer catch block
-            throw ioEx;
-         }
+            // Get unified command arguments from wrapper
+            String[] args = wrapper.getCompileArgs(new java.util.ArrayList<>());
 
-         if (!result.exists()) {
-            System.out.println("[NCSDecomp] ERROR: Expected output file does not exist: " + result.getAbsolutePath());
-            System.out.println("[NCSDecomp]   This usually means nwnnsscomp.exe compilation failed.");
-            System.out.println("[NCSDecomp]   Check the nwnnsscomp output above for compilation errors.");
-            return null;
-         }
+            System.out.println("[NCSDecomp] Using compiler: " + wrapper.getCompiler().getName());
+            System.out.println("[NCSDecomp] Input file: " + file.getAbsolutePath());
+            System.out.println("[NCSDecomp] Expected output: " + result.getAbsolutePath());
 
-         return result;
+            // Use unified working directory
+            File workingDir = wrapper.getWorkingDirectory();
+            System.out.println("[NCSDecomp] Working directory: " + workingDir.getAbsolutePath());
+
+            try {
+               new FileDecompiler.WindowsExec().callExec(args, workingDir);
+            } catch (IOException ioEx) {
+               // Elevation errors are already logged in callExec with helpful messages
+               // Re-throw to be caught by outer catch block
+               throw ioEx;
+            }
+
+            if (!result.exists()) {
+               System.out.println("[NCSDecomp] ERROR: Expected output file does not exist: " + result.getAbsolutePath());
+               System.out.println("[NCSDecomp]   This usually means nwnnsscomp.exe compilation failed.");
+               System.out.println("[NCSDecomp]   Check the nwnnsscomp output above for compilation errors.");
+               return null;
+            }
+
+            return result;
+         } finally {
+            // Clean up all temporary files (include files, nwscript.nss, etc.)
+            wrapper.cleanup();
+         }
       } catch (IOException e) {
          // Check if this is an elevation error
          String errorMsg = e.getMessage();
@@ -2504,6 +2493,10 @@ public class FileDecompiler {
        * @throws IOException If process execution fails, including elevation errors
        */
       public void callExec(String[] args) throws IOException {
+         callExec(args, null);
+      }
+      
+      public void callExec(String[] args, File workingDir) throws IOException {
          // Build copy-pasteable command string (exact format as test output)
          StringBuilder cmdStr = new StringBuilder();
          for (int i = 0; i < args.length; i++) {
@@ -2521,6 +2514,9 @@ public class FileDecompiler {
          System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
          System.out.println("[NCSDecomp] Executing nwnnsscomp.exe:");
          System.out.println("[NCSDecomp] Command: " + cmdStr.toString());
+         if (workingDir != null) {
+            System.out.println("[NCSDecomp] Working directory: " + workingDir.getAbsolutePath());
+         }
          System.out.println("");
          System.out.println("[NCSDecomp] Calling nwnnsscomp with command:");
          System.out.println(cmdStr.toString());
@@ -2534,6 +2530,10 @@ public class FileDecompiler {
          try {
 
             ProcessBuilder pb = new ProcessBuilder(args);
+            // Pattern 3: Working directory normalization
+            if (workingDir != null && workingDir.exists()) {
+               pb.directory(workingDir);
+            }
 
             // Apply TSLPatcher workaround: set __COMPAT_LAYER=RUNASINVOKER to bypass UAC elevation requirement
             // This is needed because legacy Windows executables without app.manifest trigger UAC prompts
