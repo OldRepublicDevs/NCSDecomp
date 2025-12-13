@@ -319,59 +319,62 @@ public class CompilerUtil {
 
    /**
     * Gets the NCSDecomp installation directory.
-    * This is determined from the location of the running JAR file.
-    * For jpackage EXEs, this goes up from the app/ directory to the distribution root.
+    * Dynamically determines the base directory from the executable or JAR location.
+    * Creates directories as needed rather than traversing directory structures.
     *
-    * @return The NCSDecomp directory, or user.dir as fallback
+    * @return The NCSDecomp base directory (where config/ and tools/ should be created), or user.dir as fallback
     */
    public static File getNCSDecompDirectory() {
       try {
-         // First, try to get the executable path (for jpackage EXEs)
+         // Strategy 1: Try to get the executable path (for jpackage EXEs or any native executable)
          String exePath = System.getProperty("java.launcher.path");
          if (exePath != null) {
             File exeFile = new File(exePath);
-            if (exeFile.exists()) {
+            if (exeFile.exists() && exeFile.isFile()) {
                File exeDir = exeFile.getParentFile();
-               if (exeDir != null) {
-                  // For jpackage, the structure is: dist/NCSDecomp/NCSDecomp.exe and dist/NCSDecomp/app/
-                  // We want the directory containing the EXE (which is the distribution root)
+               if (exeDir != null && exeDir.exists()) {
+                  // Use the directory containing the executable as the base directory
+                  // This works for any directory structure - we don't care about subdirectories
                   return exeDir;
                }
             }
          }
-         
-         // Fall back to JAR location
+
+         // Strategy 2: Try to get JAR location (for JAR execution)
          java.net.URL location = CompilerUtil.class.getProtectionDomain().getCodeSource().getLocation();
          if (location != null) {
             String path = location.getPath();
             if (path != null) {
+               // Handle file: protocol
                if (path.startsWith("file:")) {
                   path = path.substring(5);
                }
+               // Decode URL encoding
                try {
                   path = java.net.URLDecoder.decode(path, "UTF-8");
                } catch (java.io.UnsupportedEncodingException e) {
-                  // Fall through with original path
+                  // Continue with original path if decoding fails
                }
-               File jarFile = new File(path);
-               if (jarFile.exists()) {
-                  File parent = jarFile.getParentFile();
-                  if (parent != null) {
-                     // If we're in an app/ directory (jpackage structure), go up one level
-                     if ("app".equals(parent.getName())) {
-                        File grandParent = parent.getParentFile();
-                        if (grandParent != null) {
-                           return grandParent;
-                        }
-                     }
+               
+               File codeSourceFile = new File(path);
+               if (codeSourceFile.exists()) {
+                  File parent = codeSourceFile.getParentFile();
+                  if (parent != null && parent.exists()) {
+                     // Use the directory containing the code source (JAR or class file) as base
+                     // Don't traverse - just use what we have
                      return parent;
                   }
                }
             }
          }
       } catch (Exception e) {
-         // Fall through to user.dir
+         // Log but don't fail - fall through to user.dir
+         System.err.println("[WARNING] CompilerUtil.getNCSDecompDirectory: Could not determine base directory: " + e.getMessage());
       }
+      
+      // Fallback: Use current working directory
+      // This ensures the application can always create config/ and tools/ directories
+      // relative to where it's being run from
       return new File(System.getProperty("user.dir"));
    }
 
