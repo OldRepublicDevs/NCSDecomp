@@ -305,6 +305,9 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       this.updateWorkspaceCard();
       this.updateMenuAndToolbarState();
 
+      // Enable drag-and-drop on the main frame
+      this.dropTarget = new DropTarget(this, this);
+
       // Redirect System.out and System.err to both terminal and GUI log area
       this.setupStreamRedirection();
 
@@ -357,35 +360,25 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
 
       /**
        * Instance method to append text to GUI log with color coding.
+       * Parses ANSI escape codes and converts them to Swing colors.
        */
       private static void appendToGuiLog(String text, JTextPane guiLog, javax.swing.text.StyledDocument doc, Decompiler decompiler) {
          if (text != null && guiLog != null && doc != null) {
             SwingUtilities.invokeLater(() -> {
                try {
-                  // Parse log level and apply color
-                  LogSeverity severity = parseLogSeverity(text);
-
                   // Check if this severity should be shown based on filter
+                  // Do this before parsing ANSI to avoid unnecessary work
+                  LogSeverity severity = parseLogSeverity(text);
                   if (!shouldShowLog(severity, decompiler)) {
                      return; // Don't append if filtered out
                   }
 
-                  // Get color for this severity
-                  java.awt.Color color = getColorForSeverity(severity);
-
-                  // Create style attribute set with color
-                  javax.swing.text.SimpleAttributeSet attr = new javax.swing.text.SimpleAttributeSet();
-                  javax.swing.text.StyleConstants.setForeground(attr, color);
-                  javax.swing.text.StyleConstants.setFontFamily(attr, "Consolas");
-                  javax.swing.text.StyleConstants.setFontSize(attr, 11);
-
-                  // Append text with style
-                  int start = doc.getLength();
-                  doc.insertString(start, text, attr);
+                  // Parse ANSI codes and render with colors
+                  parseAndAppendAnsiText(text, guiLog, doc);
 
                   // Auto-scroll to bottom
                   guiLog.setCaretPosition(doc.getLength());
-               } catch (javax.swing.text.BadLocationException e) {
+               } catch (Exception e) {
                   // Fallback to plain append if styled insert fails
                   try {
                      int start = doc.getLength();
@@ -396,6 +389,134 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                   }
                }
             });
+         }
+      }
+
+      /**
+       * Parses ANSI escape codes and appends text with appropriate colors.
+       * Supports foreground colors, bold, dim, and reset codes.
+       */
+      private static void parseAndAppendAnsiText(String text, JTextPane guiLog, javax.swing.text.StyledDocument doc) {
+         try {
+            // Pattern to match ANSI escape sequences: \033[...m or \x1B[...m
+            java.util.regex.Pattern ansiPattern = java.util.regex.Pattern.compile("\u001B\\[([0-9;]+)m");
+            java.util.regex.Matcher matcher = ansiPattern.matcher(text);
+            
+            int lastEnd = 0;
+            javax.swing.text.SimpleAttributeSet currentAttr = new javax.swing.text.SimpleAttributeSet();
+            javax.swing.text.StyleConstants.setFontFamily(currentAttr, "Consolas");
+            javax.swing.text.StyleConstants.setFontSize(currentAttr, 11);
+            
+            // Default colors for light theme
+            java.awt.Color defaultColor = new java.awt.Color(0, 0, 0); // Black for light theme
+            java.awt.Color currentColor = defaultColor;
+            boolean isBold = false;
+            
+            javax.swing.text.StyleConstants.setForeground(currentAttr, currentColor);
+            
+            while (matcher.find()) {
+               // Append text before the ANSI code
+               if (matcher.start() > lastEnd) {
+                  String plainText = text.substring(lastEnd, matcher.start());
+                  if (!plainText.isEmpty()) {
+                     doc.insertString(doc.getLength(), plainText, currentAttr);
+                  }
+               }
+               
+               // Parse ANSI code
+               String codes = matcher.group(1);
+               String[] codeArray = codes.split(";");
+               
+               for (String codeStr : codeArray) {
+                  try {
+                     int code = Integer.parseInt(codeStr);
+                     
+                     if (code == 0) {
+                        // Reset
+                        currentColor = defaultColor;
+                        isBold = false;
+                     } else if (code == 1) {
+                        // Bold
+                        isBold = true;
+                     } else if (code == 2) {
+                        // Dim - make color lighter (for light theme, we'll use a lighter shade)
+                        // For now, just continue with current color
+                     } else if (code >= 30 && code <= 37) {
+                        // Foreground colors (light theme adjusted)
+                        currentColor = getAnsiColor(code - 30, isBold, true);
+                     } else if (code >= 90 && code <= 97) {
+                        // Bright foreground colors
+                        currentColor = getAnsiColor(code - 90, true, true);
+                     }
+                  } catch (NumberFormatException e) {
+                     // Ignore invalid codes
+                  }
+               }
+               
+               // Update attribute set
+               currentAttr = new javax.swing.text.SimpleAttributeSet();
+               javax.swing.text.StyleConstants.setFontFamily(currentAttr, "Consolas");
+               javax.swing.text.StyleConstants.setFontSize(currentAttr, 11);
+               javax.swing.text.StyleConstants.setForeground(currentAttr, currentColor);
+               if (isBold) {
+                  javax.swing.text.StyleConstants.setBold(currentAttr, true);
+               }
+               
+               lastEnd = matcher.end();
+            }
+            
+            // Append remaining text
+            if (lastEnd < text.length()) {
+               String plainText = text.substring(lastEnd);
+               if (!plainText.isEmpty()) {
+                  doc.insertString(doc.getLength(), plainText, currentAttr);
+               }
+            }
+         } catch (javax.swing.text.BadLocationException e) {
+            // Fallback: just append without ANSI parsing
+            try {
+               // Strip ANSI codes and append plain text
+               String plainText = text.replaceAll("\u001B\\[[0-9;]+m", "");
+               doc.insertString(doc.getLength(), plainText, null);
+            } catch (javax.swing.text.BadLocationException e2) {
+               // Ignore
+            }
+         }
+      }
+
+      /**
+       * Converts ANSI color code to Swing Color for light theme.
+       * @param colorIndex 0-7 (black, red, green, yellow, blue, magenta, cyan, white)
+       * @param bright Whether this is a bright color
+       * @param lightTheme Whether we're using a light theme
+       */
+      private static java.awt.Color getAnsiColor(int colorIndex, boolean bright, boolean lightTheme) {
+         if (lightTheme) {
+            // Light theme colors (darker, more visible on white)
+            switch (colorIndex) {
+               case 0: return new java.awt.Color(0, 0, 0); // Black
+               case 1: return new java.awt.Color(200, 0, 0); // Red
+               case 2: return new java.awt.Color(0, 150, 0); // Green
+               case 3: return new java.awt.Color(200, 120, 0); // Yellow/Orange
+               case 4: return new java.awt.Color(0, 0, 200); // Blue
+               case 5: return new java.awt.Color(200, 0, 200); // Magenta
+               case 6: return new java.awt.Color(0, 150, 200); // Cyan
+               case 7: return new java.awt.Color(100, 100, 100); // White (gray for light theme)
+               default: return new java.awt.Color(0, 0, 0);
+            }
+         } else {
+            // Dark theme colors
+            switch (colorIndex) {
+               case 0: return new java.awt.Color(0, 0, 0);
+               case 1: return new java.awt.Color(255, 0, 0);
+               case 2: return new java.awt.Color(0, 255, 0);
+               case 3: return new java.awt.Color(255, 255, 0);
+               case 4: return new java.awt.Color(0, 0, 255);
+               case 5: return new java.awt.Color(255, 0, 255);
+               case 6: return new java.awt.Color(0, 255, 255);
+               case 7: return new java.awt.Color(255, 255, 255);
+               default: return new java.awt.Color(255, 255, 255);
+            }
          }
       }
 
@@ -464,20 +585,21 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       }
 
       /**
-       * Gets color for log severity (industry standard colors).
+       * Gets color for log severity (industry standard colors, light theme).
+       * Note: This is only used as fallback when ANSI codes aren't present.
        */
       private static java.awt.Color getColorForSeverity(LogSeverity severity) {
          switch (severity) {
             case TRACE:
-               return new java.awt.Color(128, 128, 128); // Gray
+               return new java.awt.Color(0, 150, 200); // Cyan (matches ANSI)
             case DEBUG:
-               return new java.awt.Color(0, 128, 0); // Green
+               return new java.awt.Color(0, 150, 0); // Green
             case INFO:
                return new java.awt.Color(0, 0, 0); // Black
             case WARNING:
-               return new java.awt.Color(255, 140, 0); // Orange
+               return new java.awt.Color(200, 120, 0); // Orange
             case ERROR:
-               return new java.awt.Color(220, 20, 60); // Crimson red
+               return new java.awt.Color(200, 0, 0); // Red
             default:
                return java.awt.Color.BLACK;
          }
@@ -1167,6 +1289,12 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
 
    @Override
    public void dragEnter(DropTargetDragEvent dtde) {
+      // Accept drag if it contains files
+      if (dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+         dtde.acceptDrag(3); // Accept copy action
+      } else {
+         dtde.rejectDrag();
+      }
    }
 
    @Override
@@ -1175,10 +1303,22 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
 
    @Override
    public void dragOver(DropTargetDragEvent dtde) {
+      // Continue accepting drag
+      if (dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+         dtde.acceptDrag(3);
+      } else {
+         dtde.rejectDrag();
+      }
    }
 
    @Override
    public void dropActionChanged(DropTargetDragEvent dtde) {
+      // Accept if it's a copy action
+      if (dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
+         dtde.acceptDrag(3);
+      } else {
+         dtde.rejectDrag();
+      }
    }
 
    @Override
@@ -1195,17 +1335,23 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                final List<File> list = new ArrayList<>();
                for (File file : rawList) {
                   if (file != null) {
-                     list.add(file);
+                     String name = file.getName().toLowerCase();
+                     // Only accept .ncs and .nss files
+                     if (name.endsWith(".ncs") || name.endsWith(".nss")) {
+                        list.add(file);
+                     }
                   }
                }
-               Thread openThread = new Thread(() -> {
-                  Decompiler.this.open(list.toArray(new File[0]));
-               });
-               openThread.setDaemon(true);
-               openThread.setName("FileOpen-" + System.currentTimeMillis());
-               openThread.start();
-               dtde.dropComplete(true);
-               return;
+               if (!list.isEmpty()) {
+                  Thread openThread = new Thread(() -> {
+                     Decompiler.this.open(list.toArray(new File[0]));
+                  });
+                  openThread.setDaemon(true);
+                  openThread.setName("FileOpen-" + System.currentTimeMillis());
+                  openThread.start();
+                  dtde.dropComplete(true);
+                  return;
+               }
             }
          }
 
