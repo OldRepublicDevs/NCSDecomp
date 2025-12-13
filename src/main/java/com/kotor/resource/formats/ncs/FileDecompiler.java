@@ -1113,82 +1113,88 @@ public class FileDecompiler {
          // Use unified compiler execution wrapper - abstracts ALL compiler quirks
          CompilerExecutionWrapper wrapper = new CompilerExecutionWrapper(compiler, file, result, k2);
          
-         // Prepare execution environment (handles include files, nwscript.nss, etc.)
-         // For FileDecompiler, we typically don't have include directories, but wrapper handles it gracefully
-         wrapper.prepareExecutionEnvironment(new java.util.ArrayList<>());
-         
-         // Use registry spoofer for compilers that need it (KOTOR Tool, KOTOR Scripting Tool)
-         try (AutoCloseable spoofer = wrapper.createRegistrySpoofer()) {
-            // Activate registry spoofer if it's a real spoofer (not NoOp)
-            if (spoofer instanceof RegistrySpoofer) {
-               try {
-                  ((RegistrySpoofer) spoofer).activate();
-               } catch (SecurityException e) {
-                  System.out.println("[NCSDecomp] WARNING: Registry spoofing failed (permission denied): " + e.getMessage());
-                  System.out.println("[NCSDecomp]   Attempting compilation without registry spoofing (may fail)");
-                  // Continue anyway - the compiler might still work
-               }
-            }
-
+         try {
+            // Prepare execution environment (handles include files, nwscript.nss, etc.)
+            // For FileDecompiler, we typically don't have include directories, but wrapper handles it gracefully
+            wrapper.prepareExecutionEnvironment(new java.util.ArrayList<>());
+            
+            // First attempt: compile without registry spoofing
+            String[] args = wrapper.getCompileArgs(new java.util.ArrayList<>());
+            java.util.Map<String, String> env = wrapper.getEnvironmentOverrides();
+            File workingDir = wrapper.getWorkingDirectory();
+            
+            System.out.println("[NCSDecomp] Using compiler: " + wrapper.getCompiler().getName());
+            System.out.println("[NCSDecomp] Input file: " + file.getAbsolutePath());
+            System.out.println("[NCSDecomp] Expected output: " + result.getAbsolutePath());
+            System.out.println("[NCSDecomp] Working directory: " + workingDir.getAbsolutePath());
+            
+            // Capture compiler output to check for NwnStdLoader error
+            boolean needsRegistrySpoof = false;
+            
             try {
-               // Get unified command arguments from wrapper
-               String[] args = wrapper.getCompileArgs(new java.util.ArrayList<>());
-               java.util.Map<String, String> env = wrapper.getEnvironmentOverrides();
-
-               System.out.println("[NCSDecomp] Using compiler: " + wrapper.getCompiler().getName());
-               System.out.println("[NCSDecomp] Input file: " + file.getAbsolutePath());
-               System.out.println("[NCSDecomp] Expected output: " + result.getAbsolutePath());
-
-               // Use unified working directory
-               File workingDir = wrapper.getWorkingDirectory();
-               System.out.println("[NCSDecomp] Working directory: " + workingDir.getAbsolutePath());
-
-               try {
-                  new FileDecompiler.WindowsExec().callExec(args, workingDir, env);
-               } catch (IOException ioEx) {
-                  // Elevation errors are already logged in callExec with helpful messages
-                  // Re-throw to be caught by outer catch block
-                  throw ioEx;
+               // First compilation attempt
+               System.out.println("[NCSDecomp] First compilation attempt (without registry spoofing)");
+               String output = executeCompilerAndCaptureOutput(args, workingDir, env);
+               
+               // Check if compilation succeeded
+               if (result.exists()) {
+                  System.out.println("[NCSDecomp] Compilation succeeded without registry spoofing");
+                  return result;
                }
-
-               if (!result.exists()) {
+               
+               // Check if we need registry spoofing (look for NwnStdLoader error)
+               if (output.contains("Error: Couldn't initialize the NwnStdLoader")) {
+                  System.out.println("[NCSDecomp] Detected NwnStdLoader error - registry spoofing required");
+                  needsRegistrySpoof = true;
+               } else {
+                  System.out.println("[NCSDecomp] Compilation failed but no NwnStdLoader error detected");
                   System.out.println("[NCSDecomp] ERROR: Expected output file does not exist: " + result.getAbsolutePath());
                   System.out.println("[NCSDecomp]   This usually means nwnnsscomp.exe compilation failed.");
-                  System.out.println("[NCSDecomp]   Check the nwnnsscomp output above for compilation errors.");
+                  System.out.println("[NCSDecomp]   Compiler output:\n" + output);
                   return null;
                }
-
-               return result;
             } catch (IOException ioEx) {
-               // Re-throw IOException as-is
-               throw ioEx;
-            } catch (RuntimeException compileEx) {
-               // Wrap runtime exceptions in IOException
-               throw new IOException("Compilation failed: " + compileEx.getMessage(), compileEx);
-            }
-         } catch (SecurityException spooferEx) {
-            System.out.println("[NCSDecomp] SecurityException with registry spoofer: " + spooferEx.getMessage());
-            // For SecurityException, attempt compilation anyway (might work)
-            try {
-               String[] args = wrapper.getCompileArgs(new java.util.ArrayList<>());
-               java.util.Map<String, String> env = wrapper.getEnvironmentOverrides();
-               File workingDir = wrapper.getWorkingDirectory();
-               new FileDecompiler.WindowsExec().callExec(args, workingDir, env);
-               if (!result.exists()) {
-                  return null;
+               System.out.println("[NCSDecomp] IOException during first compilation attempt: " + ioEx.getMessage());
+               // Continue to try with registry spoofing if we have a spoofer available
+               AutoCloseable testSpoofer = wrapper.createRegistrySpoofer();
+               if (testSpoofer instanceof RegistrySpoofer) {
+                  needsRegistrySpoof = true;
+               } else {
+                  throw ioEx;
                }
-               return result;
-            } catch (IOException retryEx) {
-               throw retryEx;
             }
-         } catch (RuntimeException spooferEx) {
-            // Wrap unexpected runtime exceptions in IOException
-            throw new IOException("Registry spoofer error: " + spooferEx.getMessage(), spooferEx);
-         } catch (Exception spooferCloseEx) {
-            // Handle exceptions from AutoCloseable.close()
-            // This shouldn't happen in practice, but Java requires handling it
-            System.err.println("[NCSDecomp] Exception closing registry spoofer: " + spooferCloseEx.getMessage());
-            throw new IOException("Registry spoofer close error: " + spooferCloseEx.getMessage(), spooferCloseEx);
+            
+            // If registry spoofing is needed, retry with spoofer activated
+            if (needsRegistrySpoof) {
+               try (AutoCloseable spoofer = wrapper.createRegistrySpoofer()) {
+                  if (spoofer instanceof RegistrySpoofer) {
+                     try {
+                        ((RegistrySpoofer) spoofer).activate();
+                        System.out.println("[NCSDecomp] Registry spoofing activated, retrying compilation");
+                     } catch (SecurityException e) {
+                        System.out.println("[NCSDecomp] WARNING: Registry spoofing failed (permission denied): " + e.getMessage());
+                        System.out.println("[NCSDecomp]   Attempting compilation without registry spoofing (may fail)");
+                     }
+                  }
+                  
+                  // Retry compilation with registry spoofing
+                  System.out.println("[NCSDecomp] Retry compilation attempt (with registry spoofing)");
+                  String output = executeCompilerAndCaptureOutput(args, workingDir, env);
+                  
+                  if (!result.exists()) {
+                     System.out.println("[NCSDecomp] ERROR: Expected output file does not exist after retry: " + result.getAbsolutePath());
+                     System.out.println("[NCSDecomp]   Compiler output:\n" + output);
+                     return null;
+                  }
+                  
+                  return result;
+               } catch (Exception spooferEx) {
+                  System.out.println("[NCSDecomp] Exception with registry spoofer: " + spooferEx.getMessage());
+                  throw new IOException("Registry spoofer error: " + spooferEx.getMessage(), spooferEx);
+               }
+            }
+            
+            return null;
          } finally {
             // Clean up all temporary files (include files, nwscript.nss, etc.)
             wrapper.cleanup();
@@ -1212,6 +1218,50 @@ public class FileDecompiler {
          e.printStackTrace();
          return null;
       }
+   }
+
+   /**
+    * Executes the compiler and captures its output.
+    *
+    * @param args Command-line arguments (first element is the executable)
+    * @param workingDir Working directory for the process
+    * @param envOverrides Environment variable overrides
+    * @return The captured compiler output (stdout + stderr combined)
+    * @throws IOException If process execution fails
+    */
+   private String executeCompilerAndCaptureOutput(String[] args, File workingDir, java.util.Map<String, String> envOverrides) throws IOException {
+      ProcessBuilder pb = new ProcessBuilder(args);
+      if (workingDir != null && workingDir.exists()) {
+         pb.directory(workingDir);
+      }
+      if (envOverrides != null && !envOverrides.isEmpty()) {
+         pb.environment().putAll(envOverrides);
+      }
+      pb.redirectErrorStream(true);
+      
+      Process proc = pb.start();
+      
+      // Capture output
+      StringBuilder output = new StringBuilder();
+      try (java.io.BufferedReader reader = new java.io.BufferedReader(
+            new java.io.InputStreamReader(proc.getInputStream()))) {
+         String line;
+         while ((line = reader.readLine()) != null) {
+            output.append(line).append("\n");
+            // Also print to console for user visibility
+            System.out.println("[nwnnsscomp] " + line);
+         }
+      }
+      
+      try {
+         int exitCode = proc.waitFor();
+         System.out.println("[NCSDecomp] Compiler exit code: " + exitCode);
+      } catch (InterruptedException e) {
+         Thread.currentThread().interrupt();
+         throw new IOException("Compiler process interrupted", e);
+      }
+      
+      return output.toString();
    }
 
    private void ensureActionsLoaded() throws DecompilerException {

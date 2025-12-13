@@ -39,7 +39,7 @@ public class RegistrySpoofer implements AutoCloseable {
    private final String spoofedPath;
    private String originalValue;
    private boolean wasModified = false;
-   private static final String ELEVATION_PROMPT_MARKER_FILE = "ncsdecomp_registry_elevation_shown.txt";
+   private static final String DONT_SHOW_INFO_MARKER_FILE = "ncsdecomp_registry_info_dont_show.txt";
 
    /**
     * Creates a new registry spoofer for the specified game.
@@ -93,6 +93,11 @@ public class RegistrySpoofer implements AutoCloseable {
     * @throws SecurityException If registry modification fails and elevation is not possible or refused
     */
    public RegistrySpoofer activate() {
+      // Log current registry state BEFORE attempting change
+      String currentValue = readRegistryValue(this.registryPath, this.keyName);
+      System.err.println("DEBUG RegistrySpoofer: BEFORE activation - registry key " + this.registryPath +
+            "\\" + this.keyName + " = " + (currentValue != null ? currentValue : "(null/not set)"));
+
       if (this.originalValue != null && this.originalValue.equals(this.spoofedPath)) {
          System.err.println("DEBUG RegistrySpoofer: Registry value already matches spoofed path, skipping");
          return this;
@@ -100,34 +105,50 @@ public class RegistrySpoofer implements AutoCloseable {
 
       try {
          writeRegistryValue(this.registryPath, this.keyName, this.spoofedPath);
-         this.wasModified = true;
-         System.err.println("DEBUG RegistrySpoofer: Successfully set registry key " + this.registryPath +
-               "\\" + this.keyName + " to " + this.spoofedPath);
+
+         // Verify the registry was actually set
+         String verifyValue = readRegistryValue(this.registryPath, this.keyName);
+         System.err.println("DEBUG RegistrySpoofer: AFTER write - registry key " + this.registryPath +
+               "\\" + this.keyName + " = " + (verifyValue != null ? verifyValue : "(null/not set)"));
+
+         if (verifyValue != null && verifyValue.equals(this.spoofedPath)) {
+            this.wasModified = true;
+            System.err.println("DEBUG RegistrySpoofer: Successfully set and verified registry key " + this.registryPath +
+                  "\\" + this.keyName + " to " + this.spoofedPath);
+         } else {
+            System.err.println("DEBUG RegistrySpoofer: WARNING - Registry write appeared to succeed but verification failed! " +
+                  "Expected: " + this.spoofedPath + ", Got: " + verifyValue);
+         }
       } catch (SecurityException e) {
          System.err.println("DEBUG RegistrySpoofer: Failed to set registry key: " + e.getMessage());
-         
-         // Check if we've shown the elevation prompt before
-         boolean hasShownPrompt = hasShownElevationPrompt();
-         
-         if (!hasShownPrompt) {
-            // First time - prompt and attempt elevation
-            if (attemptElevatedRegistryWrite()) {
+
+         // ALWAYS attempt elevation when we see the NwnStdLoader error (it's REQUIRED)
+         // The elevation prompt should always be shown
+         System.err.println("DEBUG RegistrySpoofer: Attempting elevated registry write (REQUIRED for NwnStdLoader error)...");
+         if (attemptElevatedRegistryWrite()) {
+            // Verify the registry was actually set after elevation
+            String verifyValue = readRegistryValue(this.registryPath, this.keyName);
+            System.err.println("DEBUG RegistrySpoofer: AFTER elevation - registry key " + this.registryPath +
+                  "\\" + this.keyName + " = " + (verifyValue != null ? verifyValue : "(null/not set)"));
+
+            if (verifyValue != null && verifyValue.equals(this.spoofedPath)) {
                // Successfully set via elevation
                this.wasModified = true;
-               markElevationPromptShown();
-               System.err.println("DEBUG RegistrySpoofer: Successfully set registry key via elevation");
+               System.err.println("DEBUG RegistrySpoofer: Successfully set and verified registry key via elevation");
                return this;
             } else {
-               // User refused or elevation failed
-               markElevationPromptShown();
-               throw new SecurityException("Permission denied. Administrator privileges required to spoof registry. " +
-                     "Error: " + e.getMessage(), e);
+               System.err.println("DEBUG RegistrySpoofer: WARNING - Elevation appeared to succeed but registry verification failed! " +
+                     "Expected: " + this.spoofedPath + ", Got: " + verifyValue);
+               // Show informational message after verification failure
+               showSubsequentElevationMessage();
+               throw new SecurityException("Permission denied. Registry elevation succeeded but verification failed. " +
+                     "Expected: " + this.spoofedPath + ", Got: " + verifyValue, e);
             }
          } else {
-            // Subsequent times - show informational message
+            // User refused or elevation failed - show informational message with "don't show again" option
             showSubsequentElevationMessage();
-            // Don't throw - allow compilation to proceed (might fail, but we've warned the user)
-            return this;
+            throw new SecurityException("Permission denied. Administrator privileges required to spoof registry. " +
+                  "Error: " + e.getMessage(), e);
          }
       }
       return this;
@@ -334,26 +355,26 @@ public class RegistrySpoofer implements AutoCloseable {
    }
 
    /**
-    * Checks if we've shown the elevation prompt before by looking for a marker file.
+    * Checks if user has chosen "don't show again" for the informational message.
     */
-   private static boolean hasShownElevationPrompt() {
+   private static boolean shouldShowInfoMessage() {
       try {
-         Path markerPath = Paths.get(System.getProperty("user.dir"), ELEVATION_PROMPT_MARKER_FILE);
-         return Files.exists(markerPath);
+         Path markerPath = Paths.get(System.getProperty("user.dir"), DONT_SHOW_INFO_MARKER_FILE);
+         return !Files.exists(markerPath);
       } catch (Exception e) {
-         return false;
+         return true; // Default to showing if we can't check
       }
    }
 
    /**
-    * Marks that we've shown the elevation prompt by creating a marker file.
+    * Marks that user chose "don't show again" for the informational message.
     */
-   private static void markElevationPromptShown() {
+   private static void markDontShowInfoMessage() {
       try {
-         Path markerPath = Paths.get(System.getProperty("user.dir"), ELEVATION_PROMPT_MARKER_FILE);
+         Path markerPath = Paths.get(System.getProperty("user.dir"), DONT_SHOW_INFO_MARKER_FILE);
          Files.createFile(markerPath);
       } catch (Exception e) {
-         System.err.println("DEBUG RegistrySpoofer: Failed to create elevation prompt marker: " + e.getMessage());
+         System.err.println("DEBUG RegistrySpoofer: Failed to create don't show info marker: " + e.getMessage());
       }
    }
 
@@ -399,25 +420,41 @@ public class RegistrySpoofer implements AutoCloseable {
          // This avoids complex PowerShell escaping issues
          File tempBatch = File.createTempFile("ncsdecomp_reg_spoof_", ".bat");
          tempBatch.deleteOnExit();
-         
+
          // Write the batch file content
          // First create the key path, then set the value
+         // Escape % for batch files (need to double them)
+         String escapedPath = spoofedPath.replace("%", "%%");
          String batchContent = "@echo off\n" +
                "reg add \"" + regHive + "\\" + keyPath + "\" /f >nul 2>&1\n" +
                "reg add \"" + regHive + "\\" + keyPath + "\" /v \"" + keyName + "\" /t REG_SZ /d \"" +
-               spoofedPath.replace("\"", "\\\"") + "\" /f\n";
-         
+               escapedPath + "\" /f\n" +
+               "if errorlevel 1 (\n" +
+               "  echo Registry write failed\n" +
+               "  exit /b 1\n" +
+               ") else (\n" +
+               "  echo Registry write succeeded\n" +
+               "  exit /b 0\n" +
+               ")\n";
+
          Files.write(tempBatch.toPath(), batchContent.getBytes("UTF-8"));
-         
+
+         System.err.println("DEBUG RegistrySpoofer: Created temporary batch file: " + tempBatch.getAbsolutePath());
+         System.err.println("DEBUG RegistrySpoofer: Batch file content:\n" + batchContent);
+
          // Run the batch file elevated using PowerShell
-         String psCommand = "Start-Process -FilePath \"" + tempBatch.getAbsolutePath().replace("\\", "\\\\") +
-               "\" -Verb RunAs -Wait -NoNewWindow";
-         
+         // Note: -NoNewWindow doesn't work with -Verb RunAs, so we omit it
+         // Use single quotes in PowerShell to avoid escaping issues with double quotes
+         String batchPath = tempBatch.getAbsolutePath().replace("'", "''"); // Escape single quotes for PowerShell
+         String psCommand = "Start-Process -FilePath '" + batchPath + "' -Verb RunAs -Wait";
+
+         System.err.println("DEBUG RegistrySpoofer: Executing PowerShell command: " + psCommand);
+
          ProcessBuilder pb = new ProcessBuilder("powershell", "-Command", psCommand);
          pb.redirectErrorStream(true);
-         
+
          Process proc = pb.start();
-         
+
          // Read output
          StringBuilder output = new StringBuilder();
          try (java.io.BufferedReader reader = new java.io.BufferedReader(
@@ -429,20 +466,27 @@ public class RegistrySpoofer implements AutoCloseable {
          }
 
          int exitCode = proc.waitFor();
-         
+
+         System.err.println("DEBUG RegistrySpoofer: PowerShell exit code: " + exitCode);
+         String outputStr = output.toString();
+         if (!outputStr.trim().isEmpty()) {
+            System.err.println("DEBUG RegistrySpoofer: PowerShell output: " + outputStr);
+         }
+
          // Clean up temp file
          try {
             tempBatch.delete();
+            System.err.println("DEBUG RegistrySpoofer: Deleted temporary batch file");
          } catch (Exception e) {
-            // Ignore cleanup errors
+            System.err.println("DEBUG RegistrySpoofer: Failed to delete temp file: " + e.getMessage());
          }
-         
+
          if (exitCode == 0) {
-            System.err.println("DEBUG RegistrySpoofer: Successfully set registry via elevated process");
+            System.err.println("DEBUG RegistrySpoofer: Elevated process completed successfully");
             return true;
          } else {
             System.err.println("DEBUG RegistrySpoofer: Elevated registry write failed. Exit code: " + exitCode +
-                  ", Output: " + output.toString());
+                  ", Output: " + outputStr);
             return false;
          }
       } catch (Exception e) {
@@ -481,9 +525,16 @@ public class RegistrySpoofer implements AutoCloseable {
    }
 
    /**
-    * Shows an informational message on subsequent elevation attempts.
+    * Shows an informational message after elevation fails/is declined.
+    * Includes a "don't show again" checkbox option.
     */
    private void showSubsequentElevationMessage() {
+      // Check if user has previously chosen "don't show again"
+      if (!shouldShowInfoMessage()) {
+         System.err.println("DEBUG RegistrySpoofer: Skipping info message (user chose 'don't show again')");
+         return;
+      }
+
       String message = "NCSDecomp cannot set the Windows registry key (requires administrator privileges).\n\n" +
             "To avoid this message, you can either:\n" +
             "1. Run NCSDecomp as administrator, or\n" +
@@ -491,19 +542,37 @@ public class RegistrySpoofer implements AutoCloseable {
             "Compilation will be attempted anyway, but may fail if the registry key is not set correctly.";
 
       if (SwingUtilities.isEventDispatchThread()) {
-         JOptionPane.showMessageDialog(
-               null, message, "Registry Access Required",
-               JOptionPane.INFORMATION_MESSAGE);
+         showInfoMessageWithCheckbox(message);
       } else {
          try {
-            SwingUtilities.invokeLater(() -> {
-               JOptionPane.showMessageDialog(
-                     null, message, "Registry Access Required",
-                     JOptionPane.INFORMATION_MESSAGE);
+            SwingUtilities.invokeAndWait(() -> {
+               showInfoMessageWithCheckbox(message);
             });
          } catch (Exception e) {
             System.err.println("DEBUG RegistrySpoofer: Exception showing subsequent message: " + e.getMessage());
          }
+      }
+   }
+
+   /**
+    * Shows the informational message dialog with a "don't show again" checkbox.
+    */
+   private void showInfoMessageWithCheckbox(String message) {
+      // Create a panel with the message and checkbox
+      javax.swing.JPanel panel = new javax.swing.JPanel(new java.awt.BorderLayout());
+      panel.add(new javax.swing.JLabel("<html>" + message.replace("\n", "<br>") + "</html>"), java.awt.BorderLayout.CENTER);
+
+      javax.swing.JCheckBox dontShowAgain = new javax.swing.JCheckBox("Do not show this message again");
+      panel.add(dontShowAgain, java.awt.BorderLayout.SOUTH);
+
+      JOptionPane.showMessageDialog(
+            null, panel, "Registry Access Required",
+            JOptionPane.INFORMATION_MESSAGE);
+
+      // If user checked "don't show again", mark it
+      if (dontShowAgain.isSelected()) {
+         markDontShowInfoMessage();
+         System.err.println("DEBUG RegistrySpoofer: User chose 'don't show again' for info message");
       }
    }
 }
