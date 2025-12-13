@@ -34,7 +34,7 @@ Write-Host ""
 
 # Step 3: Test CLI JAR
 Write-Host "[3/4] Testing CLI JAR..." -ForegroundColor Yellow
-$cliJar = Join-Path "." (Join-Path "target" (Join-Path "assembly" "NCSDecomp-CLI.jar"))
+$cliJar = Join-Path "." (Join-Path "target" (Join-Path "assembly" "NCSDecompCLI.jar"))
 if (-not (Test-Path $cliJar)) {
     Write-Host "ERROR: CLI JAR not found at $cliJar" -ForegroundColor Red
     exit 1

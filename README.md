@@ -71,7 +71,7 @@ The PowerShell build script will:
 1. Automatically clean up old build artifacts (.class files, build directory, JAR)
 2. Compile all Java source files from `src/main/java`
 3. Copy resources from `src/main/resources` to the build directory
-4. Create a JAR file named `NCSDecomp-CLI.jar` in the project root
+4. Create a JAR file named `NCSDecompCLI.jar` in the project root
 5. Optionally create self-contained executables (when using `-BuildExecutable`)
 6. Automatically detect the platform and use appropriate settings
 
@@ -100,7 +100,7 @@ The Maven build process will:
 2. Copy resources from `src/main/resources` to the output directory
 3. Run all tests from `src/test/java`
 4. Create a JAR file in the `target/` directory
-5. Create a fat JAR (with dependencies) named `ncsdecomp-CLI-1.0.0.jar`
+5. Create a fat JAR (with dependencies) named `nCSDecompCLI-1.0.0.jar`
 
 ## Running
 
@@ -115,10 +115,10 @@ mvn exec:java -Dexec.mainClass="com.kotor.resource.formats.ncs.NCSDecompCLI" -De
 
 ```bash
 # After building with PowerShell script
-java -jar NCSDecomp-CLI.jar [arguments]
+java -jar NCSDecompCLI.jar [arguments]
 
 # Or after building with Maven
-java -jar target/ncsdecomp-CLI-1.0.0.jar [arguments]
+java -jar target/nCSDecompCLI-1.0.0.jar [arguments]
 ```
 
 **Note:** When using the JAR file, ensure `k1_nwscript.nss` or `tsl_nwscript.nss` is in the `tools/` directory (or current working directory for legacy support), or use the `--nwscript <path>` option to specify the location.

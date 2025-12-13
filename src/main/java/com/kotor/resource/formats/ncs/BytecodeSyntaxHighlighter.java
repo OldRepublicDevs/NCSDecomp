@@ -70,13 +70,13 @@ public class BytecodeSyntaxHighlighter {
       } catch (BadLocationException e) {
          return;
       }
-      
+
       // Skip highlighting for very large files to prevent regex catastrophic backtracking
       if (text.length() > MAX_HIGHLIGHT_SIZE) {
          System.err.println("DEBUG BytecodeSyntaxHighlighter: File too large for highlighting (" + text.length() + " chars), skipping");
          return;
       }
-      
+
       // Wrap entire highlighting in try-catch to prevent crashes
       try {
          applyHighlightingInternal(doc, text);
@@ -86,7 +86,7 @@ public class BytecodeSyntaxHighlighter {
          // Don't rethrow - just skip highlighting for this file
       }
    }
-   
+
    /**
     * Internal highlighting implementation - can throw exceptions.
     */

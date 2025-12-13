@@ -157,7 +157,7 @@ Option 1: Using the Windows Executable (Recommended)
 	3. See examples below
 
 Option 2: Using the JAR File
-	java -jar NCSDecomp-CLI.jar [options]
+	java -jar NCSDecompCLI.jar [options]
 
 ---------------
 Usage Examples

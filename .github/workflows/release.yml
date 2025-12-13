@@ -104,9 +104,9 @@ jobs:
 
             ### Downloads
 
-            - **JAR**: `ncsdecomp-CLI-${{ steps.version.outputs.version }}.jar`
+            - **JAR**: `nCSDecompCLI-${{ steps.version.outputs.version }}.jar`
           files: |
-            target/ncsdecomp-CLI-*.jar
+            target/nCSDecompCLI-*.jar
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -115,6 +115,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-assets
-          path: target/ncsdecomp-CLI-*.jar
+          path: target/nCSDecompCLI-*.jar
           retention-days: 90
 

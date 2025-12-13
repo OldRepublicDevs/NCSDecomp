@@ -6,7 +6,7 @@
 
 ## Welcome
 
-**NCSDecomp** is a tool that converts compiled KotOR game scripts (`.ncs` files) back into readable source code (`.nss` files). 
+**NCSDecomp** is a tool that converts compiled KotOR game scripts (`.ncs` files) back into readable source code (`.nss` files).
 
 **What does this mean?** If you have a compiled script file from Knights of the Old Republic or Knights of the Old Republic II, this tool can turn it back into the original source code that you can read and edit. It's like having a translator that converts the game's internal script format back into human-readable code.
 
@@ -54,7 +54,7 @@ See the examples below for common usage.
 If you already have Java installed on your computer, you can use the JAR file instead:
 
 ```bash
-java -jar NCSDecomp-CLI.jar [options]
+java -jar NCSDecompCLI.jar [options]
 ```
 
 **Note:** Most users should use the self-contained executable instead - it's easier and doesn't require Java!
@@ -293,15 +293,15 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 
 ### Program won't start
 
-**Windows:** 
+**Windows:**
 - Windows might be blocking the program. Right-click `NCSDecomp.exe` → Properties → Check "Unblock" → Apply
 - Try running as Administrator if you get permission errors
 
-**macOS:** 
+**macOS:**
 - You may need to allow the app in System Preferences → Security & Privacy
 - Right-click the app and select "Open" the first time
 
-**Linux:** 
+**Linux:**
 - Make sure the executable has permission to run: `chmod +x NCSDecompCLI/NCSDecompCLI`
 
 ### Other Issues

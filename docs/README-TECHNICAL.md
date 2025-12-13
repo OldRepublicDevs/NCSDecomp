@@ -77,25 +77,25 @@ If you're using the JAR version:
 
 ```bash
 # Show help
-java -jar NCSDecomp-CLI.jar --help
+java -jar NCSDecompCLI.jar --help
 
 # Show version
-java -jar NCSDecomp-CLI.jar --version
+java -jar NCSDecompCLI.jar --version
 
 # Decompile single file to stdout
-java -jar NCSDecomp-CLI.jar -i input.ncs --stdout --k2
+java -jar NCSDecompCLI.jar -i input.ncs --stdout --k2
 
 # Decompile single file to output file
-java -jar NCSDecomp-CLI.jar -i input.ncs -o output.nss --k2
+java -jar NCSDecompCLI.jar -i input.ncs -o output.nss --k2
 
 # Decompile directory recursively (KotOR 1)
-java -jar NCSDecomp-CLI.jar -i scripts_dir -r --k1 -O output_dir
+java -jar NCSDecompCLI.jar -i scripts_dir -r --k1 -O output_dir
 
 # Decompile directory recursively (KotOR 2 / TSL)
-java -jar NCSDecomp-CLI.jar -i scripts_dir -r --k2 -O output_dir
+java -jar NCSDecompCLI.jar -i scripts_dir -r --k2 -O output_dir
 
 # Decompile with custom suffix
-java -jar NCSDecomp-CLI.jar -i input.ncs --suffix "_decompiled" --k2
+java -jar NCSDecompCLI.jar -i input.ncs --suffix "_decompiled" --k2
 ```
 
 ## Command-Line Options

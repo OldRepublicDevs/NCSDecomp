@@ -29,6 +29,7 @@ public final class Logger {
    private static final String GREEN = "\033[32m";
    private static final String YELLOW = "\033[33m";
    private static final String BLUE = "\033[34m";
+   @SuppressWarnings("unused")
    private static final String MAGENTA = "\033[35m";
    private static final String CYAN = "\033[36m";
    private static final String WHITE = "\033[37m";
@@ -118,6 +119,13 @@ public final class Logger {
       } else {
          System.err.println("═══ " + title + " ═══");
       }
+   }
+
+   /**
+    * Logs a TRACE message (control flow, state transitions, etc.).
+    */
+   public static void trace(String message) {
+      System.err.println(colorize("TRACE", DIM + CYAN) + " " + dim(message));
    }
 
    /**

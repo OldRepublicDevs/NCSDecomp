@@ -30,7 +30,7 @@ That's it! No Java installation needed - everything is included in the folders.
 If you prefer the JAR version, you'll need Java installed on your computer. Then you can run:
 
 ```bash
-java -jar NCSDecomp-CLI.jar [options]
+java -jar NCSDecompCLI.jar [options]
 ```
 
 ---

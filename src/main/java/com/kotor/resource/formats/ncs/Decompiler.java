@@ -137,9 +137,6 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
    private static final int ERROR_BUFFER_SIZE = 1000;
    private final java.util.List<String> recentLogBuffer = new java.util.ArrayList<>();
 
-   // Track which file is currently being processed (for error association)
-   private File currentProcessingFile = null;
-
    /**
     * Log severity levels.
     */
@@ -147,7 +144,8 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       TRACE,
       DEBUG,
       INFO,
-      WARNING, ERROR,
+      WARNING,
+      ERROR,
    }
    private transient Element rootElement;
    private TitledBorder titledBorder;
@@ -475,316 +473,6 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          }
       }
 
-      /**
-       * Old extraction method - kept for reference but not used.
-       */
-      @Deprecated
-      private static void extractAndDisplayCompilationErrors_OLD(String text, Decompiler decompiler) {
-         if (text == null || decompiler == null) {
-            return;
-         }
-
-         // Strip ANSI codes for parsing
-         String textWithoutAnsi = text.replaceAll("\u001B\\[[0-9;]+m", "");
-         String upper = textWithoutAnsi.toUpperCase();
-
-         // Check if this is a compiler error line (format: "filename(line): Error: message")
-         // Pattern can have leading whitespace/pipe characters from Logger formatting
-         if (upper.contains("ERROR:") || (upper.contains("ERROR") && upper.contains("SYNTAX"))) {
-            // Try to extract error messages from compiler output
-            // Pattern: optional leading whitespace/pipe/Unicode characters, then filename(line): Error: message
-            // The pipe character │ is Unicode U+2502, so we need to handle it
-            java.util.regex.Pattern errorPattern = java.util.regex.Pattern.compile(".*?([^/\\\\\\s│]+)\\((\\d+)\\):\\s*Error:\\s*(.+)", java.util.regex.Pattern.CASE_INSENSITIVE);
-            java.util.regex.Matcher matcher = errorPattern.matcher(textWithoutAnsi);
-
-            if (matcher.find()) {
-               String filename = matcher.group(1).trim();
-               String lineNum = matcher.group(2);
-               String errorMsg = matcher.group(3).trim();
-
-               // Find the file that matches this error
-               // Match by base name (without extension) since temp files have different names
-               final File[] matchingFileRef = new File[1];
-               String baseName = filename.replaceAll("\\.(nss|ncs)$", "").toLowerCase();
-
-               // First, try to find the original file from context (look for "Input file:" or "Decompiling:")
-               File contextFile = null;
-               synchronized (decompiler.allLogLines) {
-                  for (int i = decompiler.allLogLines.size() - 1; i >= 0 && i >= decompiler.allLogLines.size() - 50; i--) {
-                     LogLine logLine = decompiler.allLogLines.get(i);
-                     String lineText = logLine.text.replaceAll("\u001B\\[[0-9;]+m", "");
-                     String lineUpper = lineText.toUpperCase();
-
-                     // Look for "Input file:" or "Decompiling:" to find the original file
-                     if (lineUpper.contains("INPUT FILE:") || lineUpper.contains("DECOMPILING:")) {
-                        // Extract filename from the line
-                        java.util.regex.Pattern filePattern = java.util.regex.Pattern.compile("([^/\\\\]+\\.(ncs|nss))", java.util.regex.Pattern.CASE_INSENSITIVE);
-                        java.util.regex.Matcher fileMatcher = filePattern.matcher(lineText);
-                        if (fileMatcher.find()) {
-                           String contextFilename = fileMatcher.group(1);
-                           String contextBaseName = contextFilename.replaceAll("\\.(nss|ncs)$", "").toLowerCase();
-
-                           // Find matching file
-                           synchronized (decompiler.hash_TabComponent2File) {
-                              for (File file : decompiler.hash_TabComponent2File.values()) {
-                                 if (file != null) {
-                                    String fileBaseName = file.getName().replaceAll("\\.(nss|ncs)$", "").toLowerCase();
-                                    if (fileBaseName.equals(contextBaseName) || file.getName().equalsIgnoreCase(contextFilename)) {
-                                       contextFile = file;
-                                       break;
-                                    }
-                                 }
-                              }
-                           }
-                           if (contextFile != null) {
-                              break;
-                           }
-                        }
-                     }
-                  }
-               }
-
-               // If we found a context file, use it; otherwise try to match by name
-               if (contextFile != null) {
-                  matchingFileRef[0] = contextFile;
-               } else {
-                  synchronized (decompiler.hash_TabComponent2File) {
-                     for (File file : decompiler.hash_TabComponent2File.values()) {
-                        if (file != null) {
-                           String fileBaseName = file.getName().replaceAll("\\.(nss|ncs)$", "").toLowerCase();
-                           // Match by base name (handles temp files like generatedcode_xxx.nss matching k_sup_galaxymap.ncs)
-                           // Also check if filename contains the base name or vice versa
-                           if (fileBaseName.equals(baseName) ||
-                               filename.toLowerCase().contains(fileBaseName) ||
-                               fileBaseName.contains(baseName) ||
-                               file.getName().equalsIgnoreCase(filename)) {
-                              matchingFileRef[0] = file;
-                              break;
-                           }
-                        }
-                     }
-                  }
-               }
-
-               if (matchingFileRef[0] != null) {
-                  final File matchingFile = matchingFileRef[0];
-                  // Collect this error
-                  synchronized (decompiler.compilationErrors) {
-                     java.util.List<String> errors = decompiler.compilationErrors.get(matchingFile);
-                     if (errors == null) {
-                        errors = new java.util.ArrayList<>();
-                        decompiler.compilationErrors.put(matchingFile, errors);
-                     }
-
-                     // Add error if not already present (use original filename from matched file)
-                     String fullError = matchingFile.getName() + "(" + lineNum + "): Error: " + errorMsg;
-                     if (!errors.contains(fullError)) {
-                        errors.add(fullError);
-
-                        // Update error display
-                        SwingUtilities.invokeLater(() -> {
-                           decompiler.showCompilationErrorsForFile(matchingFile);
-                        });
-                     }
-                  }
-               }
-            } else {
-               // Check for general error patterns (like "Compilation aborted with errors")
-               if (upper.contains("COMPILATION ABORTED") || upper.contains("COMPILATION FAILED")) {
-                  // Try to find the file from context
-                  // Look for "Compiling: filename" patterns in recent log lines
-                  synchronized (decompiler.allLogLines) {
-                     String lastCompilingFile = null;
-                     for (int i = decompiler.allLogLines.size() - 1; i >= 0 && i >= decompiler.allLogLines.size() - 10; i--) {
-                        LogLine logLine = decompiler.allLogLines.get(i);
-                        String lineText = logLine.text.replaceAll("\u001B\\[[0-9;]+m", "");
-                        if (lineText.contains("Compiling:") || lineText.contains("compiling:")) {
-                           java.util.regex.Pattern compilePattern = java.util.regex.Pattern.compile("Compiling:\\s*(.+)", java.util.regex.Pattern.CASE_INSENSITIVE);
-                           java.util.regex.Matcher compileMatcher = compilePattern.matcher(lineText);
-                           if (compileMatcher.find()) {
-                              lastCompilingFile = compileMatcher.group(1).trim();
-                              break;
-                           }
-                        }
-                     }
-
-                     if (lastCompilingFile != null) {
-                        // Find matching file
-                        final File[] matchingFileRef = new File[1];
-                        synchronized (decompiler.hash_TabComponent2File) {
-                           for (File file : decompiler.hash_TabComponent2File.values()) {
-                              if (file != null && file.getName().equals(lastCompilingFile) ||
-                                  file.getName().startsWith(lastCompilingFile.replace(".nss", ""))) {
-                                 matchingFileRef[0] = file;
-                                 break;
-                              }
-                           }
-                        }
-
-                        if (matchingFileRef[0] != null) {
-                           final File matchingFile = matchingFileRef[0];
-                           // Collect all error lines for this file
-                           java.util.List<String> errorLines = new java.util.ArrayList<>();
-                           String lastCompilingBaseName = lastCompilingFile.replaceAll("\\.(nss|ncs)$", "").toLowerCase();
-                           String matchingFileBaseName = matchingFile.getName().replaceAll("\\.(nss|ncs)$", "").toLowerCase();
-
-                           for (int i = decompiler.allLogLines.size() - 1; i >= 0 && i >= decompiler.allLogLines.size() - 30; i--) {
-                              LogLine logLine = decompiler.allLogLines.get(i);
-                              String lineText = logLine.text.replaceAll("\u001B\\[[0-9;]+m", "");
-                              String lineUpper = lineText.toUpperCase();
-
-                              // Check if this line contains an error and matches our file
-                              if (lineUpper.contains("ERROR:") || (lineUpper.contains("ERROR") && lineUpper.contains("SYNTAX"))) {
-                                 // Extract filename from error line
-                                 java.util.regex.Pattern errorLinePattern = java.util.regex.Pattern.compile(".*?([^/\\\\\\s]+)\\((\\d+)\\):\\s*Error:", java.util.regex.Pattern.CASE_INSENSITIVE);
-                                 java.util.regex.Matcher errorMatcher = errorLinePattern.matcher(lineText);
-                                 if (errorMatcher.find()) {
-                                    String errorFilename = errorMatcher.group(1).trim();
-                                    String errorBaseName = errorFilename.replaceAll("\\.(nss|ncs)$", "").toLowerCase();
-
-                                    // Match if base names match or if error filename contains our file base name
-                                    if (errorBaseName.equals(lastCompilingBaseName) ||
-                                        errorBaseName.equals(matchingFileBaseName) ||
-                                        errorFilename.toLowerCase().contains(lastCompilingBaseName) ||
-                                        errorFilename.toLowerCase().contains(matchingFileBaseName)) {
-                                       errorLines.add(0, lineText.trim());
-                                    }
-                                 } else if (lineText.contains(lastCompilingFile) || lineText.contains(matchingFile.getName())) {
-                                    // Fallback: if error line mentions the file, include it
-                                    errorLines.add(0, lineText.trim());
-                                 }
-                              }
-                           }
-
-                           if (!errorLines.isEmpty()) {
-                              synchronized (decompiler.compilationErrors) {
-                                 decompiler.compilationErrors.put(matchingFile, errorLines);
-                                 SwingUtilities.invokeLater(() -> {
-                                    decompiler.showCompilationErrorsForFile(matchingFile);
-                                 });
-                              }
-                           }
-                        }
-                     }
-                  }
-               }
-            }
-         }
-      }
-
-      /**
-       * Extracts decompilation errors from log output and displays them prominently in bytecode view.
-       */
-      private static void extractAndDisplayDecompilationErrors(String text, Decompiler decompiler) {
-         if (text == null || decompiler == null) {
-            return;
-         }
-
-         // Strip ANSI codes for parsing
-         String textWithoutAnsi = text.replaceAll("\u001B\\[[0-9;]+m", "");
-         String upper = textWithoutAnsi.toUpperCase();
-
-         // Check for decompilation error patterns
-         boolean isDecompilationError = false;
-         final String errorMessage;
-
-         if (upper.contains("DECOMPILE") && (upper.contains("FAILED") || upper.contains("ERROR") || upper.contains("EXCEPTION"))) {
-            isDecompilationError = true;
-            errorMessage = textWithoutAnsi.trim();
-         } else if (upper.contains("NWNNSCOMP DECOMPILE") && upper.contains("FAILED")) {
-            isDecompilationError = true;
-            errorMessage = textWithoutAnsi.trim();
-         } else if (upper.contains("EXCEPTION DURING EXTERNAL DECOMPILE")) {
-            isDecompilationError = true;
-            errorMessage = textWithoutAnsi.trim();
-         } else if (upper.contains("BYTECODE CAPTURE FAILED")) {
-            isDecompilationError = true;
-            errorMessage = textWithoutAnsi.trim();
-         } else {
-            errorMessage = null;
-         }
-
-         if (isDecompilationError && errorMessage != null) {
-            // Try to find the file from context
-            synchronized (decompiler.allLogLines) {
-               final File[] matchingFileRef = new File[1];
-
-               // Look for file references in recent log lines
-               for (int i = decompiler.allLogLines.size() - 1; i >= 0 && i >= decompiler.allLogLines.size() - 15; i--) {
-                  LogLine logLine = decompiler.allLogLines.get(i);
-                  String lineText = logLine.text.replaceAll("\u001B\\[[0-9;]+m", "");
-                  String lineUpper = lineText.toUpperCase();
-
-                  // Check for file references
-                  if (lineUpper.contains("DECOMPILING:") || lineUpper.contains("INPUT FILE:") ||
-                      lineUpper.contains("EXPECTED OUTPUT:")) {
-                     // Extract filename from the line
-                     java.util.regex.Pattern filePattern = java.util.regex.Pattern.compile("([^/\\\\]+\\.(ncs|nss))", java.util.regex.Pattern.CASE_INSENSITIVE);
-                     java.util.regex.Matcher fileMatcher = filePattern.matcher(lineText);
-                     if (fileMatcher.find()) {
-                        String filename = fileMatcher.group(1);
-                        // Find matching file
-                        synchronized (decompiler.hash_TabComponent2File) {
-                           for (File file : decompiler.hash_TabComponent2File.values()) {
-                              if (file != null && (file.getName().equals(filename) ||
-                                  file.getName().startsWith(filename.replace(".ncs", "").replace(".nss", "")))) {
-                                 matchingFileRef[0] = file;
-                                 break;
-                              }
-                           }
-                        }
-                        if (matchingFileRef[0] != null) {
-                           break;
-                        }
-                     }
-                  }
-               }
-
-               // If no file found, try to get the currently selected tab's file
-               if (matchingFileRef[0] == null) {
-                  SwingUtilities.invokeLater(() -> {
-                     JComponent tabComponent = decompiler.getSelectedTabComponent();
-                     if (tabComponent != null) {
-                        File tabFile = decompiler.hash_TabComponent2File.get(tabComponent);
-                        if (tabFile != null) {
-                           synchronized (decompiler.decompilationErrors) {
-                              java.util.List<String> errors = decompiler.decompilationErrors.get(tabFile);
-                              if (errors == null) {
-                                 errors = new java.util.ArrayList<>();
-                                 decompiler.decompilationErrors.put(tabFile, errors);
-                              }
-
-                              if (!errors.contains(errorMessage)) {
-                                 errors.add(errorMessage);
-                                 decompiler.showDecompilationErrorsForFile(tabFile);
-                              }
-                           }
-                        }
-                     }
-                  });
-               } else {
-                  final File matchingFile = matchingFileRef[0];
-                  // Collect this error
-                  synchronized (decompiler.decompilationErrors) {
-                     java.util.List<String> errors = decompiler.decompilationErrors.get(matchingFile);
-                     if (errors == null) {
-                        errors = new java.util.ArrayList<>();
-                        decompiler.decompilationErrors.put(matchingFile, errors);
-                     }
-
-                     if (!errors.contains(errorMessage)) {
-                        errors.add(errorMessage);
-
-                        // Update error display
-                        SwingUtilities.invokeLater(() -> {
-                           decompiler.showDecompilationErrorsForFile(matchingFile);
-                        });
-                     }
-                  }
-               }
-            }
-         }
-      }
 
       /**
        * Parses ANSI escape codes and appends text with appropriate colors.
@@ -3159,16 +2847,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                // Get right component (recompiled bytecode or error display)
                java.awt.Component rightComp = byteCodePane.getRightComponent();
 
-               // Check if there are decompilation errors to display
-               java.util.List<String> decompErrors = null;
-               synchronized (this.decompilationErrors) {
-                  decompErrors = this.decompilationErrors.get(file);
-               }
-
-               if (decompErrors != null && !decompErrors.isEmpty()) {
-                  // Show decompilation errors instead of bytecode
-                  this.showDecompilationErrorsInBytecodeView(tabComponent, decompErrors);
-               } else if (rightComp instanceof JScrollPane) {
+               if (rightComp instanceof JScrollPane) {
                   JTextPane newTextArea = (JTextPane) ((JScrollPane) rightComp).getViewport().getView();
                   if (newTextArea != null && newTextArea.getText().trim().isEmpty()) {
                      String newByteCode = this.fileDecompiler.getNewByteCode(file);
@@ -3968,72 +3647,12 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
    }
 
    /**
-    * Collects compilation errors for a file and displays them prominently.
-    * @param file The file that has errors
-    * @param errorMessages List of error messages
-    */
-   public void collectCompilationErrors(File file, java.util.List<String> errorMessages) {
-      if (file == null || errorMessages == null || errorMessages.isEmpty()) {
-         return;
-      }
-
-      synchronized (this.compilationErrors) {
-         this.compilationErrors.put(file, new java.util.ArrayList<>(errorMessages));
-      }
-
-      // Update the error display for the current tab if it matches this file
-      SwingUtilities.invokeLater(() -> {
-         JComponent tabComponent = this.getSelectedTabComponent();
-         if (tabComponent != null) {
-            File tabFile = this.hash_TabComponent2File.get(tabComponent);
-            if (file.equals(tabFile)) {
-               this.showCompilationErrors(tabComponent, errorMessages);
-            }
-         }
-      });
-   }
-
-   /**
-    * Shows compilation errors for a file by finding its tab and displaying errors.
-    * @param file The file to show errors for
-    */
-   private void showCompilationErrorsForFile(File file) {
-      if (file == null) {
-         return;
-      }
-
-      java.util.List<String> errors;
-      synchronized (this.compilationErrors) {
-         errors = this.compilationErrors.get(file);
-      }
-
-      if (errors == null || errors.isEmpty()) {
-         return;
-      }
-
-      // Find the tab component for this file
-      JComponent tabComponent = null;
-      synchronized (this.hash_TabComponent2File) {
-         for (java.util.Map.Entry<JComponent, File> entry : this.hash_TabComponent2File.entrySet()) {
-            if (file.equals(entry.getValue())) {
-               tabComponent = entry.getKey();
-               break;
-            }
-         }
-      }
-
-      if (tabComponent != null) {
-         this.showCompilationErrors(tabComponent, errors);
-      }
-   }
-
-   /**
-    * Shows compilation errors in the right panel of the bytecode view.
+    * Dumps the error buffer to the compilation error view.
     * @param tabComponent The tab component to show errors for
-    * @param errorMessages List of error messages to display
+    * @param buffer The log buffer to dump
     */
-   private void showCompilationErrors(JComponent tabComponent, java.util.List<String> errorMessages) {
-      if (tabComponent == null || errorMessages == null || errorMessages.isEmpty()) {
+   private void dumpErrorBufferToCompilationView(JComponent tabComponent, java.util.List<String> buffer) {
+      if (tabComponent == null || buffer == null || buffer.isEmpty()) {
          return;
       }
 
@@ -4049,47 +3668,27 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       }
 
       JSplitPane byteCodeSplitPane = (JSplitPane) panels[1];
-      java.awt.Component rightComponent = byteCodeSplitPane.getRightComponent();
 
-      // Check if we already have an error display
-      JScrollPane errorScrollPane = null;
-      JTextPane errorTextPane = null;
+      // Create error display
+      JTextPane errorTextPane = new JTextPane();
+      errorTextPane.setFont(new Font("Monospaced", Font.PLAIN, 12));
+      errorTextPane.setEditable(false);
+      errorTextPane.setBackground(new java.awt.Color(255, 240, 240)); // Light red background
+      errorTextPane.setForeground(new java.awt.Color(200, 0, 0)); // Dark red text
 
-      if (rightComponent instanceof JScrollPane) {
-         JScrollPane scrollPane = (JScrollPane) rightComponent;
-         TitledBorder border = (TitledBorder) scrollPane.getBorder();
-         if (border != null && "Compilation Errors".equals(border.getTitle())) {
-            errorScrollPane = scrollPane;
-            java.awt.Component view = scrollPane.getViewport().getView();
-            if (view instanceof JTextPane) {
-               errorTextPane = (JTextPane) view;
-            }
+      JScrollPane errorScrollPane = new JScrollPane(errorTextPane);
+      errorScrollPane.setBorder(new TitledBorder("Compilation Errors"));
+
+      // Dump entire buffer
+      StringBuilder errorText = new StringBuilder();
+      for (String line : buffer) {
+         // Strip ANSI codes for display
+         String cleanLine = line.replaceAll("\u001B\\[[0-9;]+m", "");
+         errorText.append(cleanLine);
+         if (!cleanLine.endsWith("\n")) {
+            errorText.append("\n");
          }
       }
-
-      // Create error display if it doesn't exist
-      if (errorScrollPane == null) {
-         errorTextPane = new JTextPane();
-         errorTextPane.setFont(new Font("Monospaced", Font.PLAIN, 12));
-         errorTextPane.setEditable(false);
-         errorTextPane.setBackground(new java.awt.Color(255, 240, 240)); // Light red background
-         errorTextPane.setForeground(new java.awt.Color(200, 0, 0)); // Dark red text
-
-         errorScrollPane = new JScrollPane(errorTextPane);
-         errorScrollPane.setBorder(new TitledBorder("Compilation Errors"));
-      }
-
-      // Build error message text
-      StringBuilder errorText = new StringBuilder();
-      errorText.append("═══════════════════════════════════════════════════════════════════════════════\n");
-      errorText.append(" ══════════════════════════════════ ERRORS ═══════════════════════════════════\n");
-      errorText.append("═══════════════════════════════════════════════════════════════════════════════\n\n");
-
-      for (String error : errorMessages) {
-         errorText.append(error).append("\n");
-      }
-
-      errorText.append("\n═══════════════════════════════════════════════════════════════════════════════\n");
 
       // Set error text
       errorTextPane.setText(errorText.toString());
@@ -4099,48 +3698,15 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       byteCodeSplitPane.setRightComponent(errorScrollPane);
       byteCodeSplitPane.setDividerLocation(0.5); // Split evenly
    }
-
+   
    /**
-    * Shows decompilation errors for a file by finding its tab and displaying errors in bytecode view.
-    * @param file The file to show errors for
-    */
-   private void showDecompilationErrorsForFile(File file) {
-      if (file == null) {
-         return;
-      }
-
-      java.util.List<String> errors;
-      synchronized (this.decompilationErrors) {
-         errors = this.decompilationErrors.get(file);
-      }
-
-      if (errors == null || errors.isEmpty()) {
-         return;
-      }
-
-      // Find the tab component for this file
-      JComponent tabComponent = null;
-      synchronized (this.hash_TabComponent2File) {
-         for (java.util.Map.Entry<JComponent, File> entry : this.hash_TabComponent2File.entrySet()) {
-            if (file.equals(entry.getValue())) {
-               tabComponent = entry.getKey();
-               break;
-            }
-         }
-      }
-
-      if (tabComponent != null) {
-         this.showDecompilationErrorsInBytecodeView(tabComponent, errors);
-      }
-   }
-
-   /**
-    * Shows decompilation errors in the right panel of the bytecode view.
+    * Dumps the error buffer to the decompilation error view.
     * @param tabComponent The tab component to show errors for
-    * @param errorMessages List of error messages to display
+    * @param buffer The log buffer to dump
     */
-   private void showDecompilationErrorsInBytecodeView(JComponent tabComponent, java.util.List<String> errorMessages) {
-      if (tabComponent == null || errorMessages == null || errorMessages.isEmpty()) {
+   private void dumpErrorBufferToDecompilationView(JComponent tabComponent, java.util.List<String> buffer) {
+
+      if (tabComponent == null || buffer == null || buffer.isEmpty()) {
          return;
       }
 
@@ -4156,47 +3722,27 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       }
 
       JSplitPane byteCodeSplitPane = (JSplitPane) panels[1];
-      java.awt.Component rightComponent = byteCodeSplitPane.getRightComponent();
 
-      // Check if we already have an error display
-      JScrollPane errorScrollPane = null;
-      JTextPane errorTextPane = null;
+      // Create error display
+      JTextPane errorTextPane = new JTextPane();
+      errorTextPane.setFont(new Font("Monospaced", Font.PLAIN, 12));
+      errorTextPane.setEditable(false);
+      errorTextPane.setBackground(new java.awt.Color(255, 240, 240)); // Light red background
+      errorTextPane.setForeground(new java.awt.Color(200, 0, 0)); // Dark red text
 
-      if (rightComponent instanceof JScrollPane) {
-         JScrollPane scrollPane = (JScrollPane) rightComponent;
-         TitledBorder border = (TitledBorder) scrollPane.getBorder();
-         if (border != null && "Decompilation Errors".equals(border.getTitle())) {
-            errorScrollPane = scrollPane;
-            java.awt.Component view = scrollPane.getViewport().getView();
-            if (view instanceof JTextPane) {
-               errorTextPane = (JTextPane) view;
-            }
+      JScrollPane errorScrollPane = new JScrollPane(errorTextPane);
+      errorScrollPane.setBorder(new TitledBorder("Decompilation Errors"));
+
+      // Dump entire buffer
+      StringBuilder errorText = new StringBuilder();
+      for (String line : buffer) {
+         // Strip ANSI codes for display
+         String cleanLine = line.replaceAll("\u001B\\[[0-9;]+m", "");
+         errorText.append(cleanLine);
+         if (!cleanLine.endsWith("\n")) {
+            errorText.append("\n");
          }
       }
-
-      // Create error display if it doesn't exist
-      if (errorScrollPane == null) {
-         errorTextPane = new JTextPane();
-         errorTextPane.setFont(new Font("Monospaced", Font.PLAIN, 12));
-         errorTextPane.setEditable(false);
-         errorTextPane.setBackground(new java.awt.Color(255, 240, 240)); // Light red background
-         errorTextPane.setForeground(new java.awt.Color(200, 0, 0)); // Dark red text
-
-         errorScrollPane = new JScrollPane(errorTextPane);
-         errorScrollPane.setBorder(new TitledBorder("Decompilation Errors"));
-      }
-
-      // Build error message text
-      StringBuilder errorText = new StringBuilder();
-      errorText.append("═══════════════════════════════════════════════════════════════════════════════\n");
-      errorText.append(" ════════════════════════════ DECOMPILATION ERRORS ════════════════════════════\n");
-      errorText.append("═══════════════════════════════════════════════════════════════════════════════\n\n");
-
-      for (String error : errorMessages) {
-         errorText.append(error).append("\n\n");
-      }
-
-      errorText.append("═══════════════════════════════════════════════════════════════════════════════\n");
 
       // Set error text
       errorTextPane.setText(errorText.toString());
@@ -4207,70 +3753,4 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       byteCodeSplitPane.setDividerLocation(0.5); // Split evenly
    }
 
-   /**
-    * Clears compilation errors for a file and restores the bytecode view.
-    * @param file The file to clear errors for
-    */
-   public void clearCompilationErrors(File file) {
-      if (file == null) {
-         return;
-      }
-
-      synchronized (this.compilationErrors) {
-         this.compilationErrors.remove(file);
-      }
-
-      // Restore bytecode view if this is the current tab
-      SwingUtilities.invokeLater(() -> {
-         JComponent tabComponent = this.getSelectedTabComponent();
-         if (tabComponent != null) {
-            File tabFile = this.hash_TabComponent2File.get(tabComponent);
-            if (file.equals(tabFile)) {
-               this.restoreBytecodeView(tabComponent);
-            }
-         }
-      });
-   }
-
-   /**
-    * Restores the bytecode view (hides error display).
-    * @param tabComponent The tab component to restore view for
-    */
-   private void restoreBytecodeView(JComponent tabComponent) {
-      if (tabComponent == null) {
-         return;
-      }
-
-      // Get the bytecode split pane
-      Object clientProperty = this.jTB.getClientProperty(tabComponent);
-      if (!(clientProperty instanceof JComponent[])) {
-         return;
-      }
-
-      JComponent[] panels = (JComponent[]) clientProperty;
-      if (panels.length < 2 || !(panels[1] instanceof JSplitPane)) {
-         return;
-      }
-
-      JSplitPane byteCodeSplitPane = (JSplitPane) panels[1];
-      java.awt.Component rightComponent = byteCodeSplitPane.getRightComponent();
-
-      // Check if we're showing errors
-      if (rightComponent instanceof JScrollPane) {
-         JScrollPane scrollPane = (JScrollPane) rightComponent;
-         TitledBorder border = (TitledBorder) scrollPane.getBorder();
-         if (border != null && "Compilation Errors".equals(border.getTitle())) {
-            // Restore bytecode view - we need to recreate it
-            JTextPane newByteCodeArea = new JTextPane();
-            newByteCodeArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-            newByteCodeArea.setEditable(false);
-            newByteCodeArea.setText("// Recompiled bytecode not available.\n// Save the file to trigger round-trip validation and bytecode capture.");
-
-            JScrollPane newScrollPane = new JScrollPane(newByteCodeArea);
-            newScrollPane.setBorder(new TitledBorder("Recompiled Byte Code"));
-
-            byteCodeSplitPane.setRightComponent(newScrollPane);
-         }
-      }
-   }
 }

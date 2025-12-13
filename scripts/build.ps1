@@ -73,7 +73,7 @@ function Remove-ClassFiles {
 $targetDir = Join-Path "." "target"
 $buildDir = Join-Path $targetDir "classes"
 $jarDir = Join-Path $targetDir "jar"
-$cliJarFile = Join-Path $jarDir "NCSDecomp-CLI.jar"
+$cliJarFile = Join-Path $jarDir "NCSDecompCLI.jar"
 $guiJarFile = Join-Path $jarDir "NCSDecomp.jar"
 $javaSourceDir = Join-Path "." (Join-Path "src" (Join-Path "main" "java"))
 
@@ -424,7 +424,7 @@ if ($BuildExecutable) {
     New-Item -ItemType Directory -Path $jpackageInput -Force | Out-Null
 
     # Copy JAR to input directory
-    $jarDest = Join-Path $jpackageInput "NCSDecomp-CLI.jar"
+    $jarDest = Join-Path $jpackageInput "NCSDecompCLI.jar"
     Copy-Item $cliJarFile $jarDest
 
     # Copy nwscript files as resources (they'll be in the app directory)
@@ -479,7 +479,7 @@ if ($BuildExecutable) {
             "--type", $packageType,
             "--input", $jpackageInput,
             "--name", $cliAppName,
-            "--main-jar", "NCSDecomp-CLI.jar",
+            "--main-jar", "NCSDecompCLI.jar",
             "--main-class", $cliMainClass,
             "--app-version", $appVersion,
             "--description", "KotOR NCSDecomp Script Decompiler - CLI Version",
