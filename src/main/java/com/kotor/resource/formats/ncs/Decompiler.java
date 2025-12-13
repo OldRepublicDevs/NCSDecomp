@@ -133,17 +133,21 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
    }
    private final java.util.List<LogLine> allLogLines = new java.util.ArrayList<>();
 
-   // Store compilation errors per file for prominent display
-   private final java.util.Map<File, java.util.List<String>> compilationErrors = new java.util.HashMap<>();
+   // Buffer last 1000 log lines for error display
+   private static final int ERROR_BUFFER_SIZE = 1000;
+   private final java.util.List<String> recentLogBuffer = new java.util.ArrayList<>();
 
-   // Store decompilation errors per file for prominent display in bytecode view
-   private final java.util.Map<File, java.util.List<String>> decompilationErrors = new java.util.HashMap<>();
+   // Track which file is currently being processed (for error association)
+   private File currentProcessingFile = null;
 
    /**
     * Log severity levels.
     */
    private enum LogSeverity {
-      TRACE, DEBUG, INFO, WARNING, ERROR
+      TRACE,
+      DEBUG,
+      INFO,
+      WARNING, ERROR,
    }
    private transient Element rootElement;
    private TitledBorder titledBorder;
@@ -389,9 +393,17 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                decompiler.allLogLines.add(new LogLine(text, severity));
             }
 
-            // Extract compilation and decompilation errors from output
-            extractAndDisplayCompilationErrors(text, decompiler);
-            extractAndDisplayDecompilationErrors(text, decompiler);
+            // Buffer recent log lines for error display
+            synchronized (decompiler.recentLogBuffer) {
+               decompiler.recentLogBuffer.add(text);
+               // Keep only last 1000 lines
+               if (decompiler.recentLogBuffer.size() > ERROR_BUFFER_SIZE) {
+                  decompiler.recentLogBuffer.remove(0);
+               }
+            }
+
+            // Check for error conditions and dump buffer
+            checkAndDisplayErrors(text, decompiler);
 
             // Only append if it should be shown based on current filter
             if (shouldShowLog(severity, decompiler)) {
@@ -418,9 +430,56 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       }
 
       /**
-       * Extracts compilation errors from log output and displays them prominently.
+       * Checks for error conditions and dumps the recent log buffer to error display.
        */
-      private static void extractAndDisplayCompilationErrors(String text, Decompiler decompiler) {
+      private static void checkAndDisplayErrors(String text, Decompiler decompiler) {
+         if (text == null || decompiler == null) {
+            return;
+         }
+
+         // Strip ANSI codes for checking
+         String textWithoutAnsi = text.replaceAll("\u001B\\[[0-9;]+m", "");
+         String upper = textWithoutAnsi.toUpperCase();
+
+         // Check for compilation errors
+         boolean isCompilationError = upper.contains("COMPILATION ABORTED") ||
+                                      upper.contains("COMPILATION FAILED") ||
+                                      (upper.contains("ERROR") && upper.contains("COMPILATION"));
+
+         // Check for decompilation errors
+         boolean isDecompilationError = (upper.contains("DECOMPILE") && (upper.contains("FAILED") || upper.contains("ERROR"))) ||
+                                        upper.contains("BYTECODE CAPTURE FAILED") ||
+                                        upper.contains("EXCEPTION DURING EXTERNAL DECOMPILE");
+
+         if (isCompilationError || isDecompilationError) {
+            // Find the currently selected file
+            SwingUtilities.invokeLater(() -> {
+               JComponent tabComponent = decompiler.getSelectedTabComponent();
+               if (tabComponent != null) {
+                  File file = decompiler.hash_TabComponent2File.get(tabComponent);
+                  if (file != null) {
+                     // Dump the entire buffer
+                     synchronized (decompiler.recentLogBuffer) {
+                        if (!decompiler.recentLogBuffer.isEmpty()) {
+                           if (isCompilationError) {
+                              decompiler.dumpErrorBufferToCompilationView(tabComponent, decompiler.recentLogBuffer);
+                           }
+                           if (isDecompilationError) {
+                              decompiler.dumpErrorBufferToDecompilationView(tabComponent, decompiler.recentLogBuffer);
+                           }
+                        }
+                     }
+                  }
+               }
+            });
+         }
+      }
+
+      /**
+       * Old extraction method - kept for reference but not used.
+       */
+      @Deprecated
+      private static void extractAndDisplayCompilationErrors_OLD(String text, Decompiler decompiler) {
          if (text == null || decompiler == null) {
             return;
          }
@@ -433,8 +492,9 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          // Pattern can have leading whitespace/pipe characters from Logger formatting
          if (upper.contains("ERROR:") || (upper.contains("ERROR") && upper.contains("SYNTAX"))) {
             // Try to extract error messages from compiler output
-            // Pattern: optional leading whitespace/pipe, then filename(line): Error: message
-            java.util.regex.Pattern errorPattern = java.util.regex.Pattern.compile(".*?([^/\\\\\\s]+)\\((\\d+)\\):\\s*Error:\\s*(.+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+            // Pattern: optional leading whitespace/pipe/Unicode characters, then filename(line): Error: message
+            // The pipe character │ is Unicode U+2502, so we need to handle it
+            java.util.regex.Pattern errorPattern = java.util.regex.Pattern.compile(".*?([^/\\\\\\s│]+)\\((\\d+)\\):\\s*Error:\\s*(.+)", java.util.regex.Pattern.CASE_INSENSITIVE);
             java.util.regex.Matcher matcher = errorPattern.matcher(textWithoutAnsi);
 
             if (matcher.find()) {
@@ -576,8 +636,8 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                               // Check if this line contains an error and matches our file
                               if (lineUpper.contains("ERROR:") || (lineUpper.contains("ERROR") && lineUpper.contains("SYNTAX"))) {
                                  // Extract filename from error line
-                                 java.util.regex.Pattern errorPattern = java.util.regex.Pattern.compile(".*?([^/\\\\\\s]+)\\((\\d+)\\):\\s*Error:", java.util.regex.Pattern.CASE_INSENSITIVE);
-                                 java.util.regex.Matcher errorMatcher = errorPattern.matcher(lineText);
+                                 java.util.regex.Pattern errorLinePattern = java.util.regex.Pattern.compile(".*?([^/\\\\\\s]+)\\((\\d+)\\):\\s*Error:", java.util.regex.Pattern.CASE_INSENSITIVE);
+                                 java.util.regex.Matcher errorMatcher = errorLinePattern.matcher(lineText);
                                  if (errorMatcher.find()) {
                                     String errorFilename = errorMatcher.group(1).trim();
                                     String errorBaseName = errorFilename.replaceAll("\\.(nss|ncs)$", "").toLowerCase();
