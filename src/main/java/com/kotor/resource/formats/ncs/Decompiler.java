@@ -120,12 +120,12 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
    private JComboBox<String> logLevelFilter;
    private static final String[] LOG_LEVELS = {"TRACE", "DEBUG", "INFO", "WARNING", "ERROR"};
    private static final int DEFAULT_LOG_LEVEL_INDEX = 2; // INFO
-   
+
    // Store all log lines for filtering
    private static class LogLine {
       final String text;
       final LogSeverity severity;
-      
+
       LogLine(String text, LogSeverity severity) {
          this.text = text;
          this.severity = severity;
@@ -248,7 +248,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       this.jTB = new JTabbedPane();
       this.jTB.addChangeListener(this);
       this.jTB.setPreferredSize(new Dimension(900, 720));
-      new DropTarget(this.jTB, this);
+      this.dropTarget = new DropTarget(this.jTB, this);
 
       // Workspace cards to show empty state when no files are open
       this.workspaceCards = new JPanel(new CardLayout());
@@ -260,9 +260,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       emptyPanel.add(this.emptyStateLabel, BorderLayout.CENTER);
       this.workspaceCards.add(emptyPanel, CARD_EMPTY);
       this.workspaceCards.add(this.jTB, CARD_TABS);
-      new DropTarget(this.workspaceCards, this);
-      // Also enable drop on the empty panel itself
-      new DropTarget(emptyPanel, this);
+      this.dropTarget = new DropTarget(this.workspaceCards, this);
 
       this.upperJSplitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, this.leftPanel, this.workspaceCards);
       this.upperJSplitPane.setDividerLocation(260);
@@ -318,9 +316,6 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       this.addWindowListener(this);
       this.updateWorkspaceCard();
       this.updateMenuAndToolbarState();
-
-      // Enable drag-and-drop on the main frame (set as the main drop target)
-      this.dropTarget = new DropTarget(this, this);
 
       // Redirect System.out and System.err to both terminal and GUI log area
       this.setupStreamRedirection();
@@ -381,12 +376,12 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          if (text != null && guiLog != null && doc != null && decompiler != null) {
             // Parse severity first
             LogSeverity severity = parseLogSeverity(text);
-            
+
             // Store the log line (always store, even if filtered)
             synchronized (decompiler.allLogLines) {
                decompiler.allLogLines.add(new LogLine(text, severity));
             }
-            
+
             // Only append if it should be shown based on current filter
             if (shouldShowLog(severity, decompiler)) {
                SwingUtilities.invokeLater(() -> {
@@ -1320,12 +1315,6 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
 
    @Override
    public void dragEnter(DropTargetDragEvent dtde) {
-      // Accept drag if it contains files
-      if (dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-         dtde.acceptDrag(java.awt.dnd.DnDConstants.ACTION_COPY);
-      } else {
-         dtde.rejectDrag();
-      }
    }
 
    @Override
@@ -1334,88 +1323,44 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
 
    @Override
    public void dragOver(DropTargetDragEvent dtde) {
-      // Continue accepting drag
-      if (dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-         dtde.acceptDrag(java.awt.dnd.DnDConstants.ACTION_COPY);
-      } else {
-         dtde.rejectDrag();
-      }
    }
 
    @Override
    public void dropActionChanged(DropTargetDragEvent dtde) {
-      // Accept if it's a copy action
-      if (dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-         dtde.acceptDrag(java.awt.dnd.DnDConstants.ACTION_COPY);
-      } else {
-         dtde.rejectDrag();
-      }
    }
 
    @Override
    public void drop(DropTargetDropEvent dtde) {
       try {
-         // First check if we can accept this drop
-         if (!dtde.isDataFlavorSupported(DataFlavor.javaFileListFlavor)) {
-            dtde.rejectDrop();
-            return;
-         }
-
-         // Accept the drop before accessing data
-         dtde.acceptDrop(java.awt.dnd.DnDConstants.ACTION_COPY);
-
          Transferable tr = dtde.getTransferable();
          DataFlavor[] flavors = tr.getTransferDataFlavors();
 
          for (int i = 0; i < flavors.length; i++) {
             if (flavors[i].isFlavorJavaFileListType()) {
+               dtde.acceptDrop(3);
                @SuppressWarnings("unchecked")
                final List<File> rawList = (List<File>) tr.getTransferData(flavors[i]);
                final List<File> list = new ArrayList<>();
-
                for (File file : rawList) {
-                  if (file != null && file.exists()) {
-                     String name = file.getName().toLowerCase();
-                     // Only accept .ncs and .nss files
-                     if (name.endsWith(".ncs") || name.endsWith(".nss")) {
-                        list.add(file);
-                     }
+                  if (file != null) {
+                     list.add(file);
                   }
                }
-
-               if (!list.isEmpty()) {
-                  // Use SwingUtilities to ensure we're on the EDT for UI updates
-                  final File[] filesToOpen = list.toArray(new File[0]);
-                  SwingUtilities.invokeLater(() -> {
-                     Decompiler.this.open(filesToOpen);
-                  });
-                  dtde.dropComplete(true);
-                  return;
-               } else {
-                  // No valid files found
-                  dtde.dropComplete(false);
-                  SwingUtilities.invokeLater(() -> {
-                     JOptionPane.showMessageDialog(Decompiler.this,
-                           "Please drop .ncs or .nss files only.",
-                           "Invalid File Type",
-                           JOptionPane.WARNING_MESSAGE);
-                  });
-                  return;
-               }
+               Thread openThread = new Thread(() -> {
+                  Decompiler.this.open(list.toArray(new File[0]));
+               });
+               openThread.setDaemon(true);
+               openThread.setName("FileOpen-" + System.currentTimeMillis());
+               openThread.start();
+               dtde.dropComplete(true);
+               return;
             }
          }
 
-         // No file list flavor found
-         dtde.dropComplete(false);
-      } catch (Exception e) {
-         e.printStackTrace();
-         dtde.dropComplete(false);
-         SwingUtilities.invokeLater(() -> {
-            JOptionPane.showMessageDialog(Decompiler.this,
-                  "Error opening dropped files: " + e.getMessage(),
-                  "Error",
-                  JOptionPane.ERROR_MESSAGE);
-         });
+         dtde.rejectDrop();
+      } catch (Exception var6) {
+         var6.printStackTrace();
+         dtde.rejectDrop();
       }
    }
 
@@ -3551,21 +3496,21 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       if (this.status == null) {
          return;
       }
-      
+
       SwingUtilities.invokeLater(() -> {
          try {
             javax.swing.text.StyledDocument doc = this.status.getStyledDocument();
-            
+
             // Clear the entire log
             doc.remove(0, doc.getLength());
-            
+
             // Get current filter level
             String selectedLevel = (String) this.logLevelFilter.getSelectedItem();
             if (selectedLevel == null) {
                selectedLevel = LOG_LEVELS[DEFAULT_LOG_LEVEL_INDEX];
             }
             int selectedIndex = DualOutputPrintStream.getSeverityIndex(selectedLevel);
-            
+
             // Re-render all log lines that match the current filter
             synchronized (this.allLogLines) {
                for (LogLine logLine : this.allLogLines) {
@@ -3578,7 +3523,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                   // If filtered out, don't append anything (no blank lines)
                }
             }
-            
+
             // Auto-scroll to bottom
             this.status.setCaretPosition(doc.getLength());
          } catch (Exception e) {
@@ -3586,7 +3531,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          }
       });
    }
-   
+
 
    /**
     * Helper method to append text to status log with INFO severity.
