@@ -90,14 +90,16 @@ https://bolabaden.org
 
 Credits:
 
-Original Developers:
-- JdNoa - Script Decompiler
-- Dashus - GUI
+Original Developers (The Foundation):
+- JdNoa - Created the original script decompiler engine
+- Dashus - Created the original GUI
+
+These developers did the hard foundational work that made this tool possible. The original DeNCS was an internal tool used by TSLRP (The Sith Lords Restoration Project) and was released to the public "as is" with no warranty.
 
 Current Maintainer:
-- th3w1zard1
+- th3w1zard1 - Complete rewrite and modernization
 
-This project is based on the original DeNCS tool that was used internally by TSLRP (The Sith Lords Restoration Project). This version represents a complete modernization with a new GUI, better features, and cross-platform support.
+This version represents a near-complete rewrite and modernization of the original DeNCS tool. While based on the original developers' foundational work, the current version has been extensively revamped with a new GUI, modernized codebase, cross-platform support, and many new features. The core decompilation concepts from the original work remain, but the implementation has been significantly rewritten for modern development practices.
 
 License:
 
