@@ -5,6 +5,11 @@
 package com.kotor.resource.formats.ncs;
 
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import javax.swing.JOptionPane;
+import javax.swing.SwingUtilities;
 
 /**
  * Temporarily spoofs Windows registry keys to point legacy compilers to the correct installation path.
@@ -21,6 +26,12 @@ import java.io.File;
  *       HKEY_LOCAL_MACHINE\SOFTWARE\LucasArts\KotOR2 (32-bit)</li>
  * </ul>
  * Key name: "Path"
+ * <p>
+ * When registry modification fails due to insufficient privileges, this class will:
+ * <ul>
+ *   <li>First time: Prompt the user and attempt to elevate privileges via RunAs</li>
+ *   <li>Subsequent times: Show an informational message suggesting to run as admin or use a different compiler</li>
+ * </ul>
  */
 public class RegistrySpoofer implements AutoCloseable {
    private final String registryPath;
@@ -28,6 +39,7 @@ public class RegistrySpoofer implements AutoCloseable {
    private final String spoofedPath;
    private String originalValue;
    private boolean wasModified = false;
+   private static final String ELEVATION_PROMPT_MARKER_FILE = "ncsdecomp_registry_elevation_shown.txt";
 
    /**
     * Creates a new registry spoofer for the specified game.
@@ -70,9 +82,15 @@ public class RegistrySpoofer implements AutoCloseable {
    /**
     * Activates the registry spoof by setting the registry key to the spoofed path.
     * This should be called at the start of a try-with-resources block.
+    * <p>
+    * If permission is denied, this method will:
+    * <ul>
+    *   <li>First time: Prompt user and attempt elevation via RunAs</li>
+    *   <li>Subsequent times: Show informational message and return without modifying registry</li>
+    * </ul>
     *
     * @return this instance for method chaining
-    * @throws SecurityException If registry modification fails due to permissions
+    * @throws SecurityException If registry modification fails and elevation is not possible or refused
     */
    public RegistrySpoofer activate() {
       if (this.originalValue != null && this.originalValue.equals(this.spoofedPath)) {
@@ -87,8 +105,30 @@ public class RegistrySpoofer implements AutoCloseable {
                "\\" + this.keyName + " to " + this.spoofedPath);
       } catch (SecurityException e) {
          System.err.println("DEBUG RegistrySpoofer: Failed to set registry key: " + e.getMessage());
-         throw new SecurityException("Permission denied. Administrator privileges required to spoof registry. " +
-               "Error: " + e.getMessage(), e);
+         
+         // Check if we've shown the elevation prompt before
+         boolean hasShownPrompt = hasShownElevationPrompt();
+         
+         if (!hasShownPrompt) {
+            // First time - prompt and attempt elevation
+            if (attemptElevatedRegistryWrite()) {
+               // Successfully set via elevation
+               this.wasModified = true;
+               markElevationPromptShown();
+               System.err.println("DEBUG RegistrySpoofer: Successfully set registry key via elevation");
+               return this;
+            } else {
+               // User refused or elevation failed
+               markElevationPromptShown();
+               throw new SecurityException("Permission denied. Administrator privileges required to spoof registry. " +
+                     "Error: " + e.getMessage(), e);
+            }
+         } else {
+            // Subsequent times - show informational message
+            showSubsequentElevationMessage();
+            // Don't throw - allow compilation to proceed (might fail, but we've warned the user)
+            return this;
+         }
       }
       return this;
    }
@@ -290,6 +330,180 @@ public class RegistrySpoofer implements AutoCloseable {
             throw (SecurityException) e.getCause();
          }
          throw new RuntimeException("Error writing registry value: " + e.getMessage(), e);
+      }
+   }
+
+   /**
+    * Checks if we've shown the elevation prompt before by looking for a marker file.
+    */
+   private static boolean hasShownElevationPrompt() {
+      try {
+         Path markerPath = Paths.get(System.getProperty("user.dir"), ELEVATION_PROMPT_MARKER_FILE);
+         return Files.exists(markerPath);
+      } catch (Exception e) {
+         return false;
+      }
+   }
+
+   /**
+    * Marks that we've shown the elevation prompt by creating a marker file.
+    */
+   private static void markElevationPromptShown() {
+      try {
+         Path markerPath = Paths.get(System.getProperty("user.dir"), ELEVATION_PROMPT_MARKER_FILE);
+         Files.createFile(markerPath);
+      } catch (Exception e) {
+         System.err.println("DEBUG RegistrySpoofer: Failed to create elevation prompt marker: " + e.getMessage());
+      }
+   }
+
+   /**
+    * Attempts to set the registry value using an elevated process.
+    * Shows a prompt to the user first.
+    *
+    * @return true if the registry was successfully set, false otherwise
+    */
+   private boolean attemptElevatedRegistryWrite() {
+      // Show prompt to user
+      String message = "NCSDecomp needs administrator privileges to set a Windows registry key.\n\n" +
+            "This is required for the " + (registryPath.contains("KotOR2") ? "KotOR 2" : "KotOR 1") +
+            " compiler (nwnnsscomp_ktool.exe or nwnnsscomp_kscript.exe) to work correctly.\n\n" +
+            "The registry key will be temporarily set to:\n" +
+            registryPath + "\\" + keyName + " = " + spoofedPath + "\n\n" +
+            "Click 'Yes' to allow this (you'll see a Windows UAC prompt), or 'No' to cancel.";
+
+      boolean userApproved = showPromptOnEDT("Registry Access Required", message);
+
+      if (!userApproved) {
+         System.err.println("DEBUG RegistrySpoofer: User declined elevation prompt");
+         return false;
+      }
+
+      // Parse registry path for reg.exe
+      int firstBackslash = registryPath.indexOf('\\');
+      if (firstBackslash < 0) {
+         return false;
+      }
+      String hive = registryPath.substring(0, firstBackslash);
+      String keyPath = registryPath.substring(firstBackslash + 1);
+
+      String regHive;
+      if (hive.equals("HKEY_LOCAL_MACHINE")) {
+         regHive = "HKLM";
+      } else {
+         return false;
+      }
+
+      try {
+         // Create a temporary batch file to run the reg command elevated
+         // This avoids complex PowerShell escaping issues
+         File tempBatch = File.createTempFile("ncsdecomp_reg_spoof_", ".bat");
+         tempBatch.deleteOnExit();
+         
+         // Write the batch file content
+         // First create the key path, then set the value
+         String batchContent = "@echo off\n" +
+               "reg add \"" + regHive + "\\" + keyPath + "\" /f >nul 2>&1\n" +
+               "reg add \"" + regHive + "\\" + keyPath + "\" /v \"" + keyName + "\" /t REG_SZ /d \"" +
+               spoofedPath.replace("\"", "\\\"") + "\" /f\n";
+         
+         Files.write(tempBatch.toPath(), batchContent.getBytes("UTF-8"));
+         
+         // Run the batch file elevated using PowerShell
+         String psCommand = "Start-Process -FilePath \"" + tempBatch.getAbsolutePath().replace("\\", "\\\\") +
+               "\" -Verb RunAs -Wait -NoNewWindow";
+         
+         ProcessBuilder pb = new ProcessBuilder("powershell", "-Command", psCommand);
+         pb.redirectErrorStream(true);
+         
+         Process proc = pb.start();
+         
+         // Read output
+         StringBuilder output = new StringBuilder();
+         try (java.io.BufferedReader reader = new java.io.BufferedReader(
+               new java.io.InputStreamReader(proc.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+               output.append(line).append("\n");
+            }
+         }
+
+         int exitCode = proc.waitFor();
+         
+         // Clean up temp file
+         try {
+            tempBatch.delete();
+         } catch (Exception e) {
+            // Ignore cleanup errors
+         }
+         
+         if (exitCode == 0) {
+            System.err.println("DEBUG RegistrySpoofer: Successfully set registry via elevated process");
+            return true;
+         } else {
+            System.err.println("DEBUG RegistrySpoofer: Elevated registry write failed. Exit code: " + exitCode +
+                  ", Output: " + output.toString());
+            return false;
+         }
+      } catch (Exception e) {
+         System.err.println("DEBUG RegistrySpoofer: Exception during elevated registry write: " + e.getMessage());
+         e.printStackTrace();
+         return false;
+      }
+   }
+
+   /**
+    * Shows a prompt dialog on the EDT (Event Dispatch Thread).
+    * If not on EDT, invokes it on EDT and waits for result.
+    */
+   private boolean showPromptOnEDT(String title, String message) {
+      if (SwingUtilities.isEventDispatchThread()) {
+         int result = JOptionPane.showConfirmDialog(
+               null, message, title,
+               JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+         return result == JOptionPane.YES_OPTION;
+      } else {
+      // Not on EDT - use invokeAndWait
+         final boolean[] result = new boolean[1];
+         try {
+            SwingUtilities.invokeAndWait(() -> {
+               int dialogResult = JOptionPane.showConfirmDialog(
+                     null, message, title,
+                     JOptionPane.YES_NO_OPTION, JOptionPane.QUESTION_MESSAGE);
+               result[0] = (dialogResult == JOptionPane.YES_OPTION);
+            });
+            return result[0];
+         } catch (Exception e) {
+            System.err.println("DEBUG RegistrySpoofer: Exception showing prompt: " + e.getMessage());
+            return false;
+         }
+      }
+   }
+
+   /**
+    * Shows an informational message on subsequent elevation attempts.
+    */
+   private void showSubsequentElevationMessage() {
+      String message = "NCSDecomp cannot set the Windows registry key (requires administrator privileges).\n\n" +
+            "To avoid this message, you can either:\n" +
+            "1. Run NCSDecomp as administrator, or\n" +
+            "2. Use a different nwnnsscomp.exe compiler if available\n\n" +
+            "Compilation will be attempted anyway, but may fail if the registry key is not set correctly.";
+
+      if (SwingUtilities.isEventDispatchThread()) {
+         JOptionPane.showMessageDialog(
+               null, message, "Registry Access Required",
+               JOptionPane.INFORMATION_MESSAGE);
+      } else {
+         try {
+            SwingUtilities.invokeLater(() -> {
+               JOptionPane.showMessageDialog(
+                     null, message, "Registry Access Required",
+                     JOptionPane.INFORMATION_MESSAGE);
+            });
+         } catch (Exception e) {
+            System.err.println("DEBUG RegistrySpoofer: Exception showing subsequent message: " + e.getMessage());
+         }
       }
    }
 }
