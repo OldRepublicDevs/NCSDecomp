@@ -1750,9 +1750,10 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                            java.util.List<File> includeDirs = new java.util.ArrayList<>();
                            includeDirs.add(file.getParentFile());
                            
-                           // For KOTOR Tool, copy include files to source directory (it doesn't support -i flag)
+                           // For KOTOR Tool and KOTOR Scripting Tool, copy include files to source directory (they don't support -i flag)
                            java.util.List<File> copiedIncludeFiles = new java.util.ArrayList<>();
-                           if (config.getChosenCompiler() == KnownExternalCompilers.KOTOR_TOOL && !includeDirs.isEmpty()) {
+                           KnownExternalCompilers compiler = config.getChosenCompiler();
+                           if ((compiler == KnownExternalCompilers.KOTOR_TOOL || compiler == KnownExternalCompilers.KOTOR_SCRIPTING_TOOL) && !includeDirs.isEmpty()) {
                               File sourceDir = file.getParentFile();
                               
                               // Parse source file to find which includes are needed
