@@ -133,6 +133,9 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
    }
    private final java.util.List<LogLine> allLogLines = new java.util.ArrayList<>();
 
+   // Store compilation errors per file for prominent display
+   private final java.util.Map<File, java.util.List<String>> compilationErrors = new java.util.HashMap<>();
+
    /**
     * Log severity levels.
     */
@@ -371,6 +374,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
        * Instance method to append text to GUI log with color coding.
        * Parses ANSI escape codes and converts them to Swing colors.
        * Stores all log lines for filtering.
+       * Also extracts compilation errors and displays them prominently.
        */
       private static void appendToGuiLog(String text, JTextPane guiLog, javax.swing.text.StyledDocument doc, Decompiler decompiler) {
          if (text != null && guiLog != null && doc != null && decompiler != null) {
@@ -381,6 +385,9 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
             synchronized (decompiler.allLogLines) {
                decompiler.allLogLines.add(new LogLine(text, severity));
             }
+
+            // Extract compilation errors from compiler output
+            extractAndDisplayCompilationErrors(text, decompiler);
 
             // Only append if it should be shown based on current filter
             if (shouldShowLog(severity, decompiler)) {
@@ -402,6 +409,122 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                      }
                   }
                });
+            }
+         }
+      }
+
+      /**
+       * Extracts compilation errors from log output and displays them prominently.
+       */
+      private static void extractAndDisplayCompilationErrors(String text, Decompiler decompiler) {
+         if (text == null || decompiler == null) {
+            return;
+         }
+
+         // Strip ANSI codes for parsing
+         String textWithoutAnsi = text.replaceAll("\u001B\\[[0-9;]+m", "");
+         String upper = textWithoutAnsi.toUpperCase();
+
+         // Check if this is a compiler error line (format: "filename(line): Error: message")
+         if (upper.contains("ERROR:") || (upper.contains("ERROR") && upper.contains("SYNTAX"))) {
+            // Try to extract error messages from compiler output
+            // Pattern: filename(line): Error: message
+            java.util.regex.Pattern errorPattern = java.util.regex.Pattern.compile("([^:]+)\\((\\d+)\\):\\s*Error:\\s*(.+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+            java.util.regex.Matcher matcher = errorPattern.matcher(textWithoutAnsi);
+
+            if (matcher.find()) {
+               String filename = matcher.group(1).trim();
+               String lineNum = matcher.group(2);
+               String errorMsg = matcher.group(3).trim();
+
+               // Find the file that matches this error
+               File matchingFile = null;
+               synchronized (decompiler.hash_TabComponent2File) {
+                  for (File file : decompiler.hash_TabComponent2File.values()) {
+                     if (file != null && (file.getName().equals(filename) || file.getName().startsWith(filename.replace(".nss", "")))) {
+                        matchingFile = file;
+                        break;
+                     }
+                  }
+               }
+
+               if (matchingFile != null) {
+                  // Collect this error
+                  synchronized (decompiler.compilationErrors) {
+                     java.util.List<String> errors = decompiler.compilationErrors.get(matchingFile);
+                     if (errors == null) {
+                        errors = new java.util.ArrayList<>();
+                        decompiler.compilationErrors.put(matchingFile, errors);
+                     }
+
+                     // Add error if not already present
+                     String fullError = filename + "(" + lineNum + "): Error: " + errorMsg;
+                     if (!errors.contains(fullError)) {
+                        errors.add(fullError);
+
+                        // Update error display
+                        SwingUtilities.invokeLater(() -> {
+                           decompiler.showCompilationErrorsForFile(matchingFile);
+                        });
+                     }
+                  }
+               }
+            } else {
+               // Check for general error patterns (like "Compilation aborted with errors")
+               if (upper.contains("COMPILATION ABORTED") || upper.contains("COMPILATION FAILED")) {
+                  // Try to find the file from context
+                  // Look for "Compiling: filename" patterns in recent log lines
+                  synchronized (decompiler.allLogLines) {
+                     String lastCompilingFile = null;
+                     for (int i = decompiler.allLogLines.size() - 1; i >= 0 && i >= decompiler.allLogLines.size() - 10; i--) {
+                        LogLine logLine = decompiler.allLogLines.get(i);
+                        String lineText = logLine.text.replaceAll("\u001B\\[[0-9;]+m", "");
+                        if (lineText.contains("Compiling:") || lineText.contains("compiling:")) {
+                           java.util.regex.Pattern compilePattern = java.util.regex.Pattern.compile("Compiling:\\s*(.+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+                           java.util.regex.Matcher compileMatcher = compilePattern.matcher(lineText);
+                           if (compileMatcher.find()) {
+                              lastCompilingFile = compileMatcher.group(1).trim();
+                              break;
+                           }
+                        }
+                     }
+
+                     if (lastCompilingFile != null) {
+                        // Find matching file
+                        File matchingFile = null;
+                        synchronized (decompiler.hash_TabComponent2File) {
+                           for (File file : decompiler.hash_TabComponent2File.values()) {
+                              if (file != null && file.getName().equals(lastCompilingFile) ||
+                                  file.getName().startsWith(lastCompilingFile.replace(".nss", ""))) {
+                                 matchingFile = file;
+                                 break;
+                              }
+                           }
+                        }
+
+                        if (matchingFile != null) {
+                           // Collect all error lines for this file
+                           java.util.List<String> errorLines = new java.util.ArrayList<>();
+                           for (int i = decompiler.allLogLines.size() - 1; i >= 0 && i >= decompiler.allLogLines.size() - 20; i--) {
+                              LogLine logLine = decompiler.allLogLines.get(i);
+                              String lineText = logLine.text.replaceAll("\u001B\\[[0-9;]+m", "");
+                              if (lineText.contains("Error:") && (lineText.contains(lastCompilingFile) || lineText.contains(matchingFile.getName()))) {
+                                 errorLines.add(0, lineText.trim());
+                              }
+                           }
+
+                           if (!errorLines.isEmpty()) {
+                              synchronized (decompiler.compilationErrors) {
+                                 decompiler.compilationErrors.put(matchingFile, errorLines);
+                                 SwingUtilities.invokeLater(() -> {
+                                    decompiler.showCompilationErrorsForFile(matchingFile);
+                                 });
+                              }
+                           }
+                        }
+                     }
+                  }
+               }
             }
          }
       }
@@ -1268,7 +1391,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
     *
     * @return The tab component, or null if no valid tab is selected
     */
-   private JComponent getSelectedTabComponent() {
+   JComponent getSelectedTabComponent() {
       int selectedIndex = this.jTB.getSelectedIndex();
       if (selectedIndex < 0 || selectedIndex >= this.jTB.getTabCount()) {
          return null;
@@ -1903,7 +2026,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
 
       origByteCodeArea.setComponentPopupMenu(bytecodePopupMenu);
 
-      // ---- Right: Recompiled Bytecode Panel ----
+      // ---- Right: Recompiled Bytecode Panel or Error Display ----
       JTextPane newByteCodeArea = new JTextPane();
       newByteCodeArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
       newByteCodeArea.setEditable(false);
@@ -1915,6 +2038,23 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       JScrollPane newScrollPane = new JScrollPane(newByteCodeArea);
       newScrollPane.setBorder(new TitledBorder("Recompiled Byte Code"));
       newScrollPane.getVerticalScrollBar().addAdjustmentListener(this);
+
+      // Create error display panel (initially hidden, shown when errors occur)
+      JTextPane errorDisplayArea = new JTextPane();
+      errorDisplayArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+      errorDisplayArea.setEditable(false);
+      errorDisplayArea.setBackground(new java.awt.Color(255, 240, 240)); // Light red background
+      errorDisplayArea.setForeground(new java.awt.Color(200, 0, 0)); // Dark red text
+
+      JScrollPane errorScrollPane = new JScrollPane(errorDisplayArea);
+      errorScrollPane.setBorder(new TitledBorder("Compilation Errors"));
+      errorScrollPane.setVisible(false); // Hidden by default
+
+      // Store references for later use
+      newByteCodeArea.putClientProperty("errorDisplay", errorScrollPane);
+      newByteCodeArea.putClientProperty("errorTextPane", errorDisplayArea);
+      newByteCodeArea.putClientProperty("bytecodeDisplay", newScrollPane);
+      newByteCodeArea.putClientProperty("bytecodeSplitPane", byteCodeSplitPane);
 
       byteCodeSplitPane.setRightComponent(newScrollPane);
 
@@ -3556,6 +3696,203 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
             } catch (javax.swing.text.BadLocationException e2) {
                // Ignore
             }
+         }
+      }
+   }
+
+   /**
+    * Collects compilation errors for a file and displays them prominently.
+    * @param file The file that has errors
+    * @param errorMessages List of error messages
+    */
+   public void collectCompilationErrors(File file, java.util.List<String> errorMessages) {
+      if (file == null || errorMessages == null || errorMessages.isEmpty()) {
+         return;
+      }
+
+      synchronized (this.compilationErrors) {
+         this.compilationErrors.put(file, new java.util.ArrayList<>(errorMessages));
+      }
+
+      // Update the error display for the current tab if it matches this file
+      SwingUtilities.invokeLater(() -> {
+         JComponent tabComponent = this.getSelectedTabComponent();
+         if (tabComponent != null) {
+            File tabFile = this.hash_TabComponent2File.get(tabComponent);
+            if (file.equals(tabFile)) {
+               this.showCompilationErrors(tabComponent, errorMessages);
+            }
+         }
+      });
+   }
+
+   /**
+    * Shows compilation errors for a file by finding its tab and displaying errors.
+    * @param file The file to show errors for
+    */
+   private void showCompilationErrorsForFile(File file) {
+      if (file == null) {
+         return;
+      }
+
+      java.util.List<String> errors;
+      synchronized (this.compilationErrors) {
+         errors = this.compilationErrors.get(file);
+      }
+
+      if (errors == null || errors.isEmpty()) {
+         return;
+      }
+
+      // Find the tab component for this file
+      JComponent tabComponent = null;
+      synchronized (this.hash_TabComponent2File) {
+         for (java.util.Map.Entry<JComponent, File> entry : this.hash_TabComponent2File.entrySet()) {
+            if (file.equals(entry.getValue())) {
+               tabComponent = entry.getKey();
+               break;
+            }
+         }
+      }
+
+      if (tabComponent != null) {
+         this.showCompilationErrors(tabComponent, errors);
+      }
+   }
+
+   /**
+    * Shows compilation errors in the right panel of the bytecode view.
+    * @param tabComponent The tab component to show errors for
+    * @param errorMessages List of error messages to display
+    */
+   private void showCompilationErrors(JComponent tabComponent, java.util.List<String> errorMessages) {
+      if (tabComponent == null || errorMessages == null || errorMessages.isEmpty()) {
+         return;
+      }
+
+      // Get the bytecode split pane
+      Object clientProperty = this.jTB.getClientProperty(tabComponent);
+      if (!(clientProperty instanceof JComponent[])) {
+         return;
+      }
+
+      JComponent[] panels = (JComponent[]) clientProperty;
+      if (panels.length < 2 || !(panels[1] instanceof JSplitPane)) {
+         return;
+      }
+
+      JSplitPane byteCodeSplitPane = (JSplitPane) panels[1];
+      java.awt.Component rightComponent = byteCodeSplitPane.getRightComponent();
+
+      // Check if we already have an error display
+      JScrollPane errorScrollPane = null;
+      JTextPane errorTextPane = null;
+
+      if (rightComponent instanceof JScrollPane) {
+         JScrollPane scrollPane = (JScrollPane) rightComponent;
+         TitledBorder border = (TitledBorder) scrollPane.getBorder();
+         if (border != null && "Compilation Errors".equals(border.getTitle())) {
+            errorScrollPane = scrollPane;
+            errorTextPane = (JTextPane) ((JViewport) scrollPane.getViewport().getView()).getView();
+         }
+      }
+
+      // Create error display if it doesn't exist
+      if (errorScrollPane == null) {
+         errorTextPane = new JTextPane();
+         errorTextPane.setFont(new Font("Monospaced", Font.PLAIN, 12));
+         errorTextPane.setEditable(false);
+         errorTextPane.setBackground(new java.awt.Color(255, 240, 240)); // Light red background
+         errorTextPane.setForeground(new java.awt.Color(200, 0, 0)); // Dark red text
+
+         errorScrollPane = new JScrollPane(errorTextPane);
+         errorScrollPane.setBorder(new TitledBorder("Compilation Errors"));
+      }
+
+      // Build error message text
+      StringBuilder errorText = new StringBuilder();
+      errorText.append("═══════════════════════════════════════════════════════════════════════════════\n");
+      errorText.append(" ══════════════════════════════════ ERRORS ═══════════════════════════════════\n");
+      errorText.append("═══════════════════════════════════════════════════════════════════════════════\n\n");
+
+      for (String error : errorMessages) {
+         errorText.append(error).append("\n");
+      }
+
+      errorText.append("\n═══════════════════════════════════════════════════════════════════════════════\n");
+
+      // Set error text
+      errorTextPane.setText(errorText.toString());
+      errorTextPane.setCaretPosition(0);
+
+      // Show error panel
+      byteCodeSplitPane.setRightComponent(errorScrollPane);
+      byteCodeSplitPane.setDividerLocation(0.5); // Split evenly
+   }
+
+   /**
+    * Clears compilation errors for a file and restores the bytecode view.
+    * @param file The file to clear errors for
+    */
+   public void clearCompilationErrors(File file) {
+      if (file == null) {
+         return;
+      }
+
+      synchronized (this.compilationErrors) {
+         this.compilationErrors.remove(file);
+      }
+
+      // Restore bytecode view if this is the current tab
+      SwingUtilities.invokeLater(() -> {
+         JComponent tabComponent = this.getSelectedTabComponent();
+         if (tabComponent != null) {
+            File tabFile = this.hash_TabComponent2File.get(tabComponent);
+            if (file.equals(tabFile)) {
+               this.restoreBytecodeView(tabComponent);
+            }
+         }
+      });
+   }
+
+   /**
+    * Restores the bytecode view (hides error display).
+    * @param tabComponent The tab component to restore view for
+    */
+   private void restoreBytecodeView(JComponent tabComponent) {
+      if (tabComponent == null) {
+         return;
+      }
+
+      // Get the bytecode split pane
+      Object clientProperty = this.jTB.getClientProperty(tabComponent);
+      if (!(clientProperty instanceof JComponent[])) {
+         return;
+      }
+
+      JComponent[] panels = (JComponent[]) clientProperty;
+      if (panels.length < 2 || !(panels[1] instanceof JSplitPane)) {
+         return;
+      }
+
+      JSplitPane byteCodeSplitPane = (JSplitPane) panels[1];
+      java.awt.Component rightComponent = byteCodeSplitPane.getRightComponent();
+
+      // Check if we're showing errors
+      if (rightComponent instanceof JScrollPane) {
+         JScrollPane scrollPane = (JScrollPane) rightComponent;
+         TitledBorder border = (TitledBorder) scrollPane.getBorder();
+         if (border != null && "Compilation Errors".equals(border.getTitle())) {
+            // Restore bytecode view - we need to recreate it
+            JTextPane newByteCodeArea = new JTextPane();
+            newByteCodeArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
+            newByteCodeArea.setEditable(false);
+            newByteCodeArea.setText("// Recompiled bytecode not available.\n// Save the file to trigger round-trip validation and bytecode capture.");
+
+            JScrollPane newScrollPane = new JScrollPane(newByteCodeArea);
+            newScrollPane.setBorder(new TitledBorder("Recompiled Byte Code"));
+
+            byteCodeSplitPane.setRightComponent(newScrollPane);
          }
       }
    }
