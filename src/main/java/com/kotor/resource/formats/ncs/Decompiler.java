@@ -524,27 +524,39 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
 
       /**
        * Parses log severity from log line.
+       * Strips ANSI codes first to properly detect severity levels.
        */
       private static LogSeverity parseLogSeverity(String text) {
          if (text == null) {
             return LogSeverity.INFO;
          }
-         String upper = text.toUpperCase();
-         if (upper.contains("[TRACE]") || upper.contains("TRACE:")) {
+         
+         // Strip ANSI escape codes before parsing (they interfere with pattern matching)
+         String textWithoutAnsi = text.replaceAll("\u001B\\[[0-9;]+m", "");
+         String upper = textWithoutAnsi.toUpperCase();
+         
+         // Check for TRACE (must come before DEBUG check)
+         if (upper.contains("TRACE") && (upper.contains("[TRACE]") || upper.matches(".*\\bTRACE\\b.*"))) {
             return LogSeverity.TRACE;
-         } else if (upper.contains("DEBUG ") && !upper.contains("DEBUG transform") && !upper.contains("DEBUG check")
-               && !upper.contains("DEBUG remove") && !upper.contains("DEBUG isAt") && !upper.contains("DEBUG isReturn")) {
-            // Only treat as DEBUG if it's NOT a decompiler control flow log
-            // Control flow logs (transformJump, checkEnd, etc.) stay as DEBUG
-            if (upper.contains("DEBUG Compiler") || upper.contains("DEBUG FileDecompiler")
-                  || upper.contains("DEBUG external") || upper.contains("DEBUG Registry")
-                  || upper.contains("DEBUG CompilerExecution") || upper.contains("DEBUG loadNssFile")
-                  || upper.contains("DEBUG decompile:") || upper.contains("DEBUG capture")) {
+         } else if (upper.contains("DEBUG") && (upper.contains("[DEBUG]") || upper.matches(".*\\bDEBUG\\b.*"))) {
+            // Check for specific DEBUG patterns that should be treated as INFO
+            if (upper.contains("DEBUG COMPILER") || upper.contains("DEBUG FILEDECOMPILER")
+                  || upper.contains("DEBUG EXTERNAL") || upper.contains("DEBUG REGISTRY")
+                  || upper.contains("DEBUG COMPILEREXECUTION") || upper.contains("DEBUG LOADNSSFILE")
+                  || upper.contains("DEBUG DECOMPILE:") || upper.contains("DEBUG CAPTURE")) {
                // These should have been changed to INFO, but handle legacy
                return LogSeverity.INFO;
             }
+            // Check if it's a control flow DEBUG (transformJump, checkEnd, etc.) - these are TRACE level
+            if (upper.contains("DEBUG TRANSFORM") || upper.contains("DEBUG CHECK") 
+                  || upper.contains("DEBUG REMOVE") || upper.contains("DEBUG ISAT")
+                  || upper.contains("DEBUG ISRETURN") || upper.contains("DEBUG TRANSFORMJZ")
+                  || upper.contains("DEBUG TRANSFORMCOPY") || upper.contains("DEBUG TRANSFORMMOVE")
+                  || upper.contains("DEBUG TRANSFORMBINARY") || upper.contains("DEBUG REMOVELASTEXP")) {
+               return LogSeverity.TRACE;
+            }
             return LogSeverity.DEBUG;
-         } else if (upper.contains("[INFO]") || upper.contains("INFO:") || upper.contains("[NCSDecomp]")) {
+         } else if (upper.contains("[INFO]") || upper.contains("INFO:") || upper.contains("[NCSDECOMP]")) {
             return LogSeverity.INFO;
          } else if (upper.contains("[WARN]") || upper.contains("WARNING:") || upper.contains("WARNING -")) {
             return LogSeverity.WARNING;
