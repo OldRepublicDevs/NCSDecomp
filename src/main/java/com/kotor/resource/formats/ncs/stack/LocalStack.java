@@ -18,7 +18,6 @@ public class LocalStack<T> implements Cloneable {
    }
 
    @Override
-   @SuppressWarnings("unchecked")
    public LocalStack<T> clone() {
       LocalStack<T> newStack = new LocalStack<>();
       newStack.stack = new LinkedList<>(this.stack);

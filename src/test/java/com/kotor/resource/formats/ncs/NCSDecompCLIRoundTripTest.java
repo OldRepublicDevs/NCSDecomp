@@ -117,7 +117,7 @@ public class NCSDecompCLIRoundTripTest {
   }
   private static final Path K1_NWSCRIPT = REPO_ROOT.resolve("src").resolve("main").resolve("resources")
         .resolve("k1_nwscript.nss");
-  private static final Path K1_ASC_NWSCRIPT = REPO_ROOT.resolve("tools").resolve("k1_asc_nwscript.nss");
+  private static final Path K1_ASC_NWSCRIPT = REPO_ROOT.resolve("tools").resolve("k1_asc_donotuse_nwscript.nss");
   private static final Path K2_NWSCRIPT = REPO_ROOT.resolve("src").resolve("main").resolve("resources")
         .resolve("tsl_nwscript.nss");
    private static final Map<String, String> NPC_CONSTANTS_K1 = loadConstantsWithPrefix(K1_NWSCRIPT, "NPC_");
@@ -289,7 +289,7 @@ public class NCSDecompCLIRoundTripTest {
       System.out.println("✓ Found K1 nwscript: " + displayPath(K1_NWSCRIPT));
 
       if (!Files.isRegularFile(K1_ASC_NWSCRIPT)) {
-         throw new IOException("k1_asc_nwscript.nss missing at: " + displayPath(K1_ASC_NWSCRIPT));
+         throw new IOException("k1_asc_donotuse_nwscript.nss missing at: " + displayPath(K1_ASC_NWSCRIPT));
       }
       System.out.println("✓ Found K1 ASC nwscript: " + displayPath(K1_ASC_NWSCRIPT));
 
@@ -1562,7 +1562,7 @@ public class NCSDecompCLIRoundTripTest {
          throws Exception {
       // Determine which nwscript.nss to use based on game
       // K1 files (from test-work\Vanilla_KOTOR_Script_Source\K1) use k1_nwscript.nss
-      // K1 files with ActionStartConversation(11 params) use k1_asc_nwscript.nss
+      // K1 files with ActionStartConversation(11 params) use k1_asc_donotuse_nwscript.nss
       // TSL files (from test-work\Vanilla_KOTOR_Script_Source\TSL) use
       // tsl_nwscript.nss
       Path nwscriptSource;

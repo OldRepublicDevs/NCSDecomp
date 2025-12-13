@@ -34,13 +34,12 @@ public class TreeModelFactory extends JTree {
     * Builds a {@link TreeModel} from the provided root object.
     * This method is deprecated because it accepts Object, which is not type-safe.
     * Use the typed {@link #createTreeModel(Hashtable<String, Vector<Variable>>)} createTreeModel method instead when possible.
-    * 
+    *
     * @param object the root object (should be a Hashtable or compatible type)
     * @return a TreeModel instance
     * @deprecated Use createTreeModel(Hashtable) instead when possible.
     */
    @Deprecated
-   @SuppressWarnings("unused")
    public static TreeModel createTreeModel(Object object) {
       if (object == null) {
          throw new IllegalArgumentException("Object cannot be null");

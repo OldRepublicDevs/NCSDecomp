@@ -266,10 +266,10 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
             "<html><div style='text-align:center;'><h2>Drop .ncs or .nss files here</h2><div>Or use File → Open to start decompiling</div></div></html>",
             SwingConstants.CENTER);
       this.emptyStateLabel.setBorder(new EmptyBorder(32, 16, 32, 16));
-      
+
       // Create support card
       JPanel supportCard = createSupportCard();
-      
+
       // Create empty panel with drag text and support card side by side
       JPanel emptyPanel = new JPanel(new BorderLayout());
       JPanel contentPanel = new JPanel(new BorderLayout(32, 0));
@@ -688,28 +688,6 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          }
          return DEFAULT_LOG_LEVEL_INDEX;
       }
-
-      /**
-       * Gets color for log severity (industry standard colors, light theme).
-       * Note: This is only used as fallback when ANSI codes aren't present.
-       */
-      private static java.awt.Color getColorForSeverity(LogSeverity severity) {
-         switch (severity) {
-            case TRACE:
-               return new java.awt.Color(0, 150, 200); // Cyan (matches ANSI)
-            case DEBUG:
-               return new java.awt.Color(0, 150, 0); // Green
-            case INFO:
-               return new java.awt.Color(0, 0, 0); // Black
-            case WARNING:
-               return new java.awt.Color(200, 120, 0); // Orange
-            case ERROR:
-               return new java.awt.Color(200, 0, 0); // Red
-            default:
-               return java.awt.Color.BLACK;
-         }
-      }
-
 
       /**
        * Custom OutputStream that writes to both the original PrintStream and the GUI
@@ -3813,21 +3791,21 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
             BorderFactory.createEmptyBorder(24, 24, 24, 24)));
       card.setBackground(java.awt.Color.WHITE);
       card.setPreferredSize(new Dimension(320, 200));
-      
+
       // Title with heart icon
       JLabel titleLabel = new JLabel("<html><div style='text-align:center;'>" +
             "<span style='color:#0066CC; font-size:18px; font-weight:bold;'>" +
             "❤ Support Development</span></div></html>");
       titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
       card.add(titleLabel, BorderLayout.NORTH);
-      
+
       // Main message
       JLabel messageLabel = new JLabel("<html><div style='text-align:center; margin-top:12px; margin-bottom:16px;'>" +
             "<span style='color:#333333; font-size:13px;'>" +
             "If you enjoy using NCSDecomp, please consider supporting its development!</span></div></html>");
       messageLabel.setHorizontalAlignment(SwingConstants.CENTER);
       card.add(messageLabel, BorderLayout.CENTER);
-      
+
       // Sponsor button
       JButton sponsorButton = new JButton("<html><div style='text-align:center;'>" +
             "<span style='color:#FFFFFF; font-size:13px;'>❤ Sponsor on GitHub</span></div></html>");
@@ -3839,24 +3817,24 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       sponsorButton.setFocusPainted(false);
       sponsorButton.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
       sponsorButton.addActionListener(e -> this.openLink(SPONSOR_URL, "Opening sponsor page"));
-      
+
       JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
       buttonPanel.setOpaque(false);
       buttonPanel.add(sponsorButton);
-      
+
       // Footer text
       JLabel footerLabel = new JLabel("<html><div style='text-align:center; margin-top:16px;'>" +
             "<span style='color:#666666; font-size:11px;'>" +
             "Your support helps maintain and improve this tool</span></div></html>");
       footerLabel.setHorizontalAlignment(SwingConstants.CENTER);
-      
+
       // Create a container for button and footer
       JPanel bottomPanel = new JPanel(new BorderLayout());
       bottomPanel.setOpaque(false);
       bottomPanel.add(buttonPanel, BorderLayout.CENTER);
       bottomPanel.add(footerLabel, BorderLayout.SOUTH);
       card.add(bottomPanel, BorderLayout.SOUTH);
-      
+
       return card;
    }
 

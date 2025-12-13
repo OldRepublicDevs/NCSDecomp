@@ -162,7 +162,7 @@ if (Test-Path $profileFile) {
             # Match compilation lines: <timestamp> <compile_id> <level> [flags] <size> <method>
             if ($line -match '^\s*(\d+)\s+(\d+)\s+(\d+)\s+([!%s]*)\s+(\d+)\s+(.+)') {
                 $totalCompilations++
-                $compileId = $matches[2]
+                # $compileId = $matches[2]
                 $level = [int]$matches[3]
                 $flags = $matches[4]
                 $size = [int]$matches[5]

@@ -35,21 +35,20 @@ import java.util.regex.Matcher;
 public class CompilerExecutionWrapper {
    private final File compilerFile;
    private final File sourceFile;
-   @SuppressWarnings("unused")
    private final File outputFile; // Used by NwnnsscompConfig internally
    private final boolean isK2;
    private final KnownExternalCompilers compiler;
    private final NwnnsscompConfig config;
    /** Process-level environment overrides applied during compiler invocation. */
    private final java.util.Map<String, String> envOverrides = new java.util.HashMap<>();
-   
+
    // Files/directories that need cleanup
    private final List<File> copiedIncludeFiles = new ArrayList<>();
    private final List<File> copiedNwscriptFiles = new ArrayList<>();
    private File originalNwscriptBackup = null;
    private File copiedSourceFile = null; // When using registry spoofing, source is copied to spoofed directory
    private File actualSourceFile = null; // The actual source file to use (original or copied)
-   
+
    /**
     * Creates a new compiler execution wrapper.
     *
@@ -68,7 +67,7 @@ public class CompilerExecutionWrapper {
       this.compiler = config.getChosenCompiler();
       buildEnvironmentOverrides();
    }
-   
+
    /**
     * Prepares the execution environment by handling all compiler-specific quirks.
     * This must be called before execute().
@@ -79,7 +78,7 @@ public class CompilerExecutionWrapper {
    public void prepareExecutionEnvironment(List<File> includeDirs) throws IOException {
       // Pattern 2: nwscript.nss abstraction (must be done first for registry spoofing logic)
       prepareNwscriptFile();
-      
+
       // If registry spoofing is needed, copy everything to the spoofed directory
       if (needsRegistrySpoofing()) {
          prepareRegistrySpoofedEnvironment(includeDirs);
@@ -88,17 +87,17 @@ public class CompilerExecutionWrapper {
          prepareIncludeFiles(includeDirs);
          actualSourceFile = sourceFile;
       }
-      
+
       // Additional patterns handled automatically during execution
    }
-   
+
    /**
     * Checks if registry spoofing will be used for this compiler.
     */
    private boolean needsRegistrySpoofing() {
       return compiler == KnownExternalCompilers.KOTOR_TOOL || compiler == KnownExternalCompilers.KOTOR_SCRIPTING_TOOL;
    }
-   
+
    /**
     * Prepares environment for registry spoofing by copying source file, includes, and nwscript.nss
     * to the registry-spoofed directory (tools/).
@@ -108,16 +107,16 @@ public class CompilerExecutionWrapper {
       if (toolsDir == null || !toolsDir.exists()) {
          throw new IOException("Compiler directory does not exist: " + (toolsDir != null ? toolsDir.getAbsolutePath() : "null"));
       }
-      
+
       System.out.println("[INFO] CompilerExecutionWrapper: Preparing registry-spoofed environment in: " + toolsDir.getAbsolutePath());
-      
+
       // Copy source file to tools directory
       copiedSourceFile = new File(toolsDir, sourceFile.getName());
       System.out.println("[INFO] CompilerExecutionWrapper: COPYING source file: " + sourceFile.getAbsolutePath() + " -> " + copiedSourceFile.getAbsolutePath());
       Files.copy(sourceFile.toPath(), copiedSourceFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
       actualSourceFile = copiedSourceFile;
       System.out.println("[INFO] CompilerExecutionWrapper: Copied source file to spoofed directory: " + copiedSourceFile.getAbsolutePath());
-      
+
       // Copy include files to tools directory
       if (includeDirs != null && !includeDirs.isEmpty()) {
          Set<String> neededIncludes = extractIncludeFiles(sourceFile);
@@ -128,7 +127,7 @@ public class CompilerExecutionWrapper {
                System.out.println("[INFO] CompilerExecutionWrapper: Include file already exists in spoofed directory: " + includeName);
                continue;
             }
-            
+
             // Search for include file in include directories
             for (File includeDir : includeDirs) {
                if (includeDir != null && includeDir.exists()) {
@@ -144,11 +143,11 @@ public class CompilerExecutionWrapper {
             }
          }
       }
-      
+
       // nwscript.nss should already be in tools directory from prepareNwscriptFile()
       System.out.println("[INFO] CompilerExecutionWrapper: Registry-spoofed environment ready. Source: " + actualSourceFile.getAbsolutePath());
    }
-   
+
    /**
     * Pattern 1: Include file abstraction.
     * For compilers that don't support -i flag, copy include files to source directory.
@@ -157,21 +156,21 @@ public class CompilerExecutionWrapper {
       if (includeDirs == null || includeDirs.isEmpty()) {
          return;
       }
-      
+
       // Check if compiler supports -i flag
-      boolean supportsIncludeFlag = (compiler != KnownExternalCompilers.KOTOR_TOOL 
+      boolean supportsIncludeFlag = (compiler != KnownExternalCompilers.KOTOR_TOOL
             && compiler != KnownExternalCompilers.KOTOR_SCRIPTING_TOOL);
-      
+
       if (!supportsIncludeFlag) {
          // Compiler doesn't support -i, copy include files to source directory
          File sourceDir = sourceFile.getParentFile();
          if (sourceDir == null) {
             return;
          }
-         
+
          // Parse source file to find which includes are needed
          Set<String> neededIncludes = extractIncludeFiles(sourceFile);
-         
+
          // Copy needed include files from include directories to source directory
          for (String includeName : neededIncludes) {
             File destFile = new File(sourceDir, includeName);
@@ -179,7 +178,7 @@ public class CompilerExecutionWrapper {
             if (destFile.exists()) {
                continue;
             }
-            
+
             // Search for include file in include directories
             for (File includeDir : includeDirs) {
                if (includeDir != null && includeDir.exists()) {
@@ -196,7 +195,7 @@ public class CompilerExecutionWrapper {
          }
       }
    }
-   
+
    /**
     * Pattern 2: nwscript.nss abstraction.
     * For compilers that don't handle -g properly or need nwscript.nss in specific location,
@@ -207,16 +206,16 @@ public class CompilerExecutionWrapper {
       if (compilerDir == null) {
          return;
       }
-      
+
       File compilerNwscript = new File(compilerDir, "nwscript.nss");
-      
+
       // Determine which nwscript.nss to use
       File nwscriptSource = determineNwscriptSource();
       if (nwscriptSource == null || !nwscriptSource.exists()) {
          System.out.println("[INFO] CompilerExecutionWrapper: Warning: nwscript.nss source not found");
          return;
       }
-      
+
       // Check if we need to update the compiler's nwscript.nss
       boolean needsUpdate = true;
       if (compilerNwscript.exists()) {
@@ -230,7 +229,7 @@ public class CompilerExecutionWrapper {
             needsUpdate = true;
          }
       }
-      
+
       if (needsUpdate) {
          // Backup original if it exists and is different
          if (compilerNwscript.exists()) {
@@ -244,7 +243,7 @@ public class CompilerExecutionWrapper {
             originalNwscriptBackup = backup;
             System.out.println("[INFO] CompilerExecutionWrapper: Created backup of original nwscript.nss: " + backup.getAbsolutePath());
          }
-         
+
          // Copy the appropriate nwscript.nss
          System.out.println("[INFO] CompilerExecutionWrapper: COPYING nwscript.nss (RENAME): " + nwscriptSource.getAbsolutePath() + " -> " + compilerNwscript.getAbsolutePath());
          System.out.println("[INFO] CompilerExecutionWrapper: Source file: " + nwscriptSource.getName() + " (K2=" + isK2 + ")");
@@ -253,13 +252,13 @@ public class CompilerExecutionWrapper {
          System.out.println("[INFO] CompilerExecutionWrapper: Copied nwscript.nss: " + nwscriptSource.getName() + " -> " + compilerNwscript.getAbsolutePath());
       }
    }
-   
+
    /**
     * Determines which nwscript.nss file to use based on game version and script requirements.
     */
    private File determineNwscriptSource() {
       File toolsDir = new File(System.getProperty("user.dir"), "tools");
-      
+
       if (isK2) {
          // For K2, use tsl_nwscript.nss
          return new File(toolsDir, "tsl_nwscript.nss");
@@ -267,8 +266,8 @@ public class CompilerExecutionWrapper {
          // For K1, check if script needs ASC nwscript (ActionStartConversation with 11 params)
          boolean needsAsc = checkNeedsAscNwscript(sourceFile);
          if (needsAsc) {
-            // Try k1_asc_nwscript.nss first, then k1_asc_donotuse_nwscript.nss
-            File ascNwscript = new File(toolsDir, "k1_asc_nwscript.nss");
+            // Try k1_asc_donotuse_nwscript.nss first, then k1_asc_donotuse_nwscript.nss
+            File ascNwscript = new File(toolsDir, "k1_asc_donotuse_nwscript.nss");
             if (!ascNwscript.exists()) {
                ascNwscript = new File(toolsDir, "k1_asc_donotuse_nwscript.nss");
             }
@@ -280,7 +279,7 @@ public class CompilerExecutionWrapper {
          return new File(toolsDir, "k1_nwscript.nss");
       }
    }
-   
+
    /**
     * Checks if a script needs ASC nwscript (for ActionStartConversation with 11 parameters).
     */
@@ -297,7 +296,7 @@ public class CompilerExecutionWrapper {
          return false;
       }
    }
-   
+
    /**
     * Extracts include file names from a source file.
     */
@@ -320,7 +319,7 @@ public class CompilerExecutionWrapper {
       }
       return includes;
    }
-   
+
    /**
     * Gets the working directory for the compiler process.
     * Pattern 3: Working directory normalization.
@@ -352,7 +351,7 @@ public class CompilerExecutionWrapper {
       // Final fallback to current directory
       return new File(System.getProperty("user.dir"));
    }
-   
+
    /**
     * Gets the formatted compile command arguments.
     * Pattern 4: Output path normalization is handled by NwnnsscompConfig.
@@ -373,7 +372,7 @@ public class CompilerExecutionWrapper {
       }
       return config.getCompileArgs(compilerFile.getAbsolutePath(), includeDirs);
    }
-   
+
    /**
     * Cleans up all temporary files created during preparation.
     * Pattern 5: Temporary file management.
@@ -390,7 +389,7 @@ public class CompilerExecutionWrapper {
          }
          copiedSourceFile = null;
       }
-      
+
       // Clean up copied include files
       for (File copiedFile : copiedIncludeFiles) {
          try {
@@ -404,7 +403,7 @@ public class CompilerExecutionWrapper {
          }
       }
       copiedIncludeFiles.clear();
-      
+
       // Restore original nwscript.nss if we backed it up
       if (originalNwscriptBackup != null && originalNwscriptBackup.exists()) {
          try {
@@ -423,11 +422,11 @@ public class CompilerExecutionWrapper {
             System.out.println("[INFO] CompilerExecutionWrapper: Failed to restore original nwscript.nss: " + e.getMessage());
          }
       }
-      
+
       // Note: We don't delete the copied nwscript.nss files because they might be needed
       // for subsequent compilations. They'll be overwritten on next use.
    }
-   
+
    /**
     * Gets the detected compiler.
     */

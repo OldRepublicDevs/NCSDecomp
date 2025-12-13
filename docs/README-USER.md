@@ -40,6 +40,7 @@ java -jar NCSDecompCLI.jar [options]
 ### Opening Terminal/Command Prompt
 
 **Windows:**
+
 1. Press `Windows Key + R`
 2. Type `cmd` and press Enter
 3. Navigate to the folder where NCSDecomp is located:
@@ -49,6 +50,7 @@ java -jar NCSDecompCLI.jar [options]
    ```
 
 **macOS/Linux:**
+
 1. Open Terminal
 2. Navigate to the folder where NCSDecomp is located:
 
@@ -63,6 +65,7 @@ java -jar NCSDecompCLI.jar [options]
 #### Decompile a Single File (KotOR 2 / TSL)
 
 **Windows:**
+
 ```powershell
 # From within NCSDecompCLI folder:
 .\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k2
@@ -72,6 +75,7 @@ java -jar NCSDecompCLI.jar [options]
 ```
 
 **macOS/Linux:**
+
 ```bash
 # From within NCSDecompCLI folder:
 ./NCSDecompCLI -i "script.ncs" -o "script.nss" --k2
@@ -89,11 +93,13 @@ This will:
 #### Decompile a Single File (KotOR 1)
 
 **Windows:**
+
 ```powershell
 .\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k1
 ```
 
 **macOS/Linux:**
+
 ```bash
 ./NCSDecompCLI -i "script.ncs" -o "script.nss" --k1
 ```
@@ -101,11 +107,13 @@ This will:
 #### Decompile an Entire Folder
 
 **Windows:**
+
 ```powershell
 .\NCSDecompCLI.exe -i "scripts_folder" -r --k2 -O "output_folder"
 ```
 
 **macOS/Linux:**
+
 ```bash
 ./NCSDecompCLI -i "scripts_folder" -r --k2 -O "output_folder"
 ```
@@ -120,11 +128,13 @@ This will:
 #### View Decompiled Code in Console
 
 **Windows:**
+
 ```powershell
 .\NCSDecompCLI.exe -i "script.ncs" --stdout --k2
 ```
 
 **macOS/Linux:**
+
 ```bash
 ./NCSDecompCLI -i "script.ncs" --stdout --k2
 ```
@@ -202,11 +212,13 @@ This script changes to the NCSDecompCLI directory first, then runs the executabl
 ### Example 2: Process Multiple Files
 
 **Windows:**
+
 ```powershell
 .\NCSDecompCLI.exe -i file1.ncs -i file2.ncs -i file3.ncs --k2 -O output
 ```
 
 **macOS/Linux:**
+
 ```bash
 ./NCSDecompCLI -i file1.ncs -i file2.ncs -i file3.ncs --k2 -O output
 ```
@@ -214,11 +226,13 @@ This script changes to the NCSDecompCLI directory first, then runs the executabl
 ### Example 3: Add Custom Suffix
 
 **Windows:**
+
 ```powershell
 .\NCSDecompCLI.exe -i script.ncs --suffix "_decompiled" --k2
 ```
 
 **macOS/Linux:**
+
 ```bash
 ./NCSDecompCLI -i script.ncs --suffix "_decompiled" --k2
 ```
@@ -258,10 +272,12 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 ## 📚 Getting Help
 
 **Windows:**
+
 - Run `.\NCSDecompCLI.exe --help` for a full list of CLI options (from within the NCSDecompCLI folder)
 - Run `.\NCSDecompCLI.exe --version` for version information
 
 **macOS/Linux:**
+
 - Run `./NCSDecompCLI --help` for a full list of CLI options (from within the NCSDecompCLI folder)
 - Run `./NCSDecompCLI --version` for version information
 

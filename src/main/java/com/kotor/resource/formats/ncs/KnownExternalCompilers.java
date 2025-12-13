@@ -82,7 +82,7 @@ public enum KnownExternalCompilers {
       "",
       "Xoreos Tools",
       LocalDate.of(2016, 1, 1),
-      "Xoreos Team",
+      "DrMcFly",
       new String[]{},
       new String[]{}
    ),
