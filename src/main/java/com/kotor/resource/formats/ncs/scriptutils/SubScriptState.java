@@ -292,21 +292,21 @@ public class SubScriptState {
    private void checkStart(Node node) {
       this.assertState(node);
       int nodePos = this.nodedata.getPos(node);
-      System.err.println("DEBUG checkStart: pos=" + nodePos + ", current=" + this.current.getClass().getSimpleName() +
+      System.out.println("[TRACE] checkStart: pos=" + nodePos + ", current=" + this.current.getClass().getSimpleName() +
             ", hasChildren=" + this.current.hasChildren());
 
       if (this.current.hasChildren()) {
          ScriptNode lastNode = this.current.getLastChild();
-         System.err.println("DEBUG checkStart: lastChild=" + (lastNode != null ? lastNode.getClass().getSimpleName() : "null"));
+         System.out.println("[TRACE] checkStart: lastChild=" + (lastNode != null ? lastNode.getClass().getSimpleName() : "null"));
 
          if (ASwitch.class.isInstance(lastNode)
                && this.nodedata.getPos(node) == ((ASwitch) lastNode).getFirstCaseStart()) {
             int firstCaseStart = ((ASwitch) lastNode).getFirstCaseStart();
-            System.err.println("DEBUG checkStart: entering first switch case (firstCaseStart=" + firstCaseStart + ")");
+            System.out.println("[TRACE] checkStart: entering first switch case (firstCaseStart=" + firstCaseStart + ")");
             this.current = ((ASwitch) lastNode).getFirstCase();
          } else if (ASwitch.class.isInstance(lastNode)) {
             int firstCaseStart = ((ASwitch) lastNode).getFirstCaseStart();
-            System.err.println("DEBUG checkStart: lastChild is ASwitch but nodePos (" + nodePos + ") != firstCaseStart (" + firstCaseStart + ")");
+            System.out.println("[TRACE] checkStart: lastChild is ASwitch but nodePos (" + nodePos + ") != firstCaseStart (" + firstCaseStart + ")");
          }
       }
 
@@ -315,26 +315,26 @@ public class SubScriptState {
 
    private void checkEnd(Node node) {
       int nodePos = this.nodedata.getPos(node);
-      System.err.println("DEBUG checkEnd: START pos=" + nodePos + ", current=" + this.current.getClass().getSimpleName() +
+      System.out.println("[TRACE] checkEnd: START pos=" + nodePos + ", current=" + this.current.getClass().getSimpleName() +
             ", currentEnd=" + this.current.getEnd() + ", state=" + this.state);
 
       while (this.current != null) {
          if (this.nodedata.getPos(node) != this.current.getEnd()) {
-            System.err.println("DEBUG checkEnd: nodePos != currentEnd, returning early");
+            System.out.println("[TRACE] checkEnd: nodePos != currentEnd, returning early");
             return;
          }
 
-         System.err.println("DEBUG checkEnd: nodePos == currentEnd, processing " + this.current.getClass().getSimpleName());
+         System.out.println("[TRACE] checkEnd: nodePos == currentEnd, processing " + this.current.getClass().getSimpleName());
 
          if (ASwitchCase.class.isInstance(this.current)) {
-            System.err.println("DEBUG checkEnd: current is ASwitchCase");
+            System.out.println("[TRACE] checkEnd: current is ASwitchCase");
             ASwitchCase nextCase = ((ASwitch) this.current.parent()).getNextCase((ASwitchCase) this.current);
             if (nextCase != null) {
-               System.err.println("DEBUG checkEnd: moving to next case");
+               System.out.println("[TRACE] checkEnd: moving to next case");
                this.current = nextCase;
             } else {
                ScriptRootNode newCurrent = (ScriptRootNode) this.current.parent().parent();
-               System.err.println("DEBUG checkEnd: no next case, moving to " + (newCurrent != null ? newCurrent.getClass().getSimpleName() : "null"));
+               System.out.println("[TRACE] checkEnd: no next case, moving to " + (newCurrent != null ? newCurrent.getClass().getSimpleName() : "null"));
                this.current = newCurrent;
             }
 
@@ -343,30 +343,30 @@ public class SubScriptState {
          }
 
          if (AIf.class.isInstance(this.current)) {
-            System.err.println("DEBUG checkEnd: current is AIf, checking for else block");
+            System.out.println("[TRACE] checkEnd: current is AIf, checking for else block");
             Node dest = this.nodedata.getDestination(node);
             if (dest == null) {
-               System.err.println("DEBUG checkEnd: dest is null, returning");
+               System.out.println("[TRACE] checkEnd: dest is null, returning");
                return;
             }
 
             // Get the destination position and AIf end position
             int destPos = this.nodedata.getPos(dest);
             int aifEnd = this.current.getEnd();
-            System.err.println("DEBUG checkEnd: AIf end=" + aifEnd + ", destPos=" + destPos + ", expectedElseStart=" + (aifEnd + 6));
+            System.out.println("[TRACE] checkEnd: AIf end=" + aifEnd + ", destPos=" + destPos + ", expectedElseStart=" + (aifEnd + 6));
 
             // If the destination is exactly 6 bytes after the AIf's end, there's no else block
             // Otherwise, there's an else block starting at AIf's end + 6
             if (destPos != aifEnd + 6) {
-               System.err.println("DEBUG checkEnd: destPos != aifEnd+6, creating else block");
+               System.out.println("[TRACE] checkEnd: destPos != aifEnd+6, creating else block");
                // Check if this AIf is inside an AElse (else-if chain)
                // If so, create the next AElse as a sibling of the parent AElse, not nested
                ScriptRootNode parent = (ScriptRootNode) this.current.parent();
-               System.err.println("DEBUG checkEnd: AIf parent=" + (parent != null ? parent.getClass().getSimpleName() : "null"));
+               System.out.println("[TRACE] checkEnd: AIf parent=" + (parent != null ? parent.getClass().getSimpleName() : "null"));
 
                // Safety check: don't create AElse if AIf is at root level (shouldn't happen, but protect against it)
                if (parent == null || ASub.class.isInstance(this.current)) {
-                  System.err.println("DEBUG checkEnd: AIf at root level, not creating else");
+                  System.out.println("[TRACE] checkEnd: AIf at root level, not creating else");
                   dest = null;
                   return;
                }
@@ -377,10 +377,10 @@ public class SubScriptState {
                // If the parent is an AElse and the AIf is the last/only child,
                // the next AElse should be a sibling of the parent AElse, not nested
                if (AElse.class.isInstance(parent)) {
-                  System.err.println("DEBUG checkEnd: AIf is inside AElse, checking else-if chain");
+                  System.out.println("[TRACE] checkEnd: AIf is inside AElse, checking else-if chain");
                   // Check if this AIf is the last child of the AElse
                   boolean isLastChild = parent.hasChildren() && parent.getLastChild() == this.current;
-                  System.err.println("DEBUG checkEnd: isLastChild=" + isLastChild + ", parentEnd=" + parent.getEnd());
+                  System.out.println("[TRACE] checkEnd: isLastChild=" + isLastChild + ", parentEnd=" + parent.getEnd());
 
                   if (isLastChild) {
                      // Check if this is a pure else-if chain (AIf's else ends at parent AElse's end)
@@ -394,33 +394,33 @@ public class SubScriptState {
                      // this is a continuation of the else-if chain at the same level
                      if (destPos >= parentEnd) {
                         ScriptRootNode grandParent = (ScriptRootNode) parent.parent();
-                        System.err.println("DEBUG checkEnd: destPos >= parentEnd, using grandParent=" +
+                        System.out.println("[TRACE] checkEnd: destPos >= parentEnd, using grandParent=" +
                               (grandParent != null ? grandParent.getClass().getSimpleName() : "null"));
                         if (grandParent != null) {
                            elseParent = grandParent;
                         }
                      } else {
-                        System.err.println("DEBUG checkEnd: destPos < parentEnd, keeping nested (elseParent=parent)");
+                        System.out.println("[TRACE] checkEnd: destPos < parentEnd, keeping nested (elseParent=parent)");
                      }
                      // Otherwise, the else block is nested inside the parent AElse (has siblings)
                      // Keep elseParent = parent
                   } else {
-                     System.err.println("DEBUG checkEnd: AIf not last child, keeping nested");
+                     System.out.println("[TRACE] checkEnd: AIf not last child, keeping nested");
                   }
                   // If the AIf is not the last child, keep parent as elseParent (nested else)
                } else {
-                  System.err.println("DEBUG checkEnd: AIf parent is not AElse, using parent as elseParent");
+                  System.out.println("[TRACE] checkEnd: AIf parent is not AElse, using parent as elseParent");
                }
 
                // Safety check: ensure elseParent is not null and is not the AIf itself
                if (elseParent == null || elseParent == this.current) {
-                  System.err.println("DEBUG checkEnd: elseParent invalid, using root");
+                  System.out.println("[TRACE] checkEnd: elseParent invalid, using root");
                   elseParent = this.root;
                }
 
                int elseStart = this.current.getEnd() + 6;
                int elseEnd = this.nodedata.getPos(NodeUtils.getPreviousCommand(dest, this.nodedata));
-               System.err.println("DEBUG checkEnd: creating AElse start=" + elseStart + ", end=" + elseEnd +
+               System.out.println("[TRACE] checkEnd: creating AElse start=" + elseStart + ", end=" + elseEnd +
                      ", elseParent=" + elseParent.getClass().getSimpleName());
 
                AElse aelse = new AElse(elseStart, elseEnd);
@@ -431,21 +431,21 @@ public class SubScriptState {
                dest = null;
                return;
             } else {
-               System.err.println("DEBUG checkEnd: destPos == aifEnd+6, no else block");
+               System.out.println("[TRACE] checkEnd: destPos == aifEnd+6, no else block");
             }
          }
 
          if (ADoLoop.class.isInstance(this.current)) {
-            System.err.println("DEBUG checkEnd: current is ADoLoop, calling transformEndDoLoop");
+            System.out.println("[TRACE] checkEnd: current is ADoLoop, calling transformEndDoLoop");
             this.transformEndDoLoop();
          }
 
          ScriptRootNode newCurrent = (ScriptRootNode) this.current.parent();
-         System.err.println("DEBUG checkEnd: moving up to parent=" + (newCurrent != null ? newCurrent.getClass().getSimpleName() : "null"));
+         System.out.println("[TRACE] checkEnd: moving up to parent=" + (newCurrent != null ? newCurrent.getClass().getSimpleName() : "null"));
          this.current = newCurrent;
       }
 
-      System.err.println("DEBUG checkEnd: END, setting state=-1");
+      System.out.println("[TRACE] checkEnd: END, setting state=-1");
       this.state = -1;
    }
 
@@ -621,14 +621,14 @@ public class SubScriptState {
       } else if (AIf.class.isInstance(this.current) && this.isModifyConditional() && this.state != 4) {
          // Don't modify AIf's end when processing switch cases (state == 4)
          int newEnd = this.nodedata.getPos(this.nodedata.getDestination(node)) - 6;
-         System.err.println("DEBUG transformJZ: modifying AIf end (isModifyConditional) from " +
+         System.out.println("[TRACE] transformJZ: modifying AIf end (isModifyConditional) from " +
                this.current.getEnd() + " to " + newEnd);
          ((AIf) this.current).end(newEnd);
          if (this.current.hasChildren()) {
             this.current.removeLastChild();
          }
       } else if (AIf.class.isInstance(this.current) && this.isModifyConditional() && this.state == 4) {
-         System.err.println("DEBUG transformJZ: NOT modifying AIf end (state==4, processing switch case)");
+         System.out.println("[TRACE] transformJZ: NOT modifying AIf end (state==4, processing switch case)");
       } else if (AWhileLoop.class.isInstance(this.current) && this.isModifyConditional()) {
          ((AWhileLoop) this.current).end(this.nodedata.getPos(this.nodedata.getDestination(node)) - 6);
          if (this.current.hasChildren()) {
@@ -650,17 +650,17 @@ public class SubScriptState {
          if (destNode != null) {
             int expectedEnd = this.nodedata.getPos(destNode) - 6;
             int currentEnd = this.current.getEnd();
-            System.err.println("DEBUG transformJZ: AIf end check - currentEnd=" + currentEnd +
+            System.out.println("[TRACE] transformJZ: AIf end check - currentEnd=" + currentEnd +
                   ", expectedEnd=" + expectedEnd + ", nodePos=" + this.nodedata.getPos(node));
             if (currentEnd != expectedEnd) {
-               System.err.println("DEBUG transformJZ: UPDATING AIf end from " + currentEnd + " to " + expectedEnd);
+               System.out.println("[TRACE] transformJZ: UPDATING AIf end from " + currentEnd + " to " + expectedEnd);
                ((AIf) this.current).end(expectedEnd);
             } else {
-               System.err.println("DEBUG transformJZ: AIf end already correct, not updating");
+               System.out.println("[TRACE] transformJZ: AIf end already correct, not updating");
             }
          }
       } else if (AIf.class.isInstance(this.current) && this.state == 4) {
-         System.err.println("DEBUG transformJZ: AIf end NOT updated (state==4, processing switch case)");
+         System.out.println("[TRACE] transformJZ: AIf end NOT updated (state==4, processing switch case)");
       }
 
       this.checkEnd(node);
@@ -684,40 +684,40 @@ public class SubScriptState {
       int nodePos = this.nodedata.getPos(node);
       int destPos = dest != null ? this.nodedata.getPos(dest) : -1;
 
-      System.err.println("DEBUG transformJump: pos=" + nodePos + " (0x" + Integer.toHexString(nodePos) + "), destPos=" + destPos +
+      System.out.println("[TRACE] transformJump: pos=" + nodePos + " (0x" + Integer.toHexString(nodePos) + "), destPos=" + destPos +
             ", state=" + this.state + ", current=" + this.current.getClass().getSimpleName() +
             ", currentEnd=" + this.current.getEnd() + ", destType=" + (dest != null ? dest.getClass().getSimpleName() : "null"));
 
       if (this.state == 2) {
-         System.err.println("DEBUG transformJump: state==2, creating AActionArgExp");
+         System.out.println("[TRACE] transformJump: state==2, creating AActionArgExp");
          this.state = 0;
          AActionArgExp aarg = new AActionArgExp(this.getNextCommand(node), this.getPriorToDestCommand(node));
          this.current.addChild(aarg);
          this.current = aarg;
       } else {
          boolean atIfEnd = this.isAtIfEnd(node);
-         System.err.println("DEBUG transformJump: isAtIfEnd=" + atIfEnd);
+         System.out.println("[TRACE] transformJump: isAtIfEnd=" + atIfEnd);
 
          if (!atIfEnd) {
             // Only process as return/break/continue if we're NOT at the end of an enclosing AIf
             // (otherwise, this JMP is the "skip else" jump and should be handled by checkEnd)
             if (this.state == 4) {
-               System.err.println("DEBUG transformJump: state==4 (switch), handling switch case/end");
+               System.out.println("[TRACE] transformJump: state==4 (switch), handling switch case/end");
                ASwitch aswitch = (ASwitch) this.current.getLastChild();
                ASwitchCase aprevcase = aswitch.getLastCase();
                if (aprevcase != null) {
                   int prevCaseEnd = this.nodedata.getPos(NodeUtils.getPreviousCommand(dest, this.nodedata));
-                  System.err.println("DEBUG transformJump: setting prevCase end to " + prevCaseEnd);
+                  System.out.println("[TRACE] transformJump: setting prevCase end to " + prevCaseEnd);
                   aprevcase.end(prevCaseEnd);
                }
 
                if (AMoveSpCommand.class.isInstance(dest)) {
                   int switchEnd = this.nodedata.getPos(this.nodedata.getDestination(node));
-                  System.err.println("DEBUG transformJump: dest is MoveSpCommand, setting switch end to " + switchEnd);
+                  System.out.println("[TRACE] transformJump: dest is MoveSpCommand, setting switch end to " + switchEnd);
                   aswitch.end(switchEnd);
                } else {
                   int defaultStart = this.nodedata.getPos(dest);
-                  System.err.println("DEBUG transformJump: creating default case at " + defaultStart);
+                  System.out.println("[TRACE] transformJump: creating default case at " + defaultStart);
                   ASwitchCase adefault = new ASwitchCase(defaultStart);
                   aswitch.addDefaultCase(adefault);
                }
@@ -725,10 +725,10 @@ public class SubScriptState {
                this.state = 0;
             } else {
                boolean isRet = this.isReturn(node);
-               System.err.println("DEBUG transformJump: isReturn=" + isRet);
+               System.out.println("[TRACE] transformJump: isReturn=" + isRet);
 
                if (isRet) {
-                  System.err.println("DEBUG transformJump: treating as RETURN, adding AReturnStatement to " + this.current.getClass().getSimpleName());
+                  System.out.println("[TRACE] transformJump: treating as RETURN, adding AReturnStatement to " + this.current.getClass().getSimpleName());
                   AReturnStatement areturn;
                   if (!this.root.type().equals((byte) 0)) {
                      areturn = new AReturnStatement(this.getReturnExp());
@@ -745,7 +745,7 @@ public class SubScriptState {
                   
                   // First check if current is a switch case
                   if (ASwitchCase.class.isInstance(this.current)) {
-                     System.err.println("DEBUG transformJump: current is ASwitchCase, adding return to case");
+                     System.out.println("[TRACE] transformJump: current is ASwitchCase, adding return to case");
                      targetNode = this.current;
                      switchCase = (ASwitchCase) this.current;
                   } else {
@@ -753,7 +753,7 @@ public class SubScriptState {
                      ScriptRootNode curr = this.current;
                      while (curr != null && !ASub.class.isInstance(curr)) {
                         if (ASwitchCase.class.isInstance(curr)) {
-                           System.err.println("DEBUG transformJump: found ASwitchCase in parent chain");
+                           System.out.println("[TRACE] transformJump: found ASwitchCase in parent chain");
                            switchCase = (ASwitchCase) curr;
                            break;
                         }
@@ -765,15 +765,15 @@ public class SubScriptState {
                      // (the return JMP is typically the last instruction in a case)
                      if (switchCase != null) {
                         int caseEnd = switchCase.getEnd();
-                        System.err.println("DEBUG transformJump: switchCase end=" + caseEnd + ", nodePos=" + nodePos);
+                        System.out.println("[TRACE] transformJump: switchCase end=" + caseEnd + ", nodePos=" + nodePos);
                         // The return JMP is typically at the end of the case, or the case end might be
                         // set to the position just before the return. Check if nodePos matches caseEnd
                         // or if caseEnd is just before nodePos (within a few bytes).
                         if (nodePos == caseEnd || (caseEnd > 0 && nodePos >= caseEnd - 6 && nodePos <= caseEnd + 6)) {
-                           System.err.println("DEBUG transformJump: nodePos matches switchCase end, adding return to case");
+                           System.out.println("[TRACE] transformJump: nodePos matches switchCase end, adding return to case");
                            targetNode = switchCase;
                         } else {
-                           System.err.println("DEBUG transformJump: nodePos does not match switchCase end, using current");
+                           System.out.println("[TRACE] transformJump: nodePos does not match switchCase end, using current");
                         }
                      } else {
                         // Check if there's a switch in the children that has a case ending at nodePos
@@ -785,9 +785,9 @@ public class SubScriptState {
                               ASwitchCase acase = null;
                               while ((acase = aswitch.getNextCase(acase)) != null) {
                                  int caseEnd = acase.getEnd();
-                                 System.err.println("DEBUG transformJump: checking case end=" + caseEnd + " vs nodePos=" + nodePos);
+                                 System.out.println("[TRACE] transformJump: checking case end=" + caseEnd + " vs nodePos=" + nodePos);
                                  if (nodePos == caseEnd || (caseEnd > 0 && nodePos >= caseEnd - 6 && nodePos <= caseEnd + 6)) {
-                                    System.err.println("DEBUG transformJump: found case ending at nodePos, adding return to case");
+                                    System.out.println("[TRACE] transformJump: found case ending at nodePos, adding return to case");
                                     targetNode = acase;
                                     break;
                                  }
@@ -799,45 +799,45 @@ public class SubScriptState {
 
                   targetNode.addChild(areturn);
                } else if (destPos >= nodePos) {
-                  System.err.println("DEBUG transformJump: forward jump (destPos >= nodePos), checking for break/continue");
+                  System.out.println("[TRACE] transformJump: forward jump (destPos >= nodePos), checking for break/continue");
                   ScriptRootNode loop = this.getBreakable();
-                  System.err.println("DEBUG transformJump: breakable=" + (loop != null ? loop.getClass().getSimpleName() : "null"));
+                  System.out.println("[TRACE] transformJump: breakable=" + (loop != null ? loop.getClass().getSimpleName() : "null"));
 
                   if (ASwitchCase.class.isInstance(loop)) {
                      loop = this.getEnclosingLoop(loop);
-                     System.err.println("DEBUG transformJump: enclosingLoop=" + (loop != null ? loop.getClass().getSimpleName() : "null"));
+                     System.out.println("[TRACE] transformJump: enclosingLoop=" + (loop != null ? loop.getClass().getSimpleName() : "null"));
                      if (loop == null) {
-                        System.err.println("DEBUG transformJump: adding ABreakStatement (no enclosing loop)");
+                        System.out.println("[TRACE] transformJump: adding ABreakStatement (no enclosing loop)");
                         ABreakStatement abreak = new ABreakStatement();
                         this.current.addChild(abreak);
                      } else {
-                        System.err.println("DEBUG transformJump: adding AUnkLoopControl");
+                        System.out.println("[TRACE] transformJump: adding AUnkLoopControl");
                         AUnkLoopControl aunk = new AUnkLoopControl(destPos);
                         this.current.addChild(aunk);
                      }
                   } else if (loop != null && destPos > loop.getEnd()) {
-                     System.err.println("DEBUG transformJump: adding ABreakStatement (destPos > loop.end)");
+                     System.out.println("[TRACE] transformJump: adding ABreakStatement (destPos > loop.end)");
                      ABreakStatement abreak = new ABreakStatement();
                      this.current.addChild(abreak);
                   } else {
                      loop = this.getLoop();
-                     System.err.println("DEBUG transformJump: getLoop()=" + (loop != null ? loop.getClass().getSimpleName() : "null"));
+                     System.out.println("[TRACE] transformJump: getLoop()=" + (loop != null ? loop.getClass().getSimpleName() : "null"));
                      if (loop != null && destPos <= loop.getEnd()) {
-                        System.err.println("DEBUG transformJump: adding AContinueStatement");
+                        System.out.println("[TRACE] transformJump: adding AContinueStatement");
                         AContinueStatement acont = new AContinueStatement();
                         this.current.addChild(acont);
                      }
                   }
                } else {
-                  System.err.println("DEBUG transformJump: backward jump, no action taken");
+                  System.out.println("[TRACE] transformJump: backward jump, no action taken");
                }
             }
          } else {
-            System.err.println("DEBUG transformJump: at if end, skipping return/break/continue handling (will be handled by checkEnd)");
+            System.out.println("[TRACE] transformJump: at if end, skipping return/break/continue handling (will be handled by checkEnd)");
          }
       }
 
-      System.err.println("DEBUG transformJump: calling checkEnd, current=" + this.current.getClass().getSimpleName());
+      System.out.println("[TRACE] transformJump: calling checkEnd, current=" + this.current.getClass().getSimpleName());
       this.checkEnd(node);
    }
 
@@ -927,17 +927,17 @@ public class SubScriptState {
       this.checkStart(node);
       int nodePos = this.nodedata.getPos(node);
       boolean isRet = this.isReturn(node);
-      System.err.println("DEBUG transformCopyDownSp: pos=" + nodePos + ", isReturn=" + isRet +
+      System.out.println("[TRACE] transformCopyDownSp: pos=" + nodePos + ", isReturn=" + isRet +
             ", current=" + this.current.getClass().getSimpleName() +
             ", hasChildren=" + this.current.hasChildren());
 
       AExpression exp = this.removeLastExp(false);
-      System.err.println("DEBUG transformCopyDownSp: extracted exp=" +
+      System.out.println("[TRACE] transformCopyDownSp: extracted exp=" +
             (exp != null ? exp.getClass().getSimpleName() : "null") +
             ", current hasChildren=" + this.current.hasChildren());
 
       if (isRet) {
-         System.err.println("DEBUG transformCopyDownSp: creating AReturnStatement");
+         System.out.println("[TRACE] transformCopyDownSp: creating AReturnStatement");
          AReturnStatement ret = new AReturnStatement(exp);
          this.current.addChild(ret);
       } else {
@@ -970,7 +970,7 @@ public class SubScriptState {
       } else {
          int loc = NodeUtils.stackOffsetToPos(node.getOffset());
          StackEntry sourceEntry = this.stack.get(loc);
-         System.err.println("DEBUG transformCopyTopSp: pos=" + nodePos + ", loc=" + loc +
+         System.out.println("[TRACE] transformCopyTopSp: pos=" + nodePos + ", loc=" + loc +
                ", sourceEntry=" + (sourceEntry != null ? sourceEntry.getClass().getSimpleName() : "null") +
                ", state=" + this.state + ", current=" + this.current.getClass().getSimpleName() +
                ", hasChildren=" + this.current.hasChildren());
@@ -989,7 +989,7 @@ public class SubScriptState {
                // stackentry() returns the Const for AConst nodes
                if (lastConst.stackentry() == sourceEntry) {
                   // Short-circuit pattern: don't add duplicate to children
-                  System.err.println("DEBUG transformCopyTopSp: skipping duplicate constant (short-circuit)");
+                  System.out.println("[TRACE] transformCopyTopSp: skipping duplicate constant (short-circuit)");
                   this.checkEnd(node);
                   return;
                }
@@ -1006,7 +1006,7 @@ public class SubScriptState {
                if (lastVarRef.var() == sourceEntry) {
                   // Short-circuit pattern: don't add duplicate to children
                   Variable var = (Variable) sourceEntry;
-                  System.err.println("DEBUG transformCopyTopSp: skipping duplicate AVarRef (short-circuit), var=" + var);
+                  System.out.println("[TRACE] transformCopyTopSp: skipping duplicate AVarRef (short-circuit), var=" + var);
                   this.checkEnd(node);
                   return;
                }
@@ -1015,7 +1015,7 @@ public class SubScriptState {
 
          AExpression varref = this.getVarToCopy(node);
          String varName = (varref instanceof AVarRef) ? ((AVarRef) varref).var().toString() : "N/A";
-         System.err.println("DEBUG transformCopyTopSp: adding " + varref.getClass().getSimpleName() +
+         System.out.println("[TRACE] transformCopyTopSp: adding " + varref.getClass().getSimpleName() +
                " to AST, var=" + varName);
          this.current.addChild((ScriptNode) varref);
       }
@@ -1043,21 +1043,21 @@ public class SubScriptState {
    public void transformMoveSp(AMoveSpCommand node) {
       this.checkStart(node);
       int nodePos = this.nodedata.getPos(node);
-      System.err.println("DEBUG transformMoveSp: pos=" + nodePos + ", state=" + this.state +
+      System.out.println("[TRACE] transformMoveSp: pos=" + nodePos + ", state=" + this.state +
             ", current=" + this.current.getClass().getSimpleName());
 
       if (this.state == 1) {
          ScriptNode last = this.current.hasChildren() ? this.current.getLastChild() : null;
-         System.err.println("DEBUG transformMoveSp: state==1, last=" +
+         System.out.println("[TRACE] transformMoveSp: state==1, last=" +
                (last != null ? last.getClass().getSimpleName() : "null"));
 
          if (!AReturnStatement.class.isInstance(last)) {
             AExpression expr = null;
             if (AModifyExp.class.isInstance(last)) {
-               System.err.println("DEBUG transformMoveSp: last is AModifyExp, removing as expression");
+               System.out.println("[TRACE] transformMoveSp: last is AModifyExp, removing as expression");
                expr = (AModifyExp) this.removeLastExp(true);
             } else if (AVarDecl.class.isInstance(last) && ((AVarDecl) last).isFcnReturn() && ((AVarDecl) last).exp() != null) {
-               System.err.println("DEBUG transformMoveSp: last is AVarDecl with function return");
+               System.out.println("[TRACE] transformMoveSp: last is AVarDecl with function return");
                // Function return value - extract the expression and convert to statement
                // However, don't extract function calls (AActionExp) as standalone statements
                // when in assignment context, as they're almost always part of a larger expression
@@ -1068,16 +1068,16 @@ public class SubScriptState {
                   // They're almost always part of a larger expression being built
                   // Leave the AVarDecl in place - it will be used by EQUAL/other operations
                   // NEVER extract function calls as statements when state == 1 (assignment context)
-                  System.err.println("DEBUG transformMoveSp: function call, NOT extracting as statement");
+                  System.out.println("[TRACE] transformMoveSp: function call, NOT extracting as statement");
                   expr = null; // Don't extract as statement
                } else {
                   // Non-function-call expressions can be extracted
-                  System.err.println("DEBUG transformMoveSp: extracting expression from AVarDecl");
+                  System.out.println("[TRACE] transformMoveSp: extracting expression from AVarDecl");
                   expr = ((AVarDecl) last).removeExp();
                   this.current.removeLastChild(); // Remove the AVarDecl
                }
             } else if (AUnaryModExp.class.isInstance(last) || AExpression.class.isInstance(last)) {
-               System.err.println("DEBUG transformMoveSp: last is AUnaryModExp or AExpression, removing as expression");
+               System.out.println("[TRACE] transformMoveSp: last is AUnaryModExp or AExpression, removing as expression");
                // Gracefully handle postfix/prefix inc/dec and other loose expressions.
                // However, don't extract function calls (AActionExp) as standalone statements
                // when in assignment context, as they're almost always part of a larger expression
@@ -1085,7 +1085,7 @@ public class SubScriptState {
                // In assignment context, function calls should remain as part of the expression tree
                // until the full expression is built (e.g., by EQUAL, ADD, etc. operations).
                expr = (AExpression) this.removeLastExp(true);
-               System.err.println("DEBUG transformMoveSp: removed expression=" +
+               System.out.println("[TRACE] transformMoveSp: removed expression=" +
                      (expr != null ? expr.getClass().getSimpleName() : "null"));
                // Don't extract function calls as statements in assignment context
                // They're almost always part of a larger expression being built.
@@ -1094,31 +1094,31 @@ public class SubScriptState {
                if (AActionExp.class.isInstance(expr)) {
                   // Put the function call back - it's part of a larger expression
                   // Function calls in assignment context are almost never standalone statements
-                  System.err.println("DEBUG transformMoveSp: function call, putting back");
+                  System.out.println("[TRACE] transformMoveSp: function call, putting back");
                   this.current.addChild((ScriptNode) expr);
                   expr = null; // Don't extract as statement
                }
             } else {
-               System.err.println("DEBUG transformMoveSp: WARNING - unexpected last child type: " +
+               System.out.println("[TRACE] transformMoveSp: WARNING - unexpected last child type: " +
                      (last != null ? last.getClass().getSimpleName() : "null") + " at " + nodePos);
                System.out.println("uh-oh... not a modify exp at " + nodePos + ", " + last);
             }
 
             if (expr != null) {
-               System.err.println("DEBUG transformMoveSp: creating AExpressionStatement with " + expr.getClass().getSimpleName());
+               System.out.println("[TRACE] transformMoveSp: creating AExpressionStatement with " + expr.getClass().getSimpleName());
                AExpressionStatement stmt = new AExpressionStatement(expr);
                this.current.addChild(stmt);
                stmt.parent(this.current);
             } else {
-               System.err.println("DEBUG transformMoveSp: NOT creating AExpressionStatement (expr is null)");
+               System.out.println("[TRACE] transformMoveSp: NOT creating AExpressionStatement (expr is null)");
             }
          } else {
-            System.err.println("DEBUG transformMoveSp: last is AReturnStatement, skipping expression statement creation");
+            System.out.println("[TRACE] transformMoveSp: last is AReturnStatement, skipping expression statement creation");
          }
 
          this.state = 0;
       } else {
-         System.err.println("DEBUG transformMoveSp: state != 1, checking for standalone expression statement");
+         System.out.println("[TRACE] transformMoveSp: state != 1, checking for standalone expression statement");
          // When state == 0, check if we have a standalone expression (like int3;)
          // that should be converted to an expression statement
          if (this.current.hasChildren()) {
@@ -1129,21 +1129,21 @@ public class SubScriptState {
             if (AExpression.class.isInstance(last) && !AActionExp.class.isInstance(last)
                   && !AModifyExp.class.isInstance(last) && !AUnaryModExp.class.isInstance(last)
                   && !AReturnStatement.class.isInstance(last)) {
-               System.err.println("DEBUG transformMoveSp: converting standalone expression to statement: " +
+               System.out.println("[TRACE] transformMoveSp: converting standalone expression to statement: " +
                      last.getClass().getSimpleName());
                AExpression expr = (AExpression) this.removeLastExp(true);
                if (expr != null) {
                   AExpressionStatement stmt = new AExpressionStatement(expr);
                   this.current.addChild(stmt);
                   stmt.parent(this.current);
-                  System.err.println("DEBUG transformMoveSp: created AExpressionStatement");
+                  System.out.println("[TRACE] transformMoveSp: created AExpressionStatement");
                }
             } else {
-               System.err.println("DEBUG transformMoveSp: last child is not a standalone expression, calling checkSwitchEnd");
+               System.out.println("[TRACE] transformMoveSp: last child is not a standalone expression, calling checkSwitchEnd");
                this.checkSwitchEnd(node);
             }
          } else {
-            System.err.println("DEBUG transformMoveSp: no children, calling checkSwitchEnd");
+            System.out.println("[TRACE] transformMoveSp: no children, calling checkSwitchEnd");
             this.checkSwitchEnd(node);
          }
       }
@@ -1210,15 +1210,15 @@ public class SubScriptState {
    public void transformBinary(ABinaryCommand node) {
       this.checkStart(node);
       int nodePos = this.nodedata.getPos(node);
-      System.err.println("DEBUG transformBinary: pos=" + nodePos + ", op=" + NodeUtils.getOp(node) +
+      System.out.println("[TRACE] transformBinary: pos=" + nodePos + ", op=" + NodeUtils.getOp(node) +
             ", state=" + this.state + ", current=" + this.current.getClass().getSimpleName() +
             ", hasChildren=" + this.current.hasChildren());
 
       AExpression right = this.removeLastExp(false);
-      System.err.println("DEBUG transformBinary: right=" + (right != null ? right.getClass().getSimpleName() : "null"));
+      System.out.println("[TRACE] transformBinary: right=" + (right != null ? right.getClass().getSimpleName() : "null"));
 
       AExpression left = this.removeLastExp(this.state == 4);
-      System.err.println("DEBUG transformBinary: left=" + (left != null ? left.getClass().getSimpleName() : "null"));
+      System.out.println("[TRACE] transformBinary: left=" + (left != null ? left.getClass().getSimpleName() : "null"));
 
       AExpression exp;
       if (NodeUtils.isArithmeticOp(node)) {
@@ -1233,7 +1233,7 @@ public class SubScriptState {
 
       exp.stackentry(this.stack.get(1));
       this.current.addChild((ScriptNode) exp);
-      System.err.println("DEBUG transformBinary: created " + exp.getClass().getSimpleName() +
+      System.out.println("[TRACE] transformBinary: created " + exp.getClass().getSimpleName() +
             ", current hasChildren=" + this.current.hasChildren());
       this.checkEnd(node);
    }
@@ -1295,26 +1295,26 @@ public class SubScriptState {
       int nodePos = this.nodedata.getPos(node);
 
       // Debug output
-      System.err.println("DEBUG isAtIfEnd: nodePos=" + nodePos + ", current=" + this.current.getClass().getSimpleName() + ", currentEnd=" + this.current.getEnd());
+      System.out.println("[TRACE] isAtIfEnd: nodePos=" + nodePos + ", current=" + this.current.getClass().getSimpleName() + ", currentEnd=" + this.current.getEnd());
 
       // Check if current is an AIf and we're at its end
       if (AIf.class.isInstance(this.current) && nodePos == this.current.getEnd()) {
-         System.err.println("DEBUG isAtIfEnd: returning true (current is AIf)");
+         System.out.println("[TRACE] isAtIfEnd: returning true (current is AIf)");
          return true;
       }
 
       // Check if we're inside a switch case and the enclosing if ends here
       if (ASwitchCase.class.isInstance(this.current)) {
          ScriptNode switchNode = this.current.parent();
-         System.err.println("DEBUG isAtIfEnd: in switch case, switchNode=" + (switchNode != null ? switchNode.getClass().getSimpleName() : "null"));
+         System.out.println("[TRACE] isAtIfEnd: in switch case, switchNode=" + (switchNode != null ? switchNode.getClass().getSimpleName() : "null"));
          if (ASwitch.class.isInstance(switchNode)) {
             ScriptNode switchParent = switchNode.parent();
-            System.err.println("DEBUG isAtIfEnd: switchParent=" + (switchParent != null ? switchParent.getClass().getSimpleName() : "null"));
+            System.out.println("[TRACE] isAtIfEnd: switchParent=" + (switchParent != null ? switchParent.getClass().getSimpleName() : "null"));
             if (AIf.class.isInstance(switchParent) && switchParent instanceof ScriptRootNode) {
                int parentEnd = ((ScriptRootNode) switchParent).getEnd();
-               System.err.println("DEBUG isAtIfEnd: parentEnd=" + parentEnd);
+               System.out.println("[TRACE] isAtIfEnd: parentEnd=" + parentEnd);
                if (nodePos == parentEnd) {
-                  System.err.println("DEBUG isAtIfEnd: returning true (switch in AIf)");
+                  System.out.println("[TRACE] isAtIfEnd: returning true (switch in AIf)");
                   return true;
                }
             }
@@ -1325,14 +1325,14 @@ public class SubScriptState {
       ScriptRootNode curr = this.current;
       while (curr != null && !ASub.class.isInstance(curr)) {
          if (AIf.class.isInstance(curr) && nodePos == curr.getEnd()) {
-            System.err.println("DEBUG isAtIfEnd: returning true (found AIf in parent chain)");
+            System.out.println("[TRACE] isAtIfEnd: returning true (found AIf in parent chain)");
             return true;
          }
          ScriptNode parent = curr.parent();
          curr = parent instanceof ScriptRootNode ? (ScriptRootNode) parent : null;
       }
 
-      System.err.println("DEBUG isAtIfEnd: returning false");
+      System.out.println("[TRACE] isAtIfEnd: returning false");
       return false;
    }
 
@@ -1416,27 +1416,27 @@ public class SubScriptState {
    }
 
    public AExpression getReturnExp() {
-      System.err.println("DEBUG getReturnExp: current=" + this.current.getClass().getSimpleName() +
+      System.out.println("[TRACE] getReturnExp: current=" + this.current.getClass().getSimpleName() +
             ", hasChildren=" + this.current.hasChildren());
 
       if (!this.current.hasChildren()) {
-         System.err.println("DEBUG getReturnExp: no children, returning placeholder");
+         System.out.println("[TRACE] getReturnExp: no children, returning placeholder");
          return new AConst(new IntConst(0L));
       }
 
       ScriptNode last = this.current.removeLastChild();
-      System.err.println("DEBUG getReturnExp: removed last child=" + last.getClass().getSimpleName());
+      System.out.println("[TRACE] getReturnExp: removed last child=" + last.getClass().getSimpleName());
 
       if (AModifyExp.class.isInstance(last)) {
-         System.err.println("DEBUG getReturnExp: last is AModifyExp, extracting expression");
+         System.out.println("[TRACE] getReturnExp: last is AModifyExp, extracting expression");
          return ((AModifyExp) last).expression();
       } else if (AExpressionStatement.class.isInstance(last)) {
          AExpression exp = ((AExpressionStatement) last).exp();
-         System.err.println("DEBUG getReturnExp: last is AExpressionStatement, exp=" +
+         System.out.println("[TRACE] getReturnExp: last is AExpressionStatement, exp=" +
                (exp != null ? exp.getClass().getSimpleName() : "null"));
 
          if (AModifyExp.class.isInstance(exp)) {
-            System.err.println("DEBUG getReturnExp: extracting expression from AModifyExp inside AExpressionStatement");
+            System.out.println("[TRACE] getReturnExp: extracting expression from AModifyExp inside AExpressionStatement");
             return ((AModifyExp) exp).expression();
          } else if (AExpression.class.isInstance(exp)) {
             // AExpressionStatement containing a plain expression (e.g., AVarRef)
@@ -1444,22 +1444,22 @@ public class SubScriptState {
             // IMPORTANT: The AExpressionStatement has been removed from the AST, so the expression
             // inside it should be extracted and used. However, we need to clear the parent relationship
             // since the AExpressionStatement is being discarded.
-            System.err.println("DEBUG getReturnExp: extracting plain expression from AExpressionStatement");
+            System.out.println("[TRACE] getReturnExp: extracting plain expression from AExpressionStatement");
             exp.parent(null); // Clear parent since AExpressionStatement is being discarded
             return exp;
          } else {
-            System.err.println("DEBUG getReturnExp: AExpressionStatement with unexpected exp type, returning placeholder");
+            System.out.println("[TRACE] getReturnExp: AExpressionStatement with unexpected exp type, returning placeholder");
             return new AConst(new IntConst(0L));
          }
       } else if (AReturnStatement.class.isInstance(last)) {
-         System.err.println("DEBUG getReturnExp: last is AReturnStatement, extracting exp");
+         System.out.println("[TRACE] getReturnExp: last is AReturnStatement, extracting exp");
          return ((AReturnStatement) last).exp();
       } else if (AExpression.class.isInstance(last)) {
-         System.err.println("DEBUG getReturnExp: last is AExpression, returning directly");
+         System.out.println("[TRACE] getReturnExp: last is AExpression, returning directly");
          return (AExpression) last;
       } else {
          // Keep decompilation alive; emit placeholder when structure is unexpected.
-         System.err.println("DEBUG getReturnExp: unexpected last child type, returning placeholder");
+         System.out.println("[TRACE] getReturnExp: unexpected last child type, returning placeholder");
          return new AConst(new IntConst(0L));
       }
    }
@@ -1532,7 +1532,7 @@ public class SubScriptState {
    }
 
    private AExpression removeLastExp(boolean forceOneOnly) {
-      System.err.println("DEBUG removeLastExp: forceOneOnly=" + forceOneOnly + ", current=" +
+      System.out.println("[TRACE] removeLastExp: forceOneOnly=" + forceOneOnly + ", current=" +
             this.current.getClass().getSimpleName() + ", hasChildren=" + this.current.hasChildren());
 
       ArrayList<ScriptNode> trailingErrors = new ArrayList<>();
@@ -1551,14 +1551,14 @@ public class SubScriptState {
          ArrayList<AExpressionStatement> foundExpressionStatements = new ArrayList<>();
          while (true) {
             if (!this.current.hasChildren()) {
-               System.err.println("DEBUG removeLastExp: no more children, breaking");
+               System.out.println("[TRACE] removeLastExp: no more children, breaking");
                break;
             }
             anode = this.current.removeLastChild();
-            System.err.println("DEBUG removeLastExp: removed child=" + anode.getClass().getSimpleName());
+            System.out.println("[TRACE] removeLastExp: removed child=" + anode.getClass().getSimpleName());
 
             if (AExpression.class.isInstance(anode)) {
-               System.err.println("DEBUG removeLastExp: found AExpression, returning");
+               System.out.println("[TRACE] removeLastExp: found AExpression, returning");
                // Found a plain expression - put back any AExpressionStatement nodes we found
                for (int i = foundExpressionStatements.size() - 1; i >= 0; i--) {
                   this.current.addChild(foundExpressionStatements.get(i));
@@ -1595,19 +1595,19 @@ public class SubScriptState {
             } else if (AExpressionStatement.class.isInstance(anode)) {
                // Store AExpressionStatement nodes and continue searching for plain expressions
                // Only extract from AExpressionStatement if no plain expressions are found
-               System.err.println("DEBUG removeLastExp: found AExpressionStatement, storing and continuing search");
+               System.out.println("[TRACE] removeLastExp: found AExpressionStatement, storing and continuing search");
                foundExpressionStatements.add((AExpressionStatement) anode);
                anode = null; // Continue searching
                continue;
             }
             // Skip non-expression nodes and keep searching.
-            System.err.println("DEBUG removeLastExp: skipping " + anode.getClass().getSimpleName() + ", continuing search");
+            System.out.println("[TRACE] removeLastExp: skipping " + anode.getClass().getSimpleName() + ", continuing search");
             anode = null;
          }
 
          // If no plain expression was found, try extracting from AExpressionStatement nodes
          if (anode == null && !foundExpressionStatements.isEmpty()) {
-            System.err.println("DEBUG removeLastExp: no plain expression found, extracting from AExpressionStatement");
+            System.out.println("[TRACE] removeLastExp: no plain expression found, extracting from AExpressionStatement");
             AExpressionStatement expstmt = foundExpressionStatements.remove(foundExpressionStatements.size() - 1);
             AExpression exp = expstmt.exp();
             if (exp != null) {
@@ -1619,7 +1619,7 @@ public class SubScriptState {
                for (int i = trailingErrors.size() - 1; i >= 0; i--) {
                   this.current.addChild(trailingErrors.get(i));
                }
-               System.err.println("DEBUG removeLastExp: returning expression from AExpressionStatement");
+               System.out.println("[TRACE] removeLastExp: returning expression from AExpressionStatement");
                return exp;
             }
          }
@@ -1760,22 +1760,22 @@ public class SubScriptState {
       int nodePos = this.nodedata.getPos(node);
       int destPos = dest != null ? this.nodedata.getPos(dest) : -1;
 
-      System.err.println("DEBUG isReturn: pos=" + nodePos + ", destPos=" + destPos +
+      System.out.println("[TRACE] isReturn: pos=" + nodePos + ", destPos=" + destPos +
             ", destType=" + (dest != null ? dest.getClass().getSimpleName() : "null") +
             ", destChildType=" + (destChild != null ? destChild.getClass().getSimpleName() : "null"));
 
       if (NodeUtils.isReturn(destChild)) {
-         System.err.println("DEBUG isReturn: returning true (destChild is Return)");
+         System.out.println("[TRACE] isReturn: returning true (destChild is Return)");
          return true;
       } else if (AMoveSpCommand.class.isInstance(dest)) {
          Node afterdest = NodeUtils.getNextCommand(dest, this.nodedata);
          boolean result = afterdest == null;
-         System.err.println("DEBUG isReturn: dest is MoveSpCommand, afterdest=" +
+         System.out.println("[TRACE] isReturn: dest is MoveSpCommand, afterdest=" +
                (afterdest != null ? this.nodedata.getPos(afterdest) + " (" + afterdest.getClass().getSimpleName() + ")" : "null") +
                ", returning " + result);
          return result;
       } else {
-         System.err.println("DEBUG isReturn: returning false");
+         System.out.println("[TRACE] isReturn: returning false");
          return false;
       }
    }
