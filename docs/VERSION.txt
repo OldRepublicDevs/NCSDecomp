@@ -1,5 +1,5 @@
 NCSDecomp Distribution Package (CLI + GUI)
-Version: 1.0.1
+Version: 1.0.2
 Build Date: 2025-12-12 16:28:13
 Platform: Windows
 
