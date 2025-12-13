@@ -49,7 +49,8 @@ $pathSeparator = if ($IsWindows) { ";" } else { ":" }
 $sourcepath = "$testSourceDir$pathSeparator$mainSourceDir"
 $cp = "$buildDir$pathSeparator$junitStandalone$pathSeparator."
 
-$compileOutput = javac -cp $cp -d $buildDir -encoding UTF-8 -sourcepath $sourcepath $testFile 2>&1
+# Use -source 8 -target 8 for Java 8 compatibility regardless of installed JDK version
+$compileOutput = javac -cp $cp -d $buildDir -encoding UTF-8 -source 8 -target 8 -sourcepath $sourcepath $testFile 2>&1
 $exitCode = $LASTEXITCODE
 
 if ($exitCode -ne 0) {

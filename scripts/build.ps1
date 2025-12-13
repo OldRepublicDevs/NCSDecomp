@@ -15,6 +15,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$MinimumJavaVersion = 8
+
 # Show help if requested
 if ($Help) {
     Write-Host "NCSDecomp Build Script" -ForegroundColor Green
@@ -25,7 +27,8 @@ if ($Help) {
     Write-Host "  .\scripts\build.ps1 -Help               # Show this help"
     Write-Host ""
     Write-Host "Options:" -ForegroundColor Cyan
-    Write-Host "  -BuildExecutable    Build self-contained executable (requires JDK 14+ with jpackage)"
+    Write-Host "  -BuildExecutable    Build self-contained executable (requires JDK 14+ with jpackage, optional)"
+    Write-Host "                       Default: Builds JARs only (Java $MinimumJavaVersion compatible, works with any JDK $MinimumJavaVersion+)"
     Write-Host "  -Help        Show this help message"
     exit 0
 }
@@ -232,10 +235,25 @@ if (Test-Path $resourcesDir) {
 # Compile Java files
 Write-Host "Compiling Java files..." -ForegroundColor Yellow
 
+# Verify Java compiler is available
+$javacCheck = Get-Command javac -ErrorAction SilentlyContinue
+if (-not $javacCheck) {
+    Write-Host "Error: javac not found in PATH" -ForegroundColor Red
+    Write-Host "Please ensure Java JDK is installed and javac is in your PATH" -ForegroundColor Yellow
+    exit 1
+}
+
+# Check Java compiler version (informational only - we'll use -source/-target flags)
+Write-Host "Using Java compiler: $(javac -version 2>&1)" -ForegroundColor Gray
+Write-Host "Compiling with Java $MinimumJavaVersion source/target compatibility (will work with any JDK $MinimumJavaVersion+)" -ForegroundColor Gray
+
 # Build javac arguments array for proper handling
+# Use -source $MinimumJavaVersion -target $MinimumJavaVersion to ensure Java $MinimumJavaVersion compatibility regardless of installed JDK version
 $javacArgs = @(
     "-d", $buildDir,
     "-encoding", "UTF-8",
+    "-source", $MinimumJavaVersion,
+    "-target", $MinimumJavaVersion,
     "-sourcepath", $javaSourceDir
 ) + $javaFiles
 
@@ -671,8 +689,7 @@ Categories=Utility;
             return $null
         }
 
-        # Skip single-file packaging for CLI apps
-        $cliSingleFile = $null
+        # Skip single-file packaging for CLI apps (CLI uses directory-based executable)
 
         # Package GUI if it exists
         $guiAppImagePath = Join-Path $exeOutputDir $guiAppName

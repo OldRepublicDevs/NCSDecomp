@@ -25,14 +25,39 @@ Write-Host "=======================================" -ForegroundColor Green
 Write-Host ""
 
 # Build everything first
-# NOTE: build.ps1 -BuildExecutable already builds the JARs, and it cleans target/ at start.
-$exeType = if ($IsWindows) { ".exe" } elseif ($IsMacOS) { ".app" } else { "executable" }
-Write-Host "Step 1: Building JAR + self-contained $exeType..." -ForegroundColor Yellow
+# Try to build executable if jpackage is available (requires JDK 14+), otherwise just build JARs
+Write-Host "Step 1: Building JAR files (Java 8 compatible)..." -ForegroundColor Yellow
 $buildScript = Join-Path $PSScriptRoot "build.ps1"
-& $buildScript -BuildExecutable
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "EXE build failed!" -ForegroundColor Red
-    exit 1
+
+# Check if jpackage is available (for executable builds)
+$javaHome = $env:JAVA_HOME
+$jpackageExe = if ($IsWindows) { "jpackage.exe" } else { "jpackage" }
+$jpackageAvailable = $false
+if ($javaHome -and (Test-Path $javaHome)) {
+    $jpackagePath = Join-Path $javaHome (Join-Path "bin" $jpackageExe)
+    $jpackageAvailable = (Test-Path $jpackagePath)
+}
+
+if ($jpackageAvailable) {
+    Write-Host "  jpackage found - will build executable..." -ForegroundColor Gray
+    & $buildScript -BuildExecutable
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "EXE build failed, falling back to JAR-only build..." -ForegroundColor Yellow
+        # Fall back to JAR-only build
+        & $buildScript
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "JAR build failed!" -ForegroundColor Red
+            exit 1
+        }
+    }
+} else {
+    Write-Host "  jpackage not found (requires JDK 14+) - building JARs only..." -ForegroundColor Gray
+    Write-Host "  (JARs are Java 8 compatible and will run on any JRE 8+)" -ForegroundColor Gray
+    & $buildScript
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "JAR build failed!" -ForegroundColor Red
+        exit 1
+    }
 }
 
 # Create archive staging directory (this becomes the ZIP root)
@@ -71,7 +96,8 @@ $jarDir = Join-Path $targetDir "jar"
 $cliJarSource = Join-Path $jarDir "NCSDecomp-CLI.jar"
 $guiJarSource = Join-Path $jarDir "NCSDecomp.jar"
 
-# Copy executables (flattened into archive root)
+# Copy executables (flattened into archive root) if they exist
+# Note: Executables are only built if jpackage (JDK 14+) is available
 # Note: jpackage app-images normally require their sibling app/ + runtime/ folders.
 # This publish script intentionally creates a minimal archive layout (EXE/JAR/docs/examples/tools/config).
 $distDir = Join-Path $targetDir "dist"
@@ -82,7 +108,8 @@ if (Test-Path $cliExeSource) {
     Copy-Item $cliExeSource (Join-Path $publishDir $cliExeName) -Force
     Write-Host "  - Copied $cliExeName" -ForegroundColor Cyan
 } else {
-    Write-Host "  Warning: $cliExeName not found at $cliExeSource" -ForegroundColor Yellow
+    Write-Host "  Note: $cliExeName not found (executable build skipped - requires JDK 14+ with jpackage)" -ForegroundColor Gray
+    Write-Host "         JAR files are provided instead (Java 8+ compatible)" -ForegroundColor Gray
 }
 
 $guiExeName = if ($IsWindows) { "NCSDecomp.exe" } else { "NCSDecomp" }
@@ -91,7 +118,7 @@ if (Test-Path $guiExeSource) {
     Copy-Item $guiExeSource (Join-Path $publishDir $guiExeName) -Force
     Write-Host "  - Copied $guiExeName" -ForegroundColor Cyan
 } else {
-    Write-Host "  Note: $guiExeName not found at $guiExeSource (GUI build may have been skipped)" -ForegroundColor Gray
+    Write-Host "  Note: $guiExeName not found (GUI executable build skipped)" -ForegroundColor Gray
 }
 
 # Copy JAR files to root as well (for standalone usage)
