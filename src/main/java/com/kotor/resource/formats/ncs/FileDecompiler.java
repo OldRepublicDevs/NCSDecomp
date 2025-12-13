@@ -28,8 +28,6 @@ import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.PushbackReader;
 import java.io.StringReader;
 import java.nio.charset.Charset;
@@ -1047,7 +1045,6 @@ public class FileDecompiler {
 
       // Set up registry spoofing and file structure if needed
       AutoCloseable spoofer = null;
-      File copiedNwscript = null;
       try {
          if (needsRegistrySpoof) {
             // For decompilation, we need:
@@ -1059,9 +1056,8 @@ public class FileDecompiler {
 
             // Set up registry spoofing
             try {
-               RegistrySpoofer regSpoofer = new RegistrySpoofer(toolsDir, k2);
-               regSpoofer.activate(); // This creates chitin.key and directories
-               spoofer = regSpoofer;
+               spoofer = new RegistrySpoofer(toolsDir, k2);
+               ((RegistrySpoofer) spoofer).activate(); // This creates chitin.key and directories
                System.out.println("[INFO] externalDecompile: Registry spoofing activated for decompilation");
             } catch (Exception e) {
                System.out.println("[INFO] externalDecompile: Failed to set up registry spoofing: " + e.getMessage());
@@ -1147,6 +1143,16 @@ public class FileDecompiler {
          int exitCode = proc.waitFor();
          if (exitCode != 0) {
             Logger.warn("nwnnsscomp.exe exited with code: " + exitCode);
+         }
+
+         // Close registry spoofing now that nwnnsscomp has completed
+         if (spoofer != null) {
+            try {
+               spoofer.close();
+               spoofer = null; // Prevent double-close in finally
+            } catch (Exception e) {
+               System.out.println("[INFO] externalDecompile: Error closing registry spoofer: " + e.getMessage());
+            }
          }
       } catch (IOException e) {
          // Check if this is an elevation error
@@ -2735,203 +2741,6 @@ public class FileDecompiler {
             if (lower.contains("effectdroidstun") && lower.contains("applyeffecttoobject")
                   && lower.contains("getnearestobjectbytag")) {
                state.setName("UT_MakeNeutral");
-            }
-         }
-      }
-   }
-
-   /**
-    * Thin wrapper around {@link ProcessBuilder} to execute external compilers on
-    * Windows. Handles quoting, output streaming, and blocking until process
-    * completion.
-    */
-   private class WindowsExec {
-      WindowsExec() {
-      }
-
-      /**
-       * Executes a raw command string via {@code cmd /c}. Retained for legacy
-       * callers.
-       */
-      @SuppressWarnings("unused")
-      public void callExec(String args) {
-         try {
-            System.out.println("Execing " + args);
-            ProcessBuilder pb = new ProcessBuilder("cmd", "/c", args);
-            Process proc = pb.start();
-            FileDecompiler.WindowsExec.StreamGobbler errorGobbler = new FileDecompiler.WindowsExec.StreamGobbler(
-                  proc.getErrorStream(), "ERROR");
-            FileDecompiler.WindowsExec.StreamGobbler outputGobbler = new FileDecompiler.WindowsExec.StreamGobbler(
-                  proc.getInputStream(), "OUTPUT");
-            errorGobbler.start();
-            outputGobbler.start();
-            proc.waitFor();
-         } catch (Throwable var6) {
-            var6.printStackTrace();
-         }
-      }
-
-      /**
-       * Executes a command with an array of arguments. This method is used when we
-       * have properly formatted arguments from compiler detection.
-       *
-       * @param args Array of command-line arguments (first element is the executable)
-       * @throws IOException If process execution fails, including elevation errors
-       */
-      public void callExec(String[] args) throws IOException {
-         callExec(args, null, java.util.Collections.emptyMap());
-      }
-
-      public void callExec(String[] args, File workingDir, java.util.Map<String, String> envOverrides) throws IOException {
-         // Build copy-pasteable command string (exact format as test output)
-         StringBuilder cmdStr = new StringBuilder();
-         for (int i = 0; i < args.length; i++) {
-            if (i > 0) {
-               cmdStr.append(" ");
-            }
-            String arg = args[i];
-            // Quote arguments that contain spaces
-            if (arg.contains(" ") || arg.contains("\"")) {
-               cmdStr.append("\"").append(arg.replace("\"", "\\\"")).append("\"");
-            } else {
-               cmdStr.append(arg);
-            }
-         }
-         System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-         System.out.println("[NCSDecomp] Executing nwnnsscomp.exe:");
-         System.out.println("[NCSDecomp] Command: " + cmdStr.toString());
-         if (workingDir != null) {
-            System.out.println("[NCSDecomp] Working directory: " + workingDir.getAbsolutePath());
-         }
-         System.out.println("");
-         System.out.println("[NCSDecomp] Calling nwnnsscomp with command:");
-         System.out.println(cmdStr.toString());
-         System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-         // Check if this is a TSLPatcher variant that needs the compatibility layer workaround
-         // Declare outside try block so it can be used in catch block for error messages
-         String exePath = args.length > 0 ? args[0] : "";
-         boolean isTslPatcher = exePath.toLowerCase().contains("tslpatcher");
-
-         try {
-
-            ProcessBuilder pb = new ProcessBuilder(args);
-            // Pattern 3: Working directory normalization
-            if (workingDir != null && workingDir.exists()) {
-               pb.directory(workingDir);
-            }
-
-            // Apply environment overrides when provided (registry spoof / root redirects)
-            if (envOverrides != null && !envOverrides.isEmpty()) {
-               pb.environment().putAll(envOverrides);
-               System.out.println("[NCSDecomp] Applying environment overrides: " + envOverrides);
-            }
-
-            // Apply TSLPatcher workaround: set __COMPAT_LAYER=RUNASINVOKER to bypass UAC elevation requirement
-            // This is needed because legacy Windows executables without app.manifest trigger UAC prompts
-            // even when they don't actually need administrator privileges
-            if (isTslPatcher) {
-               pb.environment().put("__COMPAT_LAYER", "RUNASINVOKER");
-               System.out.println("[NCSDecomp] Applying TSLPatcher compatibility layer workaround (__COMPAT_LAYER=RUNASINVOKER)");
-            }
-
-            Process proc = pb.start();
-            FileDecompiler.WindowsExec.StreamGobbler errorGobbler = new FileDecompiler.WindowsExec.StreamGobbler(
-                  proc.getErrorStream(), "nwnnsscomp");
-            FileDecompiler.WindowsExec.StreamGobbler outputGobbler = new FileDecompiler.WindowsExec.StreamGobbler(
-                  proc.getInputStream(), "nwnnsscomp");
-            errorGobbler.start();
-            outputGobbler.start();
-            int exitCode = proc.waitFor();
-
-            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            System.out.println("[NCSDecomp] nwnnsscomp.exe exited with code: " + exitCode);
-            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-         } catch (IOException e) {
-            // Check for elevation error (error code 740 on Windows)
-            String errorMsg = e.getMessage();
-            boolean isElevationError = errorMsg != null && errorMsg.contains("error=740");
-
-            // exePath and isTslPatcher are already declared above, available in catch block
-
-            // If we still get elevation error after applying compatibility layer, it means the workaround didn't work
-            // This could happen if the environment variable wasn't set correctly or Windows doesn't support it
-            if (isElevationError && isTslPatcher) {
-               System.out.println("[NCSDecomp] WARNING: TSLPatcher compatibility layer workaround was applied but elevation error still occurred.");
-               System.out.println("[NCSDecomp]   This may indicate the workaround didn't work on this system.");
-            }
-
-            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            System.out.println("[NCSDecomp] EXCEPTION executing nwnnsscomp.exe:");
-            System.out.println("[NCSDecomp] Exception Type: " + e.getClass().getName());
-            System.out.println("[NCSDecomp] Exception Message: " + e.getMessage());
-
-            if (isElevationError) {
-               if (isTslPatcher) {
-                  System.out.println("[NCSDecomp] ERROR: TSLPatcher compiler requires administrator privileges.");
-                  System.out.println("[NCSDecomp]   The nwnnsscomp_tslpatcher.exe variant requires elevation to run.");
-                  System.out.println("[NCSDecomp]   Please either:");
-                  System.out.println("[NCSDecomp]   1. Run NCSDecomp as administrator, or");
-                  System.out.println(
-                        "[NCSDecomp]   2. Use a different compiler variant (e.g., nwnnsscomp.exe) in Settings.");
-               } else {
-                  System.out.println("[NCSDecomp] ERROR: Compiler requires administrator privileges.");
-                  System.out.println("[NCSDecomp]   Please run NCSDecomp as administrator.");
-               }
-            }
-
-            e.printStackTrace();
-            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-            // Re-throw with enhanced message for elevation errors
-            if (isElevationError) {
-               String enhancedMsg = isTslPatcher
-                     ? "TSLPatcher compiler requires administrator privileges. Please run NCSDecomp as administrator or use a different compiler."
-                     : "Compiler requires administrator privileges. Please run NCSDecomp as administrator.";
-               throw new IOException(enhancedMsg, e);
-            }
-
-            throw e;
-         } catch (InterruptedException e) {
-            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            System.out.println("[NCSDecomp] EXCEPTION executing nwnnsscomp.exe:");
-            System.out.println("[NCSDecomp] Exception Type: " + e.getClass().getName());
-            System.out.println("[NCSDecomp] Exception Message: " + e.getMessage());
-            e.printStackTrace();
-            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            Thread.currentThread().interrupt();
-            throw new IOException("Process execution was interrupted", e);
-         }
-      }
-
-      /**
-       * Continuously drains an input stream to avoid deadlocking the process.
-       */
-      private class StreamGobbler extends Thread {
-         /** Stream to consume (stdout or stderr). */
-         InputStream is;
-         /** Label used when echoing lines to our logger. */
-         String type;
-
-         StreamGobbler(InputStream is, String type) {
-            this.is = is;
-            this.type = type;
-         }
-
-         @Override
-         public void run() {
-            try {
-               InputStreamReader isr = new InputStreamReader(this.is);
-               BufferedReader br = new BufferedReader(isr);
-               String line = null;
-
-               while ((line = br.readLine()) != null) {
-                  // Clearly differentiate nwnnsscomp output from our output
-                  System.out.println("[" + this.type + "] " + line);
-               }
-            } catch (IOException var4) {
-               System.out.println("[NCSDecomp] Error reading " + this.type + " stream: " + var4.getMessage());
-               var4.printStackTrace();
             }
          }
       }
