@@ -430,10 +430,11 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          String upper = textWithoutAnsi.toUpperCase();
 
          // Check if this is a compiler error line (format: "filename(line): Error: message")
+         // Pattern can have leading whitespace/pipe characters from Logger formatting
          if (upper.contains("ERROR:") || (upper.contains("ERROR") && upper.contains("SYNTAX"))) {
             // Try to extract error messages from compiler output
-            // Pattern: filename(line): Error: message
-            java.util.regex.Pattern errorPattern = java.util.regex.Pattern.compile("([^:]+)\\((\\d+)\\):\\s*Error:\\s*(.+)", java.util.regex.Pattern.CASE_INSENSITIVE);
+            // Pattern: optional leading whitespace/pipe, then filename(line): Error: message
+            java.util.regex.Pattern errorPattern = java.util.regex.Pattern.compile(".*?([^/\\\\\\s]+)\\((\\d+)\\):\\s*Error:\\s*(.+)", java.util.regex.Pattern.CASE_INSENSITIVE);
             java.util.regex.Matcher matcher = errorPattern.matcher(textWithoutAnsi);
 
             if (matcher.find()) {
@@ -442,12 +443,23 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                String errorMsg = matcher.group(3).trim();
 
                // Find the file that matches this error
+               // Match by base name (without extension) since temp files have different names
                final File[] matchingFileRef = new File[1];
+               String baseName = filename.replaceAll("\\.(nss|ncs)$", "").toLowerCase();
+               
                synchronized (decompiler.hash_TabComponent2File) {
                   for (File file : decompiler.hash_TabComponent2File.values()) {
-                     if (file != null && (file.getName().equals(filename) || file.getName().startsWith(filename.replace(".nss", "")))) {
-                        matchingFileRef[0] = file;
-                        break;
+                     if (file != null) {
+                        String fileBaseName = file.getName().replaceAll("\\.(nss|ncs)$", "").toLowerCase();
+                        // Match by base name (handles temp files like generatedcode_xxx.nss matching k_sup_galaxymap.ncs)
+                        // Also check if filename contains the base name or vice versa
+                        if (fileBaseName.equals(baseName) || 
+                            filename.toLowerCase().contains(fileBaseName) || 
+                            fileBaseName.contains(baseName) ||
+                            file.getName().equalsIgnoreCase(filename)) {
+                           matchingFileRef[0] = file;
+                           break;
+                        }
                      }
                   }
                }
@@ -462,8 +474,8 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                         decompiler.compilationErrors.put(matchingFile, errors);
                      }
 
-                     // Add error if not already present
-                     String fullError = filename + "(" + lineNum + "): Error: " + errorMsg;
+                     // Add error if not already present (use original filename from matched file)
+                     String fullError = matchingFile.getName() + "(" + lineNum + "): Error: " + errorMsg;
                      if (!errors.contains(fullError)) {
                         errors.add(fullError);
 
@@ -550,7 +562,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          // Check for decompilation error patterns
          boolean isDecompilationError = false;
          final String errorMessage;
-         
+
          if (upper.contains("DECOMPILE") && (upper.contains("FAILED") || upper.contains("ERROR") || upper.contains("EXCEPTION"))) {
             isDecompilationError = true;
             errorMessage = textWithoutAnsi.trim();
@@ -566,7 +578,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          } else {
             errorMessage = null;
          }
-         
+
          if (isDecompilationError && errorMessage != null) {
             // Try to find the file from context
             synchronized (decompiler.allLogLines) {
