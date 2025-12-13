@@ -236,13 +236,18 @@ public class CompilerExecutionWrapper {
          if (compilerNwscript.exists()) {
             File backup = new File(compilerDir, "nwscript.nss.backup");
             if (backup.exists()) {
+               System.out.println("[INFO] CompilerExecutionWrapper: DELETING existing backup file: " + backup.getAbsolutePath());
                backup.delete();
             }
+            System.out.println("[INFO] CompilerExecutionWrapper: COPYING nwscript.nss to backup: " + compilerNwscript.getAbsolutePath() + " -> " + backup.getAbsolutePath());
             Files.copy(compilerNwscript.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING);
             originalNwscriptBackup = backup;
+            System.out.println("[INFO] CompilerExecutionWrapper: Created backup of original nwscript.nss: " + backup.getAbsolutePath());
          }
          
          // Copy the appropriate nwscript.nss
+         System.out.println("[INFO] CompilerExecutionWrapper: COPYING nwscript.nss (RENAME): " + nwscriptSource.getAbsolutePath() + " -> " + compilerNwscript.getAbsolutePath());
+         System.out.println("[INFO] CompilerExecutionWrapper: Source file: " + nwscriptSource.getName() + " (K2=" + isK2 + ")");
          Files.copy(nwscriptSource.toPath(), compilerNwscript.toPath(), StandardCopyOption.REPLACE_EXISTING);
          copiedNwscriptFiles.add(compilerNwscript);
          System.out.println("[INFO] CompilerExecutionWrapper: Copied nwscript.nss: " + nwscriptSource.getName() + " -> " + compilerNwscript.getAbsolutePath());
@@ -377,6 +382,7 @@ public class CompilerExecutionWrapper {
       // Clean up copied source file (if registry spoofing was used)
       if (copiedSourceFile != null && copiedSourceFile.exists()) {
          try {
+            System.out.println("[INFO] CompilerExecutionWrapper: DELETING copied source file: " + copiedSourceFile.getAbsolutePath());
             copiedSourceFile.delete();
             System.out.println("[INFO] CompilerExecutionWrapper: Cleaned up copied source file: " + copiedSourceFile.getName());
          } catch (Exception e) {
@@ -389,6 +395,7 @@ public class CompilerExecutionWrapper {
       for (File copiedFile : copiedIncludeFiles) {
          try {
             if (copiedFile.exists()) {
+               System.out.println("[INFO] CompilerExecutionWrapper: DELETING include file: " + copiedFile.getAbsolutePath());
                copiedFile.delete();
                System.out.println("[INFO] CompilerExecutionWrapper: Cleaned up include file: " + copiedFile.getName());
             }
@@ -405,10 +412,12 @@ public class CompilerExecutionWrapper {
             if (compilerDir != null) {
                File compilerNwscript = new File(compilerDir, "nwscript.nss");
                if (compilerNwscript.exists()) {
+                  System.out.println("[INFO] CompilerExecutionWrapper: COPYING (RESTORE) nwscript.nss from backup: " + originalNwscriptBackup.getAbsolutePath() + " -> " + compilerNwscript.getAbsolutePath());
                   Files.copy(originalNwscriptBackup.toPath(), compilerNwscript.toPath(), StandardCopyOption.REPLACE_EXISTING);
                   System.out.println("[INFO] CompilerExecutionWrapper: Restored original nwscript.nss");
                }
             }
+            System.out.println("[INFO] CompilerExecutionWrapper: DELETING backup file: " + originalNwscriptBackup.getAbsolutePath());
             originalNwscriptBackup.delete();
          } catch (Exception e) {
             System.out.println("[INFO] CompilerExecutionWrapper: Failed to restore original nwscript.nss: " + e.getMessage());

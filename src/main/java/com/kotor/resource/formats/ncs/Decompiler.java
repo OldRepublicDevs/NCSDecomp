@@ -166,9 +166,12 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          // If default doesn't exist, try to create it, otherwise prompt user
          File defaultDir = new File(defaultOutputDir);
          if (!defaultDir.exists()) {
+            System.out.println("[INFO] Decompiler: CREATING default output directory: " + defaultDir.getAbsolutePath());
             if (defaultDir.mkdirs()) {
+               System.out.println("[INFO] Decompiler: Created default output directory: " + defaultDir.getAbsolutePath());
                settings.setProperty("Output Directory", defaultOutputDir);
             } else {
+               System.out.println("[INFO] Decompiler: Failed to create default output directory: " + defaultDir.getAbsolutePath());
                // If we can't create it, prompt user
                settings.setProperty("Output Directory", chooseOutputDirectory());
             }
@@ -351,7 +354,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       private void appendToGui(String text) {
          appendToGuiLog(text, this.guiLog, this.doc, this.decompiler);
       }
-      
+
       /**
        * Instance method to append text to GUI log with color coding.
        */
@@ -361,25 +364,25 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                try {
                   // Parse log level and apply color
                   LogSeverity severity = parseLogSeverity(text);
-                  
+
                   // Check if this severity should be shown based on filter
                   if (!shouldShowLog(severity, decompiler)) {
                      return; // Don't append if filtered out
                   }
-                  
+
                   // Get color for this severity
                   java.awt.Color color = getColorForSeverity(severity);
-                  
+
                   // Create style attribute set with color
                   javax.swing.text.SimpleAttributeSet attr = new javax.swing.text.SimpleAttributeSet();
                   javax.swing.text.StyleConstants.setForeground(attr, color);
                   javax.swing.text.StyleConstants.setFontFamily(attr, "Consolas");
                   javax.swing.text.StyleConstants.setFontSize(attr, 11);
-                  
+
                   // Append text with style
                   int start = doc.getLength();
                   doc.insertString(start, text, attr);
-                  
+
                   // Auto-scroll to bottom
                   guiLog.setCaretPosition(doc.getLength());
                } catch (javax.swing.text.BadLocationException e) {
@@ -395,7 +398,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
             });
          }
       }
-      
+
       /**
        * Parses log severity from log line.
        */
@@ -406,11 +409,11 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          String upper = text.toUpperCase();
          if (upper.contains("[TRACE]") || upper.contains("TRACE:")) {
             return LogSeverity.TRACE;
-         } else if (upper.contains("DEBUG ") && !upper.contains("DEBUG transform") && !upper.contains("DEBUG check") 
+         } else if (upper.contains("DEBUG ") && !upper.contains("DEBUG transform") && !upper.contains("DEBUG check")
                && !upper.contains("DEBUG remove") && !upper.contains("DEBUG isAt") && !upper.contains("DEBUG isReturn")) {
             // Only treat as DEBUG if it's NOT a decompiler control flow log
             // Control flow logs (transformJump, checkEnd, etc.) stay as DEBUG
-            if (upper.contains("DEBUG Compiler") || upper.contains("DEBUG FileDecompiler") 
+            if (upper.contains("DEBUG Compiler") || upper.contains("DEBUG FileDecompiler")
                   || upper.contains("DEBUG external") || upper.contains("DEBUG Registry")
                   || upper.contains("DEBUG CompilerExecution") || upper.contains("DEBUG loadNssFile")
                   || upper.contains("DEBUG decompile:") || upper.contains("DEBUG capture")) {
@@ -428,7 +431,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          // Default to INFO for unmarked logs
          return LogSeverity.INFO;
       }
-      
+
       /**
        * Checks if log should be shown based on current filter level.
        */
@@ -440,14 +443,14 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          if (selectedLevel == null) {
             return true;
          }
-         
+
          int selectedIndex = getSeverityIndex(selectedLevel);
          int logIndex = severity.ordinal();
-         
+
          // Show if log severity is >= selected filter level
          return logIndex >= selectedIndex;
       }
-      
+
       /**
        * Gets severity index for comparison.
        */
@@ -459,7 +462,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          }
          return DEFAULT_LOG_LEVEL_INDEX;
       }
-      
+
       /**
        * Gets color for log severity (industry standard colors).
        */
@@ -479,7 +482,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                return java.awt.Color.BLACK;
          }
       }
-      
+
 
       /**
        * Custom OutputStream that writes to both the original PrintStream and the GUI
@@ -1800,8 +1803,10 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       String fileContent = null;
       try {
       // Read the file content
+      System.out.println("[INFO] Decompiler: READING file: " + file.getAbsolutePath());
       fileContent = new String(java.nio.file.Files.readAllBytes(file.toPath()),
          java.nio.charset.StandardCharsets.UTF_8);
+      System.out.println("[INFO] Decompiler: Read file: " + file.getAbsolutePath() + " (length: " + fileContent.length() + " chars)");
       } catch (java.io.IOException e) {
       this.appendStatus("[ERROR] error reading file: " + e.getMessage() + "\n");
       JOptionPane.showMessageDialog(null, "Error reading NSS file: " + e.getMessage());
@@ -2019,14 +2024,18 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                            // Write round-trip NSS to temp file
                            File tempDir = new File(System.getProperty("java.io.tmpdir"), "ncsdecomp_roundtrip");
                            if (!tempDir.exists()) {
+                              System.out.println("[INFO] Decompiler: CREATING directory: " + tempDir.getAbsolutePath());
                               tempDir.mkdirs();
+                              System.out.println("[INFO] Decompiler: Created directory: " + tempDir.getAbsolutePath());
                            }
                            String baseName = file.getName();
                            if (baseName.endsWith(".nss")) {
                               baseName = baseName.substring(0, baseName.length() - 4);
                            }
                            File roundTripNssFile = new File(tempDir, baseName + "_roundtrip.nss");
+                           System.out.println("[INFO] Decompiler: WRITING round-trip NSS file: " + roundTripNssFile.getAbsolutePath() + " (length: " + roundTripCode.getBytes().length + " bytes)");
                            java.nio.file.Files.write(roundTripNssFile.toPath(), roundTripCode.getBytes());
+                           System.out.println("[INFO] Decompiler: Wrote round-trip NSS file: " + roundTripNssFile.getAbsolutePath());
 
                            // Compile the round-trip NSS to NCS
                            File secondCompiledNcs = this.fileDecompiler.compileNssToNcs(roundTripNssFile, tempDir);
@@ -2263,7 +2272,9 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                         // Create temp directory for round-trip
                         File tempDir = new File(System.getProperty("java.io.tmpdir"), "ncsdecomp_roundtrip");
                         if (!tempDir.exists()) {
+                           System.out.println("[INFO] Decompiler: CREATING directory: " + tempDir.getAbsolutePath());
                            tempDir.mkdirs();
+                           System.out.println("[INFO] Decompiler: Created directory: " + tempDir.getAbsolutePath());
                         }
 
                         // Save decompiled code to temp file
@@ -2273,8 +2284,9 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                         File tempNssFile = new File(tempDir, baseName2 + ".nss");
 
                         // Write the generated code to temp file
-                        java.nio.file.Files.write(tempNssFile.toPath(),
-                              finalGeneratedCode.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                        byte[] codeBytes = finalGeneratedCode.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                        System.out.println("[INFO] Decompiler: WRITING temp NSS file: " + tempNssFile.getAbsolutePath() + " (length: " + codeBytes.length + " bytes)");
+                        java.nio.file.Files.write(tempNssFile.toPath(), codeBytes);
                         System.out.println("[INFO] decompile: Saved temp NSS to: " + tempNssFile.getAbsolutePath());
 
                         // Compile the temp NSS file directly (without cleanup) for round-trip display
@@ -2470,10 +2482,13 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
             }
          }
 
+         System.out.println("[INFO] Decompiler: WRITING file: " + canonicalPath + " (encoding: " + charset.name() + ")");
          BufferedWriter bw = new BufferedWriter(
                new java.io.OutputStreamWriter(new java.io.FileOutputStream(canonicalPath), charset));
-         bw.write(buffer.getText());
+         String text = buffer.getText();
+         bw.write(text);
          bw.close();
+         System.out.println("[INFO] Decompiler: Wrote file: " + canonicalPath + " (length: " + text.length() + " chars)");
          return new File(canonicalPath);
       } catch (FileNotFoundException var4) {
          File toDel = new File(canonicalPath);

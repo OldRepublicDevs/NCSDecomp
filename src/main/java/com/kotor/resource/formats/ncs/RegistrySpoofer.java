@@ -461,7 +461,9 @@ public class RegistrySpoofer implements AutoCloseable {
    private static void markDontShowInfoMessage() {
       try {
          Path markerPath = Paths.get(System.getProperty("user.dir"), DONT_SHOW_INFO_MARKER_FILE);
+         System.out.println("[INFO] RegistrySpoofer: CREATING marker file: " + markerPath.toAbsolutePath());
          Files.createFile(markerPath);
+         System.out.println("[INFO] RegistrySpoofer: Created marker file: " + markerPath.toAbsolutePath());
       } catch (Exception e) {
          System.out.println("[INFO] RegistrySpoofer: Failed to create don't show info marker: " + e.getMessage());
       }
@@ -526,8 +528,9 @@ public class RegistrySpoofer implements AutoCloseable {
                "  exit /b 0\n" +
                ")\n";
 
+         System.out.println("[INFO] RegistrySpoofer: CREATING temporary batch file: " + tempBatch.getAbsolutePath());
+         System.out.println("[INFO] RegistrySpoofer: WRITING batch file content (length: " + batchContent.getBytes("UTF-8").length + " bytes)");
          Files.write(tempBatch.toPath(), batchContent.getBytes("UTF-8"));
-
          System.out.println("[INFO] RegistrySpoofer: Created temporary batch file: " + tempBatch.getAbsolutePath());
          System.out.println("[INFO] RegistrySpoofer: Batch file content:\n" + batchContent);
 
@@ -564,6 +567,7 @@ public class RegistrySpoofer implements AutoCloseable {
 
          // Clean up temp file
          try {
+            System.out.println("[INFO] RegistrySpoofer: DELETING temporary batch file: " + tempBatch.getAbsolutePath());
             tempBatch.delete();
             System.out.println("[INFO] RegistrySpoofer: Deleted temporary batch file");
          } catch (Exception e) {
@@ -689,16 +693,22 @@ public class RegistrySpoofer implements AutoCloseable {
          File installDir = new File(installationPath);
          if (!installDir.exists()) {
             System.out.println("[INFO] RegistrySpoofer: Installation directory doesn't exist, creating: " + installationPath);
+            System.out.println("[INFO] RegistrySpoofer: CREATING directory: " + installDir.getAbsolutePath());
             if (!installDir.mkdirs()) {
                System.out.println("[INFO] RegistrySpoofer: WARNING - Failed to create installation directory: " + installationPath);
                return;
             }
+            System.out.println("[INFO] RegistrySpoofer: Created directory: " + installDir.getAbsolutePath());
          }
 
          // Create chitin.key - this is CRITICAL for initialization
          // ALWAYS recreate it to ensure it's valid (previous versions may have been corrupt)
          File chitinKey = new File(installDir, "chitin.key");
          System.out.println("[INFO] RegistrySpoofer: Creating chitin.key file: " + chitinKey.getAbsolutePath());
+         if (chitinKey.exists()) {
+            System.out.println("[INFO] RegistrySpoofer: DELETING existing chitin.key file: " + chitinKey.getAbsolutePath());
+            chitinKey.delete();
+         }
 
          // BioWare KEY file format - MUST use LITTLE ENDIAN for integers
          byte[] keyFile = new byte[32]; // Header is 32 bytes (0x20)
@@ -733,6 +743,7 @@ public class RegistrySpoofer implements AutoCloseable {
          // Bytes 28-31: Build day = 1 (little endian)
          writeLittleEndianInt(keyFile, 28, 1);
 
+         System.out.println("[INFO] RegistrySpoofer: WRITING chitin.key file: " + chitinKey.getAbsolutePath() + " (size: " + keyFile.length + " bytes)");
          Files.write(chitinKey.toPath(), keyFile);
          System.out.println("[INFO] RegistrySpoofer: Created valid chitin.key file (size: " + chitinKey.length() + " bytes, header: KEY V1)");
 
@@ -741,6 +752,7 @@ public class RegistrySpoofer implements AutoCloseable {
          for (String dirName : dirs) {
             File dir = new File(installDir, dirName);
             if (!dir.exists()) {
+               System.out.println("[INFO] RegistrySpoofer: CREATING directory: " + dir.getAbsolutePath());
                if (dir.mkdirs()) {
                   System.out.println("[INFO] RegistrySpoofer: Created directory: " + dir.getAbsolutePath());
                } else {

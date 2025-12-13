@@ -117,7 +117,9 @@ public class FileDecompiler {
                + (nwscriptFile != null ? nwscriptFile.getAbsolutePath() : "null"));
       }
       try {
+         System.out.println("[INFO] FileDecompiler: READING nwscript file: " + nwscriptFile.getAbsolutePath());
          this.actions = new ActionsData(new BufferedReader(new FileReader(nwscriptFile)));
+         System.out.println("[INFO] FileDecompiler: Read nwscript file: " + nwscriptFile.getAbsolutePath());
       } catch (IOException ex) {
          throw new DecompilerException("Error reading nwscript file: " + ex.getMessage());
       }
@@ -156,7 +158,10 @@ public class FileDecompiler {
             if (settingsPath != null && !settingsPath.isEmpty()) {
                actionfile = new File(settingsPath);
                if (actionfile.isFile()) {
-                  return new ActionsData(new BufferedReader(new FileReader(actionfile)));
+                  System.out.println("[INFO] loadActionsDataInternal: READING nwscript file from settings: " + actionfile.getAbsolutePath() + " (K2=" + isK2Selected + ")");
+                  ActionsData result = new ActionsData(new BufferedReader(new FileReader(actionfile)));
+                  System.out.println("[INFO] loadActionsDataInternal: Read nwscript file: " + actionfile.getAbsolutePath());
+                  return result;
                }
             }
          } catch (NoClassDefFoundError | Exception e) {
@@ -187,7 +192,10 @@ public class FileDecompiler {
             }
          }
          if (actionfile.isFile()) {
-            return new ActionsData(new BufferedReader(new FileReader(actionfile)));
+            System.out.println("[INFO] loadActionsDataInternal: READING nwscript file (fallback): " + actionfile.getAbsolutePath() + " (K2=" + isK2Selected + ")");
+            ActionsData result = new ActionsData(new BufferedReader(new FileReader(actionfile)));
+            System.out.println("[INFO] loadActionsDataInternal: Read nwscript file: " + actionfile.getAbsolutePath());
+            return result;
          } else {
             throw new DecompilerException("Error: cannot open actions file " + actionfile.getAbsolutePath() + ".");
          }
@@ -211,6 +219,7 @@ public class FileDecompiler {
          }
 
          if (configFile.exists() && configFile.isFile()) {
+            System.out.println("[INFO] loadPreferSwitchesFromConfig: READING config file: " + configFile.getAbsolutePath());
             try (BufferedReader reader = new BufferedReader(new FileReader(configFile))) {
                String line;
                while ((line = reader.readLine()) != null) {
@@ -584,13 +593,19 @@ public class FileDecompiler {
       String code = this.decompileToString(input);
       File parent = output.getParentFile();
       if (parent != null) {
-         parent.mkdirs();
+         if (!parent.exists()) {
+            System.out.println("[INFO] decompileToFile: CREATING directory: " + parent.getAbsolutePath());
+            parent.mkdirs();
+            System.out.println("[INFO] decompileToFile: Created directory: " + parent.getAbsolutePath());
+         }
       }
 
+      System.out.println("[INFO] decompileToFile: WRITING file: " + output.getAbsolutePath() + " (encoding: " + charset.name() + ", length: " + code.length() + " chars)");
       try (BufferedWriter bw = new BufferedWriter(
             new java.io.OutputStreamWriter(new java.io.FileOutputStream(output), charset))) {
          bw.write(code);
       }
+      System.out.println("[INFO] decompileToFile: Wrote file: " + output.getAbsolutePath());
    }
 
    /**
@@ -681,14 +696,17 @@ public class FileDecompiler {
       } finally {
          try {
             if (newcompiled != null) {
+               System.out.println("[INFO] compileNss: DELETING temp compiled file: " + newcompiled.getAbsolutePath());
                newcompiled.delete();
             }
 
             if (newdecompiled != null) {
+               System.out.println("[INFO] compileNss: DELETING temp decompiled file: " + newdecompiled.getAbsolutePath());
                newdecompiled.delete();
             }
 
             if (olddecompiled != null) {
+               System.out.println("[INFO] compileNss: DELETING temp old decompiled file: " + olddecompiled.getAbsolutePath());
                olddecompiled.delete();
             }
          } catch (Exception var15) {
@@ -713,6 +731,7 @@ public class FileDecompiler {
       } finally {
          try {
             if (gennedcode != null) {
+               System.out.println("[INFO] compileNss: DELETING temp generated code file: " + gennedcode.getAbsolutePath());
                gennedcode.delete();
             }
          } catch (Exception var10) {
@@ -740,7 +759,9 @@ public class FileDecompiler {
          // Use temp directory for compileNss (used internally, not user-initiated save)
          File tempDir = new File(System.getProperty("java.io.tmpdir"), "ncsdecomp_roundtrip");
          if (!tempDir.exists()) {
+            System.out.println("[INFO] compileNss: CREATING directory: " + tempDir.getAbsolutePath());
             tempDir.mkdirs();
+            System.out.println("[INFO] compileNss: Created directory: " + tempDir.getAbsolutePath());
          }
          newcompiled = this.externalCompile(nssFile, isK2Selected, tempDir);
          if (newcompiled == null) {
@@ -761,10 +782,12 @@ public class FileDecompiler {
       } finally {
          try {
             if (newcompiled != null) {
+               System.out.println("[INFO] compileNss: DELETING temp compiled file: " + newcompiled.getAbsolutePath());
                newcompiled.delete();
             }
 
             if (newdecompiled != null) {
+               System.out.println("[INFO] compileNss: DELETING temp decompiled file: " + newdecompiled.getAbsolutePath());
                newdecompiled.delete();
             }
          } catch (Exception var11) {
@@ -783,6 +806,7 @@ public class FileDecompiler {
       BufferedReader reader = null;
 
       try {
+         System.out.println("[INFO] readPcodeFile: READING pcode file: " + file.getAbsolutePath());
          reader = new BufferedReader(new FileReader(file));
 
          String line;
@@ -810,6 +834,7 @@ public class FileDecompiler {
     * @return null when identical; otherwise a human-readable mismatch description
     */
    private String comparePcodeFiles(File originalPcode, File newPcode) {
+      System.out.println("[INFO] comparePcodeFiles: READING pcode files for comparison: " + originalPcode.getAbsolutePath() + " vs " + newPcode.getAbsolutePath());
       try (BufferedReader reader1 = new BufferedReader(new FileReader(originalPcode));
             BufferedReader reader2 = new BufferedReader(new FileReader(newPcode))) {
          String line1;
@@ -844,6 +869,7 @@ public class FileDecompiler {
     * Performs byte-for-byte comparison of two compiled NCS files.
     */
    private boolean compareBinaryFiles(File original, File generated) {
+      System.out.println("[INFO] compareBinaryFiles: READING binary files for comparison: " + original.getAbsolutePath() + " vs " + generated.getAbsolutePath());
       try (BufferedInputStream a = new BufferedInputStream(new FileInputStream(original));
             BufferedInputStream b = new BufferedInputStream(new FileInputStream(generated))) {
          int ba;
@@ -985,6 +1011,7 @@ public class FileDecompiler {
       }
       File result = new File(actualOutputDir, baseName + ".pcode");
       if (result.exists()) {
+         System.out.println("[INFO] externalDecompile: DELETING existing pcode file: " + result.getAbsolutePath());
          result.delete();
       }
 
@@ -1037,13 +1064,15 @@ public class FileDecompiler {
             if (nwscriptSource.exists()) {
                if (!compilerNwscript.exists()) {
                   try {
+                     System.out.println("[INFO] externalDecompile: COPYING nwscript.nss (RENAME) for decompilation: " + nwscriptSource.getAbsolutePath() + " -> " + compilerNwscript.getAbsolutePath());
+                     System.out.println("[INFO] externalDecompile: Source file: " + nwscriptSource.getName() + " (K2=" + k2 + ")");
                      java.nio.file.Files.copy(nwscriptSource.toPath(), compilerNwscript.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
                      System.out.println("[INFO] externalDecompile: Copied nwscript.nss for decompilation: " + nwscriptSource.getName() + " -> " + compilerNwscript.getAbsolutePath());
                   } catch (IOException e) {
                      System.out.println("[INFO] externalDecompile: Failed to copy nwscript.nss: " + e.getMessage());
                   }
                } else {
-                  System.out.println("[INFO] externalDecompile: nwscript.nss already exists in tools directory");
+                  System.out.println("[INFO] externalDecompile: nwscript.nss already exists in tools directory: " + compilerNwscript.getAbsolutePath());
                }
             } else {
                System.out.println("[WARNING] externalDecompile: nwscript source not found: " + nwscriptSource.getAbsolutePath());
@@ -1155,20 +1184,27 @@ public class FileDecompiler {
          // Use temp directory to avoid creating files outside temp without user consent
          File tempDir = new File(System.getProperty("java.io.tmpdir"), "ncsdecomp_roundtrip");
          if (!tempDir.exists()) {
+            System.out.println("[INFO] writeCode: CREATING directory: " + tempDir.getAbsolutePath());
             tempDir.mkdirs();
+            System.out.println("[INFO] writeCode: Created directory: " + tempDir.getAbsolutePath());
          }
 
          // Create unique temp file to avoid conflicts
+         System.out.println("[INFO] writeCode: CREATING temp file in: " + tempDir.getAbsolutePath());
          File out = File.createTempFile("generatedcode_", ".nss", tempDir);
+         System.out.println("[INFO] writeCode: Created temp file: " + out.getAbsolutePath());
+         System.out.println("[INFO] writeCode: WRITING code to file: " + out.getAbsolutePath() + " (length: " + code.length() + " chars)");
          FileWriter writer = new FileWriter(out);
          writer.write(code);
          writer.close();
+         System.out.println("[INFO] writeCode: Wrote code to file: " + out.getAbsolutePath());
 
          // Clean up any old NCS file with similar name (shouldn't exist, but just in
          // case)
          String baseName = out.getName().substring(0, out.getName().lastIndexOf('.'));
          File result = new File(tempDir, baseName + ".ncs");
          if (result.exists()) {
+            System.out.println("[INFO] writeCode: DELETING existing NCS file: " + result.getAbsolutePath());
             result.delete();
          }
 
@@ -1208,7 +1244,9 @@ public class FileDecompiler {
             // Default to temp directory to avoid creating files without user consent
             actualOutputDir = new File(System.getProperty("java.io.tmpdir"), "ncsdecomp_roundtrip");
             if (!actualOutputDir.exists()) {
+               System.out.println("[INFO] externalCompile: CREATING directory: " + actualOutputDir.getAbsolutePath());
                actualOutputDir.mkdirs();
+               System.out.println("[INFO] externalCompile: Created directory: " + actualOutputDir.getAbsolutePath());
             }
          }
 
@@ -1583,7 +1621,9 @@ public class FileDecompiler {
          // Decode bytecode - wrap in try-catch to handle corrupted files
          try {
             System.err.println("DEBUG decompileNcs: starting decode for " + file.getName());
+            System.out.println("[INFO] decompileNcs: READING NCS file for decompilation: " + file.getAbsolutePath());
             commands = new Decoder(new BufferedInputStream(new FileInputStream(file)), this.actions).decode();
+            System.out.println("[INFO] decompileNcs: Read NCS file: " + file.getAbsolutePath());
             System.err.println("DEBUG decompileNcs: decode successful, commands length="
                   + (commands != null ? commands.length() : 0));
          } catch (Exception decodeEx) {
@@ -1593,6 +1633,7 @@ public class FileDecompiler {
             long fileSize = file.exists() ? file.length() : -1;
             String fileInfo = "File size: " + fileSize + " bytes";
             if (fileSize > 0) {
+               System.out.println("[INFO] decompileNcs: READING file header: " + file.getAbsolutePath());
                try (FileInputStream fis = new FileInputStream(file)) {
                   byte[] header = new byte[Math.min(16, (int) fileSize)];
                   int read = fis.read(header);

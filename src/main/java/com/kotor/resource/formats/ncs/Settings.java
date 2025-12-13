@@ -386,9 +386,11 @@ public class Settings extends Properties implements ActionListener {
       }
 
       try {
+         System.out.println("[INFO] Settings: READING config file: " + configToLoad.getAbsolutePath());
          try (FileInputStream fis = new FileInputStream(configToLoad)) {
             this.load(fis);
          }
+         System.out.println("[INFO] Settings: Read config file: " + configToLoad.getAbsolutePath());
       } catch (Exception var4) {
          try {
             new File(CONFIG_FILE).createNewFile();
@@ -418,9 +420,16 @@ public class Settings extends Properties implements ActionListener {
     */
    public void save() {
       File configDir = new File(System.getProperty("user.dir"), "config");
+      if (!configDir.exists()) {
+         System.out.println("[INFO] Settings: CREATING config directory: " + configDir.getAbsolutePath());
+         configDir.mkdirs();
+         System.out.println("[INFO] Settings: Created config directory: " + configDir.getAbsolutePath());
+      }
       File configFile = new File(configDir, CONFIG_FILE);
+      System.out.println("[INFO] Settings: WRITING config file: " + configFile.getAbsolutePath());
       try (FileOutputStream fos = new FileOutputStream(configFile)) {
          this.store(fos, "NCSDecomp Configuration");
+         System.out.println("[INFO] Settings: Wrote config file: " + configFile.getAbsolutePath());
       } catch (FileNotFoundException var2) {
          var2.printStackTrace();
       } catch (IOException var3) {
