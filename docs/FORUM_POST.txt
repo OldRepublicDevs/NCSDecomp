@@ -1,0 +1,107 @@
+NCSDecomp - Turn Your Compiled KOTOR Scripts Back Into Readable Code!
+
+Ever wanted to see what's inside those compiled .ncs script files from KOTOR? Or maybe you found a mod with scripts you want to understand or modify? NCSDecomp can take those compiled script files and turn them back into readable source code that you can actually understand and edit!
+
+What does it do?
+
+Simply put, NCSDecomp converts compiled KOTOR scripts (.ncs files) back into source code (.nss files). It's like having a translator that converts the game's internal script format back into human-readable code. Works with both KOTOR 1 and KOTOR 2!
+
+How to use:
+
+There are two ways to use NCSDecomp - a simple graphical program (GUI) or command-line tools. Most users will want the GUI version!
+
+Option 1: The Easy Way (GUI - Recommended!)
+
+1. Download the NCSDecomp folder
+2. Double-click NCSDecomp.exe (Windows) or NCSDecomp.app (Mac)
+3. That's it! No Java installation needed - everything is included!
+
+Once it opens:
+- Drag and drop any .ncs file onto the window to decompile it
+- Or use File → Open to browse for files
+- The decompiled code will appear with syntax highlighting (color-coded keywords, functions, etc.)
+- You can edit the code right there if you want
+- Press Ctrl+S (or Cmd+S on Mac) to save your changes
+- Open multiple files at once - each gets its own tab
+
+The program automatically detects whether you're working with KOTOR 1 or KOTOR 2 scripts, so you don't need to worry about that!
+
+Option 2: Command Line (For Advanced Users)
+
+If you prefer using the command line or want to automate tasks:
+
+Windows:
+.\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k2
+
+Mac/Linux:
+./NCSDecompCLI -i "script.ncs" -o "script.nss" --k2
+
+This reads script.ncs and creates script.nss with the decompiled code. Use --k1 for KOTOR 1 scripts, or --k2 for KOTOR 2 scripts.
+
+Decompile an entire folder:
+.\NCSDecompCLI.exe -i "scripts_folder" -r --k2 -O "output_folder"
+
+This processes all .ncs files in the folder (including subfolders) and saves the results to your output folder.
+
+Features:
+
+- Works with both KOTOR 1 and KOTOR 2/TSL scripts
+- Beautiful graphical interface with syntax highlighting
+- Edit decompiled scripts and compile them back
+- Round-trip verification - see if your edited code compiles correctly
+- Batch process entire folders of scripts at once
+- View bytecode if you're curious about the low-level details
+- Self-contained - no Java installation needed!
+- Cross-platform - works on Windows, Mac, and Linux
+
+What can you do with it?
+
+- Decompile .ncs files to see the original source code
+- Understand how game scripts work
+- Edit scripts and recompile them for mods
+- Analyze scripts from your favorite mods
+- Batch process entire script folders quickly
+
+Troubleshooting:
+
+"Error: nwscript file not found"
+- Make sure you haven't deleted or moved the tools folder that came with the download
+- The program should find everything automatically, but if you get this error, check that the tools folder is in the same directory as the executable
+
+"Program won't start" (Windows)
+- Windows might be blocking it. Right-click NCSDecomp.exe → Properties → Check "Unblock" → Apply
+- Try running as Administrator if you get permission errors
+
+"Program won't start" (Mac)
+- You may need to allow the app in System Preferences → Security & Privacy
+- Right-click the app and select "Open" the first time
+
+"Program won't start" (Linux)
+- Make sure the executable has permission to run: chmod +x NCSDecompCLI/NCSDecompCLI
+
+For more help:
+- Run .\NCSDecompCLI.exe --help (Windows) or ./NCSDecompCLI --help (Mac/Linux) to see all available options
+- Check the included README files for detailed documentation
+
+Source code and more info:
+
+https://github.com/bolabaden
+https://bolabaden.org
+
+Credits:
+
+Original Developers:
+- JdNoa - Script Decompiler
+- Dashus - GUI
+
+Current Maintainer:
+- th3w1zard1
+
+This project is based on the original DeNCS tool that was used internally by TSLRP (The Sith Lords Restoration Project). This version represents a complete modernization with a new GUI, better features, and cross-platform support.
+
+License:
+
+This software is provided under the Business Source License 1.1 (BSL 1.1). See LICENSE.txt in the download for full license information.
+
+Enjoy decompiling! 🎮✨
+
