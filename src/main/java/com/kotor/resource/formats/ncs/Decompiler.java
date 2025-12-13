@@ -1730,18 +1730,58 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                            File compilerDir = compiler.getParentFile();
                            if (compilerDir != null) {
                               File compilerNwscript = new File(compilerDir, "nwscript.nss");
-                              File nwscriptSource = isK2
-                                    ? new File(new File(System.getProperty("user.dir"), "tools"), "tsl_nwscript.nss")
-                                    : new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss");
-                              if (nwscriptSource.exists() && (!compilerNwscript.exists()
+                              File nwscriptSource = null;
+                              
+                              if (isK2) {
+                                 nwscriptSource = new File(new File(System.getProperty("user.dir"), "tools"), "tsl_nwscript.nss");
+                              } else {
+                                 // For K1, check if script needs ASC nwscript (ActionStartConversation with 11 params)
+                                 boolean needsAsc = false;
+                                 try {
+                                    String sourceContent = new String(java.nio.file.Files.readAllBytes(file.toPath()), java.nio.charset.StandardCharsets.UTF_8);
+                                    // Look for ActionStartConversation calls with 11 parameters (10 commas)
+                                    java.util.regex.Pattern ascPattern = java.util.regex.Pattern.compile(
+                                          "ActionStartConversation\\s*\\(([^,)]*,\\s*){10}[^)]*\\)",
+                                          java.util.regex.Pattern.MULTILINE);
+                                    needsAsc = ascPattern.matcher(sourceContent).find();
+                                    if (needsAsc) {
+                                       System.err.println("DEBUG loadNssFile: Script needs ASC nwscript (ActionStartConversation with 11 params)");
+                                    }
+                                 } catch (Exception e) {
+                                    System.err.println("DEBUG loadNssFile: Failed to check for ASC nwscript requirement: " + e.getMessage());
+                                 }
+                                 
+                                 if (needsAsc) {
+                                    // Try k1_asc_nwscript.nss first, then k1_asc_donotuse_nwscript.nss
+                                    File ascNwscript = new File(new File(System.getProperty("user.dir"), "tools"), "k1_asc_nwscript.nss");
+                                    if (!ascNwscript.exists()) {
+                                       ascNwscript = new File(new File(System.getProperty("user.dir"), "tools"), "k1_asc_donotuse_nwscript.nss");
+                                    }
+                                    if (ascNwscript.exists()) {
+                                       nwscriptSource = ascNwscript;
+                                       System.err.println("DEBUG loadNssFile: Using ASC nwscript: " + nwscriptSource.getAbsolutePath());
+                                    } else {
+                                       System.err.println("DEBUG loadNssFile: Warning: ASC nwscript not found, falling back to regular k1_nwscript.nss");
+                                       nwscriptSource = new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss");
+                                    }
+                                 } else {
+                                    nwscriptSource = new File(new File(System.getProperty("user.dir"), "tools"), "k1_nwscript.nss");
+                                 }
+                              }
+                              
+                              if (nwscriptSource != null && nwscriptSource.exists() && (!compilerNwscript.exists()
                                     || !compilerNwscript.getAbsolutePath().equals(nwscriptSource.getAbsolutePath()))) {
                                  try {
                                     java.nio.file.Files.copy(nwscriptSource.toPath(), compilerNwscript.toPath(),
                                           java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                                    System.err.println("DEBUG loadNssFile: Copied nwscript.nss to compiler directory: " + nwscriptSource.getName());
                                  } catch (java.io.IOException e) {
                                     System.err.println(
                                           "DEBUG loadNssFile: Warning: Could not copy nwscript.nss: " + e.getMessage());
                                  }
+                              } else if (nwscriptSource == null || !nwscriptSource.exists()) {
+                                 System.err.println("DEBUG loadNssFile: Warning: nwscript.nss source not found: " + 
+                                       (nwscriptSource != null ? nwscriptSource.getAbsolutePath() : "null"));
                               }
                            }
 
@@ -1752,8 +1792,8 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                            
                            // For KOTOR Tool and KOTOR Scripting Tool, copy include files to source directory (they don't support -i flag)
                            java.util.List<File> copiedIncludeFiles = new java.util.ArrayList<>();
-                           KnownExternalCompilers compiler = config.getChosenCompiler();
-                           if ((compiler == KnownExternalCompilers.KOTOR_TOOL || compiler == KnownExternalCompilers.KOTOR_SCRIPTING_TOOL) && !includeDirs.isEmpty()) {
+                           KnownExternalCompilers extCompiler = config.getChosenCompiler();
+                           if ((extCompiler == KnownExternalCompilers.KOTOR_TOOL || extCompiler == KnownExternalCompilers.KOTOR_SCRIPTING_TOOL) && !includeDirs.isEmpty()) {
                               File sourceDir = file.getParentFile();
                               
                               // Parse source file to find which includes are needed
