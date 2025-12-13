@@ -17,7 +17,6 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import com.kotor.resource.formats.ncs.CompilerUtil;
 import java.time.format.DateTimeFormatter;
 import java.util.Properties;
 import javax.swing.event.DocumentEvent;
