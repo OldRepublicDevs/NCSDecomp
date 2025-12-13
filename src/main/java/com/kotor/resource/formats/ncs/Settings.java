@@ -411,26 +411,37 @@ public class Settings extends Properties implements ActionListener {
             this.save();
          }
       } catch (Exception var4) {
-         // If reading failed, try to create default config in config directory
+         // If reading failed, log warning and continue with defaults
+         // NEVER crash on startup due to config issues - just use sensible defaults
+         System.err.println("[WARNING] Settings: Error reading config file: " + var4.getMessage());
+         System.err.println("[INFO] Settings: Continuing with default settings");
+
+         // Try to create default config, but don't crash if we can't
          try {
             // Ensure config directory exists before creating file
             if (!configDir.exists()) {
-               configDir.mkdirs();
+               if (!configDir.mkdirs()) {
+                  System.err.println("[WARNING] Settings: Could not create config directory: " + configDir.getAbsolutePath());
+               }
             }
             File defaultConfigFile = new File(configDir, CONFIG_FILE);
             if (!defaultConfigFile.exists()) {
-               defaultConfigFile.createNewFile();
+               if (!defaultConfigFile.createNewFile()) {
+                  System.err.println("[WARNING] Settings: Could not create config file: " + defaultConfigFile.getAbsolutePath());
+               }
             }
-         } catch (FileNotFoundException var2) {
-            var2.printStackTrace();
-            System.exit(1);
-         } catch (IOException var3) {
-            var3.printStackTrace();
-            System.exit(1);
+         } catch (Exception createEx) {
+            // Log but NEVER crash - we can run fine with defaults in memory
+            System.err.println("[WARNING] Settings: Could not create default config: " + createEx.getMessage());
          }
 
          this.reset();
-         this.save();
+         // Try to save, but don't crash if we can't
+         try {
+            this.save();
+         } catch (Exception saveEx) {
+            System.err.println("[WARNING] Settings: Could not save default config: " + saveEx.getMessage());
+         }
       }
 
       // Apply loaded settings to static flags

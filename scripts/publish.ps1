@@ -96,29 +96,56 @@ $jarDir = Join-Path $targetDir "jar"
 $cliJarSource = Join-Path $jarDir "NCSDecompCLI.jar"
 $guiJarSource = Join-Path $jarDir "NCSDecomp.jar"
 
-# Copy executables (flattened into archive root) if they exist
-# Note: Executables are only built if jpackage (JDK 14+) is available
-# Note: jpackage app-images normally require their sibling app/ + runtime/ folders.
-# This publish script intentionally creates a minimal archive layout (EXE/JAR/docs/examples/tools/config).
+# Copy complete jpackage app-image directories (not just the .exe files!)
+# jpackage creates app-images that REQUIRE their sibling app/ + runtime/ folders to run.
+# Without these folders, the .exe launcher fails with "Error opening NCSDecomp.cfg".
 $distDir = Join-Path $targetDir "dist"
 
-$cliExeName = if ($IsWindows) { "NCSDecompCLI.exe" } else { "NCSDecompCLI" }
-$cliExeSource = Join-Path (Join-Path $distDir "NCSDecompCLI") $cliExeName
-if (Test-Path $cliExeSource) {
-    Copy-Item $cliExeSource (Join-Path $publishDir $cliExeName) -Force
-    Write-Host "  - Copied $cliExeName" -ForegroundColor Cyan
+# Helper function to copy jpackage app-image and add config/tools
+function Copy-JPackageApp {
+    param(
+        [string]$AppName,
+        [string]$SourceDir,
+        [string]$DestDir
+    )
+
+    $appImageDir = Join-Path $SourceDir $AppName
+    if (-not (Test-Path $appImageDir)) {
+        return $false
+    }
+
+    $destAppDir = Join-Path $DestDir $AppName
+    Write-Host "  - Copying $AppName app-image (complete jpackage output)..." -ForegroundColor Cyan
+
+    # Copy entire app-image directory
+    Copy-Item -Path $appImageDir -Destination $destAppDir -Recurse -Force
+
+    # Create config/ inside the app-image so the EXE can find it
+    $appConfigDir = Join-Path $destAppDir "config"
+    New-Item -ItemType Directory -Path $appConfigDir -Force | Out-Null
+
+    # Create tools/ inside the app-image so the EXE can find compilers
+    $appToolsDir = Join-Path $destAppDir "tools"
+    New-Item -ItemType Directory -Path $appToolsDir -Force | Out-Null
+
+    return $true
+}
+
+# Copy CLI app-image
+$cliCopied = Copy-JPackageApp -AppName "NCSDecompCLI" -SourceDir $distDir -DestDir $publishDir
+if ($cliCopied) {
+    Write-Host "    - Copied complete NCSDecompCLI app-image" -ForegroundColor Gray
 } else {
-    Write-Host "  Note: $cliExeName not found (executable build skipped - requires JDK 14+ with jpackage)" -ForegroundColor Gray
+    Write-Host "  Note: NCSDecompCLI app-image not found (executable build skipped - requires JDK 14+ with jpackage)" -ForegroundColor Gray
     Write-Host "         JAR files are provided instead (Java 8+ compatible)" -ForegroundColor Gray
 }
 
-$guiExeName = if ($IsWindows) { "NCSDecomp.exe" } else { "NCSDecomp" }
-$guiExeSource = Join-Path (Join-Path $distDir "NCSDecomp") $guiExeName
-if (Test-Path $guiExeSource) {
-    Copy-Item $guiExeSource (Join-Path $publishDir $guiExeName) -Force
-    Write-Host "  - Copied $guiExeName" -ForegroundColor Cyan
+# Copy GUI app-image
+$guiCopied = Copy-JPackageApp -AppName "NCSDecomp" -SourceDir $distDir -DestDir $publishDir
+if ($guiCopied) {
+    Write-Host "    - Copied complete NCSDecomp app-image" -ForegroundColor Gray
 } else {
-    Write-Host "  Note: $guiExeName not found (GUI executable build skipped)" -ForegroundColor Gray
+    Write-Host "  Note: NCSDecomp app-image not found (GUI executable build skipped)" -ForegroundColor Gray
 }
 
 # Copy JAR files to root as well (for standalone usage)
@@ -139,6 +166,7 @@ if (Test-Path $guiJarSource) {
 }
 
 # Copy tools/ payload (compiler + nwscript) into tools/ folder in the archive
+# Also copy into each jpackage app-image directory for EXE users
 $toolsDir = Join-Path "." "tools"
 $toolsPublishDir = Join-Path $publishDir "tools"
 New-Item -ItemType Directory -Path $toolsPublishDir -Force | Out-Null
@@ -150,17 +178,27 @@ $toolPayload = @(
     "nwnnsscomp_ktool.exe"
 )
 
+# Collect destinations: root tools/ plus each app-image tools/
+$toolDestinations = @($toolsPublishDir)
+$cliToolsDir = Join-Path (Join-Path $publishDir "NCSDecompCLI") "tools"
+$guiToolsDir = Join-Path (Join-Path $publishDir "NCSDecomp") "tools"
+if (Test-Path $cliToolsDir) { $toolDestinations += $cliToolsDir }
+if (Test-Path $guiToolsDir) { $toolDestinations += $guiToolsDir }
+
 foreach ($tool in $toolPayload) {
     $toolPath = Join-Path $toolsDir $tool
     if (Test-Path $toolPath) {
-        Copy-Item $toolPath (Join-Path $toolsPublishDir $tool) -Force
-        Write-Host "  - Copied tools/$tool" -ForegroundColor Cyan
+        foreach ($dest in $toolDestinations) {
+            Copy-Item $toolPath (Join-Path $dest $tool) -Force
+        }
+        Write-Host "  - Copied tools/$tool (to $($toolDestinations.Count) locations)" -ForegroundColor Cyan
     } else {
         Write-Host "  Warning: tools/$tool not found" -ForegroundColor Yellow
     }
 }
 
 # Create default config file into config/
+# Also copy into each jpackage app-image directory for EXE users
 $configPublishDir = Join-Path $publishDir "config"
 New-Item -ItemType Directory -Path $configPublishDir -Force | Out-Null
 $defaultConfig = @"
@@ -187,13 +225,23 @@ nwnnsscomp Path=
 K1 nwscript Path=.\tools\k1_nwscript.nss
 K2 nwscript Path=.\tools\tsl_nwscript.nss
 "@
-$configOutPath = Join-Path $configPublishDir "ncsdecomp.conf"
-if ($IsWindows) {
-    $defaultConfig | Out-File $configOutPath -Encoding ASCII
-} else {
-    $defaultConfig | Out-File $configOutPath -Encoding utf8NoBOM
+
+# Collect destinations: root config/ plus each app-image config/
+$configDestinations = @($configPublishDir)
+$cliConfigDir = Join-Path (Join-Path $publishDir "NCSDecompCLI") "config"
+$guiConfigDir = Join-Path (Join-Path $publishDir "NCSDecomp") "config"
+if (Test-Path $cliConfigDir) { $configDestinations += $cliConfigDir }
+if (Test-Path $guiConfigDir) { $configDestinations += $guiConfigDir }
+
+foreach ($dest in $configDestinations) {
+    $configOutPath = Join-Path $dest "ncsdecomp.conf"
+    if ($IsWindows) {
+        $defaultConfig | Out-File $configOutPath -Encoding ASCII
+    } else {
+        $defaultConfig | Out-File $configOutPath -Encoding utf8NoBOM
+    }
 }
-Write-Host "  - Wrote config/ncsdecomp.conf" -ForegroundColor Cyan
+Write-Host "  - Wrote config/ncsdecomp.conf (to $($configDestinations.Count) locations)" -ForegroundColor Cyan
 
 # Copy docs into archive root (verbatim names)
 $docsDir = Join-Path "." "docs"
