@@ -3800,4 +3800,62 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       byteCodeSplitPane.setDividerLocation(0.5); // Split evenly
    }
 
+   /**
+    * Creates a support development card for the empty state.
+    * @return A panel styled as a support card with light theme colors
+    */
+   private JPanel createSupportCard() {
+      JPanel card = new JPanel(new BorderLayout());
+      card.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new java.awt.Color(200, 200, 200), 1),
+            BorderFactory.createEmptyBorder(24, 24, 24, 24)));
+      card.setBackground(java.awt.Color.WHITE);
+      card.setPreferredSize(new Dimension(320, 200));
+      
+      // Title with heart icon
+      JLabel titleLabel = new JLabel("<html><div style='text-align:center;'>" +
+            "<span style='color:#0066CC; font-size:18px; font-weight:bold;'>" +
+            "❤ Support Development</span></div></html>");
+      titleLabel.setHorizontalAlignment(SwingConstants.CENTER);
+      card.add(titleLabel, BorderLayout.NORTH);
+      
+      // Main message
+      JLabel messageLabel = new JLabel("<html><div style='text-align:center; margin-top:12px; margin-bottom:16px;'>" +
+            "<span style='color:#333333; font-size:13px;'>" +
+            "If you enjoy using NCSDecomp, please consider supporting its development!</span></div></html>");
+      messageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+      card.add(messageLabel, BorderLayout.CENTER);
+      
+      // Sponsor button
+      JButton sponsorButton = new JButton("<html><div style='text-align:center;'>" +
+            "<span style='color:#FFFFFF; font-size:13px;'>❤ Sponsor on GitHub</span></div></html>");
+      sponsorButton.setBackground(new java.awt.Color(0, 102, 204)); // Blue background
+      sponsorButton.setForeground(java.awt.Color.WHITE);
+      sponsorButton.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new java.awt.Color(0, 80, 160), 1),
+            BorderFactory.createEmptyBorder(10, 20, 10, 20)));
+      sponsorButton.setFocusPainted(false);
+      sponsorButton.setCursor(new java.awt.Cursor(java.awt.Cursor.HAND_CURSOR));
+      sponsorButton.addActionListener(e -> this.openLink(SPONSOR_URL, "Opening sponsor page"));
+      
+      JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 0, 0));
+      buttonPanel.setOpaque(false);
+      buttonPanel.add(sponsorButton);
+      
+      // Footer text
+      JLabel footerLabel = new JLabel("<html><div style='text-align:center; margin-top:16px;'>" +
+            "<span style='color:#666666; font-size:11px;'>" +
+            "Your support helps maintain and improve this tool</span></div></html>");
+      footerLabel.setHorizontalAlignment(SwingConstants.CENTER);
+      
+      // Create a container for button and footer
+      JPanel bottomPanel = new JPanel(new BorderLayout());
+      bottomPanel.setOpaque(false);
+      bottomPanel.add(buttonPanel, BorderLayout.CENTER);
+      bottomPanel.add(footerLabel, BorderLayout.SOUTH);
+      card.add(bottomPanel, BorderLayout.SOUTH);
+      
+      return card;
+   }
+
 }
