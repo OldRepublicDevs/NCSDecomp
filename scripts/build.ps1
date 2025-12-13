@@ -458,7 +458,7 @@ if ($BuildExecutable) {
         # Build CLI executable
         $cliAppName = "NCSDecompCLI"
         $cliMainClass = "com.kotor.resource.formats.ncs.NCSDecompCLI"
-        $appVersion = "1.0.0"
+        $appVersion = "1.0.1"
 
         Write-Host "Building CLI executable ($cliAppName)..." -ForegroundColor Yellow
 

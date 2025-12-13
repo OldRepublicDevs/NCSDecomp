@@ -100,7 +100,7 @@ The Maven build process will:
 2. Copy resources from `src/main/resources` to the output directory
 3. Run all tests from `src/test/java`
 4. Create a JAR file in the `target/` directory
-5. Create a fat JAR (with dependencies) named `nCSDecompCLI-1.0.0.jar`
+5. Create a fat JAR (with dependencies) named `nCSDecompCLI-1.0.1.jar`
 
 ## Running
 
@@ -118,7 +118,7 @@ mvn exec:java -Dexec.mainClass="com.kotor.resource.formats.ncs.NCSDecompCLI" -De
 java -jar NCSDecompCLI.jar [arguments]
 
 # Or after building with Maven
-java -jar target/nCSDecompCLI-1.0.0.jar [arguments]
+java -jar target/nCSDecompCLI-1.0.1.jar [arguments]
 ```
 
 **Note:** When using the JAR file, ensure `k1_nwscript.nss` or `tsl_nwscript.nss` is in the `tools/` directory (or current working directory for legacy support), or use the `--nwscript <path>` option to specify the location.

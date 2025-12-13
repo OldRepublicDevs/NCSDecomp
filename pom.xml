@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.kotor</groupId>
   <artifactId>ncsdecomp</artifactId>
-  <version>1.0.0</version>
+  <version>1.0.1</version>
   <packaging>jar</packaging>
   <name>NCSDecomp</name>
   <description>KotOR Script Decompiler - A decompiler for Knights of the Old Republic NCS script files</description>
