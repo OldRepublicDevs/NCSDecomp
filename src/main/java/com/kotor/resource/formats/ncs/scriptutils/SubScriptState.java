@@ -357,9 +357,10 @@ public class SubScriptState {
             Logger.trace("checkEnd: AIf end=" + aifEnd + ", destPos=" + destPos + ", expectedElseStart=" + (aifEnd + 6));
 
             // If the destination is exactly 6 bytes after the AIf's end, there's no else block
-            // Otherwise, there's an else block starting at AIf's end + 6
-            if (destPos != aifEnd + 6) {
-               Logger.trace("checkEnd: destPos != aifEnd+6, creating else block");
+            // If the destination is before the AIf's end, it's a backward jump (e.g., loop back) - no else block
+            // Only create an else block if destPos > aifEnd + 6 (forward jump past the if block)
+            if (destPos > aifEnd + 6) {
+               Logger.trace("checkEnd: destPos > aifEnd+6, creating else block");
                // Check if this AIf is inside an AElse (else-if chain)
                // If so, create the next AElse as a sibling of the parent AElse, not nested
                ScriptRootNode parent = (ScriptRootNode) this.current.parent();
@@ -2015,7 +2016,19 @@ public class SubScriptState {
          }
          return params;
       }
-      int paramcount = Math.min(NodeUtils.getActionParamCount(node), paramtypes.size());
+      // getActionParamCount returns bytes, not parameter count
+      // Convert bytes to parameter count by summing parameter type sizes
+      int argBytes = NodeUtils.getActionParamCount(node);
+      int paramcount = 0;
+      int totalBytes = 0;
+      for (int i = 0; i < paramtypes.size(); i++) {
+         int paramSize = paramtypes.get(i).typeSize();
+         if (totalBytes + paramSize > argBytes) {
+            break;
+         }
+         totalBytes += paramSize;
+         paramcount++;
+      }
 
       for (int i = 0; i < paramcount; i++) {
          Type paramtype = paramtypes.get(i);

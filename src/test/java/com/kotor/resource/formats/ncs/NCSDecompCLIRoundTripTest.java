@@ -9,9 +9,11 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.PrintStream;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -434,6 +436,47 @@ public class NCSDecompCLIRoundTripTest {
    }
 
    /**
+    * Wrapper for roundTripSingle that captures all output (stdout and stderr) and only prints it on failure.
+    * Returns the captured output as a string.
+    */
+   private static class RoundTripResult {
+      final String capturedOutput;
+      final Exception exception;
+
+      RoundTripResult(String capturedOutput, Exception exception) {
+         this.capturedOutput = capturedOutput;
+         this.exception = exception;
+      }
+   }
+
+   private static RoundTripResult roundTripSingleWithOutputCapture(Path nssPath, String gameFlag, Path scratchRoot) {
+      ByteArrayOutputStream outCapture = new ByteArrayOutputStream();
+      ByteArrayOutputStream errCapture = new ByteArrayOutputStream();
+      PrintStream originalOut = System.out;
+      PrintStream originalErr = System.err;
+
+      try {
+         PrintStream outStream = new PrintStream(outCapture, true);
+         PrintStream errStream = new PrintStream(errCapture, true);
+         System.setOut(outStream);
+         System.setErr(errStream);
+
+         roundTripSingle(nssPath, gameFlag, scratchRoot);
+
+         String captured = new String(outCapture.toByteArray(), StandardCharsets.UTF_8) +
+                          new String(errCapture.toByteArray(), StandardCharsets.UTF_8);
+         return new RoundTripResult(captured, null);
+      } catch (Exception e) {
+         String captured = new String(outCapture.toByteArray(), StandardCharsets.UTF_8) +
+                          new String(errCapture.toByteArray(), StandardCharsets.UTF_8);
+         return new RoundTripResult(captured, e);
+      } finally {
+         System.setOut(originalOut);
+         System.setErr(originalErr);
+      }
+   }
+
+   /**
     * Performs a complete round-trip test: NSS->NCS->NSS->NCS
     * 1. Compiles original NSS to NCS
     * 2. Decompiles NCS back to NSS
@@ -470,8 +513,8 @@ public class NCSDecompCLIRoundTripTest {
          long compileTime = System.nanoTime() - compileOriginalStart;
          operationTimes.merge("compile-original", compileTime, Long::sum);
          operationTimes.merge("compile", compileTime, Long::sum);
-         // Original source file compilation failure - skip this test (not a decompiler issue)
-         System.out.println(" ⚠ SKIPPED (original source file has compilation errors)");
+         // Original source file compilation failure - treat as test failure
+         System.out.println(" ✗ FAILED (original source file has compilation errors)");
          throw new SourceCompilationException("Original source file failed to compile: " + e.getMessage(), e);
       }
 
@@ -1588,19 +1631,19 @@ public class NCSDecompCLIRoundTripTest {
          throw new IllegalArgumentException("Invalid game flag: " + gameFlag + " (expected 'k1' or 'k2')");
       }
 
-      // Ensure nwscript.nss is in the compiler's directory
-      Path compilerDir = NWN_COMPILER.getParent();
-      Path compilerNwscript = compilerDir.resolve("nwscript.nss");
-      if (!Files.exists(compilerNwscript) || !Files.isSameFile(nwscriptSource, compilerNwscript)) {
-         Files.copy(nwscriptSource, compilerNwscript, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-      }
-
       // Create temp directory with source file and all includes
       Path tempDir = null;
       Path tempSourceFile = null;
       try {
          tempDir = setupTempCompileDir(originalNssPath, gameFlag);
          tempSourceFile = tempDir.resolve(originalNssPath.getFileName());
+
+         // Ensure nwscript.nss is in the temp directory (compiler's working directory)
+         // The compiler runs from tempDir, so it needs nwscript.nss there
+         Path tempNwscript = tempDir.resolve("nwscript.nss");
+         if (!Files.exists(tempNwscript) || !Files.isSameFile(nwscriptSource, tempNwscript)) {
+            Files.copy(nwscriptSource, tempNwscript, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+         }
 
          Files.createDirectories(compiledOut.getParent());
 
@@ -3196,8 +3239,8 @@ public class NCSDecompCLIRoundTripTest {
          System.out.println("✓ PASSED - Round-trip successful (bytecode matches)");
          return 0;
       } catch (SourceCompilationException e) {
-         System.err.println("⊘ SKIPPED: " + e.getMessage());
-         return 0; // Not a decompiler issue
+         System.err.println("✗ FAILED: " + e.getMessage());
+         return 1; // Treat original source compilation failure as test failure
       } catch (Exception e) {
          System.err.println();
          System.err.println("✗ FAILED");
@@ -3229,7 +3272,7 @@ public class NCSDecompCLIRoundTripTest {
    private static void saveResumePoint(String testIdentifier) {
       try {
          Files.createDirectories(RESUME_FILE.getParent());
-         Files.writeString(RESUME_FILE, testIdentifier, StandardCharsets.UTF_8);
+         Files.write(RESUME_FILE, testIdentifier.getBytes(StandardCharsets.UTF_8));
       } catch (IOException e) {
          System.err.println("Warning: Could not save resume point: " + e.getMessage());
       }
@@ -3241,7 +3284,7 @@ public class NCSDecompCLIRoundTripTest {
    private static String loadResumePoint() {
       try {
          if (Files.exists(RESUME_FILE)) {
-            String content = Files.readString(RESUME_FILE, StandardCharsets.UTF_8).trim();
+            String content = new String(Files.readAllBytes(RESUME_FILE), StandardCharsets.UTF_8).trim();
             if (!content.isEmpty()) {
                return content;
             }
@@ -3308,27 +3351,34 @@ public class NCSDecompCLIRoundTripTest {
          }
          System.out.println();
 
-         for (RoundTripCase testCase : tests) {
+         // Initialize testsProcessed to startIndex for correct numbering when resuming
+         testsProcessed = startIndex;
+
+         // Only process tests starting from startIndex
+         for (int i = startIndex; i < tests.size(); i++) {
+            RoundTripCase testCase = tests.get(i);
             testsProcessed++;
             Path relPath = VANILLA_REPO_DIR.relativize(testCase.item.path);
             String displayPath = relPath.toString().replace('\\', '/');
-            System.out.println(String.format("[%d/%d] %s", testsProcessed, totalTests, displayPath));
 
-            try {
-               roundTripSingle(testCase.item.path, testCase.item.gameFlag, testCase.item.scratchRoot);
-               System.out.println("  ✓ PASSED - Round-trip successful (bytecode matches)");
+            RoundTripResult result = roundTripSingleWithOutputCapture(testCase.item.path, testCase.item.gameFlag, testCase.item.scratchRoot);
+
+            if (result.exception == null) {
+               // Test passed - only show one-line summary
+               System.out.println(String.format("[%d/%d] %s - PASS", testsProcessed, totalTests, displayPath));
+            } else {
+               // Test failed - show summary and all captured output
+               // This includes SourceCompilationException - original source compilation failures are treated as failures
+               System.out.println(String.format("[%d/%d] %s - FAIL", testsProcessed, totalTests, displayPath));
                System.out.println();
-            } catch (SourceCompilationException ex) {
-               // Original source file has compilation errors - skip this test (not a decompiler issue)
-               System.out.println("  ⊘ SKIPPED (original source file has compilation errors)");
-               System.out.println();
-               // Continue to next test - this is not a failure
-            } catch (Exception ex) {
-               System.out.println("  ✗ FAILED");
-               System.out.println();
+
+               // Print all captured output (DEBUG/TRACE/INFO/WARN/ERROR logs)
+               if (result.capturedOutput != null && !result.capturedOutput.isEmpty()) {
+                  System.out.print(result.capturedOutput);
+               }
 
                // Print the full error message (already formatted by assertBytecodeEqual)
-               String message = ex.getMessage();
+               String message = result.exception.getMessage();
                if (message != null && !message.isEmpty()) {
                   // If message already contains formatted output (starts with ═══), print it as-is
                   if (message.contains("═══════════════════════════════════════════════════════════════")) {
@@ -3338,7 +3388,7 @@ public class NCSDecompCLIRoundTripTest {
                      System.out.println("═══════════════════════════════════════════════════════════════");
                      System.out.println("FAILURE: " + testCase.displayName);
                      System.out.println("═══════════════════════════════════════════════════════════════");
-                     System.out.println("Exception: " + ex.getClass().getSimpleName());
+                     System.out.println("Exception: " + result.exception.getClass().getSimpleName());
                      String diff = extractAndFormatDiff(message);
                      if (diff != null) {
                         System.out.println("\nDiff:");
@@ -3346,8 +3396,8 @@ public class NCSDecompCLIRoundTripTest {
                      } else {
                         System.out.println("Message:\n" + message);
                      }
-                     if (ex.getCause() != null && ex.getCause() != ex) {
-                        System.out.println("\nCause: " + ex.getCause().getMessage());
+                     if (result.exception.getCause() != null && result.exception.getCause() != result.exception) {
+                        System.out.println("\nCause: " + result.exception.getCause().getMessage());
                      }
                      System.out.println("═══════════════════════════════════════════════════════════════");
                   }
@@ -3355,8 +3405,8 @@ public class NCSDecompCLIRoundTripTest {
                   System.out.println("═══════════════════════════════════════════════════════════════");
                   System.out.println("FAILURE: " + testCase.displayName);
                   System.out.println("═══════════════════════════════════════════════════════════════");
-                  System.out.println("Exception: " + ex.getClass().getSimpleName());
-                  ex.printStackTrace();
+                  System.out.println("Exception: " + result.exception.getClass().getSimpleName());
+                  result.exception.printStackTrace();
                   System.out.println("═══════════════════════════════════════════════════════════════");
                }
                System.out.println();
@@ -3446,34 +3496,43 @@ public class NCSDecompCLIRoundTripTest {
          }
          System.out.println();
 
-         for (RoundTripCase testCase : tests) {
+         // Initialize testsProcessed to startIndex for correct numbering when resuming
+         testsProcessed = startIndex;
+
+         // Only process tests starting from startIndex
+         for (int i = startIndex; i < tests.size(); i++) {
+            RoundTripCase testCase = tests.get(i);
             testsProcessed++;
             Path relPath = VANILLA_REPO_DIR.relativize(testCase.item.path);
             String displayPath = relPath.toString().replace('\\', '/');
-            System.out.println(String.format("[%d/%d] %s", testsProcessed, totalTests, displayPath));
 
-            try {
-               roundTripSingle(testCase.item.path, testCase.item.gameFlag, testCase.item.scratchRoot);
-               System.out.println("  ✓ PASSED - Round-trip successful (bytecode matches)");
+            RoundTripResult result = roundTripSingleWithOutputCapture(testCase.item.path, testCase.item.gameFlag, testCase.item.scratchRoot);
+
+            if (result.exception == null) {
+               // Test passed - only show one-line summary
+               System.out.println(String.format("[%d/%d] %s - PASS", testsProcessed, totalTests, displayPath));
+            } else {
+               // Test failed - show summary and all captured output
+               // This includes SourceCompilationException - original source compilation failures are treated as failures
+               System.out.println(String.format("[%d/%d] %s - FAIL", testsProcessed, totalTests, displayPath));
                System.out.println();
-            } catch (SourceCompilationException ex) {
-               // Original source file has compilation errors - skip this test (not a decompiler issue)
-               System.out.println("  ⊘ SKIPPED (original source file has compilation errors)");
-               System.out.println();
-               // Continue to next test - this is not a failure
-            } catch (Exception ex) {
-               System.out.println("  ✗ FAILED");
-               System.out.println();
+
+               // Print all captured output (DEBUG/TRACE/INFO/WARN/ERROR logs)
+               if (result.capturedOutput != null && !result.capturedOutput.isEmpty()) {
+                  System.out.print(result.capturedOutput);
+               }
+
+               // Print exception details
                System.out.println("═══════════════════════════════════════════════════════════");
                System.out.println("BYTECODE FAILURE: " + testCase.displayName);
                System.out.println("═══════════════════════════════════════════════════════════");
-               System.out.println("Exception: " + ex.getClass().getSimpleName());
-               String message = ex.getMessage();
+               System.out.println("Exception: " + result.exception.getClass().getSimpleName());
+               String message = result.exception.getMessage();
                if (message != null && !message.isEmpty()) {
                   System.out.println("Message: " + message);
                }
-               if (ex.getCause() != null && ex.getCause() != ex) {
-                  System.out.println("Cause: " + ex.getCause().getMessage());
+               if (result.exception.getCause() != null && result.exception.getCause() != result.exception) {
+                  System.out.println("Cause: " + result.exception.getCause().getMessage());
                }
                System.out.println("═══════════════════════════════════════════════════════════");
                System.out.println();
@@ -3568,7 +3627,7 @@ public class NCSDecompCLIRoundTripTest {
 
       if (decompiledExists) {
          try {
-            String decompiledContent = Files.readString(decompiledNss, StandardCharsets.UTF_8);
+            String decompiledContent = new String(Files.readAllBytes(decompiledNss), StandardCharsets.UTF_8);
             String[] decompiledLines = decompiledContent.split("\n");
             message.append("\n");
             message.append("DECOMPILED OUTPUT (first 30 lines):\n");
@@ -3613,7 +3672,7 @@ public class NCSDecompCLIRoundTripTest {
                   ? Paths.get("src/main/resources/k1_nwscript.nss")
                   : Paths.get("src/main/resources/tsl_nwscript.nss");
                if (Files.exists(nwscript)) {
-                  String content = Files.readString(nwscript, StandardCharsets.UTF_8);
+                  String content = new String(Files.readAllBytes(nwscript), StandardCharsets.UTF_8);
                   // Look for "// actionId:" pattern (with or without description)
                   String pattern = "// " + actionId + ":";
                   int idx = content.indexOf(pattern);
@@ -3707,8 +3766,8 @@ public class NCSDecompCLIRoundTripTest {
          decompileNcsToPcode(originalNcs, originalPcode, gameFlag);
          decompileNcsToPcode(roundTripNcs, roundTripPcode, gameFlag);
 
-         String expected = Files.readString(originalPcode, StandardCharsets.UTF_8);
-         String actual = Files.readString(roundTripPcode, StandardCharsets.UTF_8);
+         String expected = new String(Files.readAllBytes(originalPcode), StandardCharsets.UTF_8);
+         String actual = new String(Files.readAllBytes(roundTripPcode), StandardCharsets.UTF_8);
          return formatUnifiedDiff(expected, actual);
       } catch (Exception e) {
          return "Failed to generate p-code diff: " + e.getMessage();

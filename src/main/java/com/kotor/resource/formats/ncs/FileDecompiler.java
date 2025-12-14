@@ -1054,30 +1054,97 @@ public class FileDecompiler {
          return null;
       }
 
-      // Check if this compiler needs registry spoofing
+      // Check if this compiler is a variant that might need registry spoofing
       KnownExternalCompilers chosenCompiler = config.getChosenCompiler();
-      boolean needsRegistrySpoof = (chosenCompiler == KnownExternalCompilers.KOTOR_TOOL
+      boolean isLegacyCompiler = (chosenCompiler == KnownExternalCompilers.KOTOR_TOOL
             || chosenCompiler == KnownExternalCompilers.KOTOR_SCRIPTING_TOOL);
 
-      // Set up registry spoofing and file structure if needed
       AutoCloseable spoofer = null;
-      try {
-         if (needsRegistrySpoof) {
-            // For decompilation, we need:
-            // 1. Registry spoofing
-            // 2. chitin.key and directory structure
-            // 3. nwscript.nss in tools directory
+      boolean needsRegistrySpoof = false;
+      String firstAttemptOutput = null;
 
+      try {
+         String[] args = config.getDecompileArgs(compiler.getAbsolutePath());
+
+         Logger.startNCSDecompSection();
+         Logger.ncsdecomp("Using compiler: " + chosenCompiler.getName() + " (SHA256: "
+               + config.getSha256Hash().substring(0, 16) + "...)");
+         Logger.ncsdecomp("Input file: " + in.getAbsolutePath());
+         Logger.ncsdecomp("Expected output: " + result.getAbsolutePath());
+
+         // First attempt: try without registry spoofing
+         Logger.ncsdecomp("First decompilation attempt (without registry spoofing)");
+
+         // Determine working directory
+         File workingDir;
+         if (isLegacyCompiler || !chosenCompiler.getCompileArgs()[0].contains("{game_value}")) {
+            workingDir = compiler.getParentFile();
+         } else {
+            workingDir = in.getParentFile();
+            if (workingDir == null || !workingDir.exists()) {
+               workingDir = compiler.getParentFile();
+            }
+         }
+
+         // Execute decompiler (first attempt)
+         ProcessBuilder pb = new ProcessBuilder(args);
+         pb.directory(workingDir);
+         pb.redirectErrorStream(true);
+         Process proc = pb.start();
+
+         // Read output
+         StringBuilder output = new StringBuilder();
+         Logger.startCompilerSection();
+         try (java.io.BufferedReader reader = new java.io.BufferedReader(
+               new java.io.InputStreamReader(proc.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+               output.append(line).append("\n");
+               Logger.compiler(line);
+            }
+         }
+         Logger.endSection();
+
+         int exitCode = proc.waitFor();
+         firstAttemptOutput = output.toString();
+
+         // Check if decompilation succeeded
+         if (result.exists() && exitCode == 0) {
+            Logger.success("Decompilation succeeded without registry spoofing");
+            Logger.endSection();
+            return result;
+         }
+
+         // Check if we need registry spoofing (NwnStdLoader error)
+         if (isLegacyCompiler && firstAttemptOutput.contains("Error: Couldn't initialize the NwnStdLoader")) {
+            Logger.warn("Detected NwnStdLoader error - registry spoofing required");
+            needsRegistrySpoof = true;
+         } else {
+            // Decompilation failed but not due to registry issue
+            if (exitCode != 0) {
+               Logger.warn("nwnnsscomp.exe exited with code: " + exitCode);
+            }
+            // Let the method continue to the file check at the end
+         }
+
+         // Retry with registry spoofing if needed
+         if (needsRegistrySpoof) {
             File toolsDir = compiler.getParentFile();
 
             // Set up registry spoofing
             try {
                spoofer = new RegistrySpoofer(toolsDir, k2);
                ((RegistrySpoofer) spoofer).activate(); // This creates chitin.key and directories
-               System.out.println("[INFO] externalDecompile: Registry spoofing activated for decompilation");
+               Logger.ncsdecomp("Registry spoofing activated, retrying decompilation");
+            } catch (SecurityException e) {
+               Logger.warn("Registry spoofing failed (permission denied): " + e.getMessage());
+               Logger.warn("Cannot proceed without registry spoofing");
+               Logger.endSection();
+               return null;
             } catch (Exception e) {
-               System.out.println("[INFO] externalDecompile: Failed to set up registry spoofing: " + e.getMessage());
-               // Continue anyway
+               Logger.warn("Failed to set up registry spoofing: " + e.getMessage());
+               Logger.endSection();
+               return null;
             }
 
             // Ensure nwscript.nss is in tools directory (compiler needs it for decompilation too)
@@ -1115,69 +1182,48 @@ public class FileDecompiler {
             } else {
                System.out.println("[WARNING] externalDecompile: nwscript source not found: " + nwscriptSource.getAbsolutePath());
             }
-         }
 
-         String[] args = config.getDecompileArgs(compiler.getAbsolutePath());
-
-         Logger.startNCSDecompSection();
-         Logger.ncsdecomp("Using compiler: " + chosenCompiler.getName() + " (SHA256: "
-               + config.getSha256Hash().substring(0, 16) + "...)");
-         Logger.ncsdecomp("Input file: " + in.getAbsolutePath());
-         Logger.ncsdecomp("Expected output: " + result.getAbsolutePath());
-
-         // Determine working directory - legacy compilers need their own directory
-         File workingDir;
-         if (needsRegistrySpoof || !chosenCompiler.getCompileArgs()[0].contains("{game_value}")) {
-            workingDir = compiler.getParentFile();
-         } else {
-            workingDir = in.getParentFile();
-            if (workingDir == null || !workingDir.exists()) {
-               workingDir = compiler.getParentFile();
-            }
-         }
-
-         // Set up environment overrides for legacy compilers
-         java.util.Map<String, String> envOverrides = new java.util.HashMap<>();
-         if (needsRegistrySpoof) {
-            File toolsDir = compiler.getParentFile();
+            // Set up environment overrides for legacy compilers
+            java.util.Map<String, String> envOverrides = new java.util.HashMap<>();
             String resolvedRoot = toolsDir.getAbsolutePath();
             envOverrides.put("NWN_ROOT", resolvedRoot);
             envOverrides.put("NWNDir", resolvedRoot);
             envOverrides.put("KOTOR_ROOT", resolvedRoot);
-         }
 
-         // Execute decompiler
-         ProcessBuilder pb = new ProcessBuilder(args);
-         pb.directory(workingDir);
-         pb.environment().putAll(envOverrides);
-         pb.redirectErrorStream(true);
-         Process proc = pb.start();
+            // Retry decompilation with registry spoofing
+            Logger.ncsdecomp("Retry decompilation attempt (with registry spoofing)");
+            pb = new ProcessBuilder(args);
+            pb.directory(workingDir);
+            pb.environment().putAll(envOverrides);
+            pb.redirectErrorStream(true);
+            proc = pb.start();
 
-         // Read output
-         StringBuilder output = new StringBuilder();
-         Logger.startCompilerSection();
-         try (java.io.BufferedReader reader = new java.io.BufferedReader(
-               new java.io.InputStreamReader(proc.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-               output.append(line).append("\n");
-               Logger.compiler(line);
+            // Read output
+            output = new StringBuilder();
+            Logger.startCompilerSection();
+            try (java.io.BufferedReader reader = new java.io.BufferedReader(
+                  new java.io.InputStreamReader(proc.getInputStream()))) {
+               String line;
+               while ((line = reader.readLine()) != null) {
+                  output.append(line).append("\n");
+                  Logger.compiler(line);
+               }
             }
-         }
-         Logger.endSection();
+            Logger.endSection();
 
-         int exitCode = proc.waitFor();
-         if (exitCode != 0) {
-            Logger.warn("nwnnsscomp.exe exited with code: " + exitCode);
-         }
+            exitCode = proc.waitFor();
+            if (exitCode != 0) {
+               Logger.warn("nwnnsscomp.exe exited with code: " + exitCode);
+            }
 
-         // Close registry spoofing now that nwnnsscomp has completed
-         if (spoofer != null) {
-            try {
-               spoofer.close();
-               spoofer = null; // Prevent double-close in finally
-            } catch (Exception e) {
-               System.out.println("[INFO] externalDecompile: Error closing registry spoofer: " + e.getMessage());
+            // Close registry spoofing now that nwnnsscomp has completed
+            if (spoofer != null) {
+               try {
+                  spoofer.close();
+                  spoofer = null; // Prevent double-close in finally
+               } catch (Exception e) {
+                  System.out.println("[INFO] externalDecompile: Error closing registry spoofer: " + e.getMessage());
+               }
             }
          }
       } catch (IOException e) {
