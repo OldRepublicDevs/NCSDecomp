@@ -547,6 +547,39 @@ if ($BuildExecutable) {
                 Write-Host "Warning: GUI executable build failed" -ForegroundColor Yellow
             } else {
                 Write-Host "GUI executable built successfully!" -ForegroundColor Green
+
+                # Copy tools (ncsdis.exe and DLLs) to GUI app-image tools/ directory
+                $guiAppImagePath = Join-Path $exeOutputDir $guiAppName
+                if (Test-Path $guiAppImagePath) {
+                    $guiToolsDir = Join-Path $guiAppImagePath "tools"
+                    New-Item -ItemType Directory -Path $guiToolsDir -Force | Out-Null
+                    $toolsDir = Join-Path "." "tools"
+                    $toolPayload = @(
+                        "nwnnsscomp_kscript.exe",
+                        "nwnnsscomp_ktool.exe",
+                        "ncsdis.exe",
+                        "icudt63.dll",
+                        "icuin63.dll",
+                        "icuuc63.dll",
+                        "libboost_filesystem.dll",
+                        "libboost_locale.dll",
+                        "libboost_thread.dll",
+                        "libgcc_s_seh-1.dll",
+                        "libiconv-2.dll",
+                        "libstdc++-6.dll",
+                        "libwinpthread-1.dll"
+                    )
+                    foreach ($tool in $toolPayload) {
+                        $toolPath = Join-Path $toolsDir $tool
+                        if (Test-Path $toolPath) {
+                            $destPath = Join-Path $guiToolsDir $tool
+                            Copy-Item $toolPath $destPath -Force
+                            Write-Host "Copied $tool to GUI app-image tools directory" -ForegroundColor Gray
+                        } else {
+                            Write-Host "Warning: Could not find $tool to copy to GUI app-image tools directory" -ForegroundColor Yellow
+                        }
+                    }
+                }
             }
 
             # Cleanup GUI input
@@ -596,6 +629,36 @@ if ($BuildExecutable) {
                 if (-not $copied) {
                     Write-Host "Warning: Could not find $nssFile to copy to CLI app directory" -ForegroundColor Yellow
                 }
+            }
+        }
+
+        # Copy tools (ncsdis.exe and DLLs) to CLI app-image tools/ directory
+        $cliToolsDir = Join-Path $cliAppImagePath "tools"
+        New-Item -ItemType Directory -Path $cliToolsDir -Force | Out-Null
+        $toolsDir = Join-Path "." "tools"
+        $toolPayload = @(
+            "nwnnsscomp_kscript.exe",
+            "nwnnsscomp_ktool.exe",
+            "ncsdis.exe",
+            "icudt63.dll",
+            "icuin63.dll",
+            "icuuc63.dll",
+            "libboost_filesystem.dll",
+            "libboost_locale.dll",
+            "libboost_thread.dll",
+            "libgcc_s_seh-1.dll",
+            "libiconv-2.dll",
+            "libstdc++-6.dll",
+            "libwinpthread-1.dll"
+        )
+        foreach ($tool in $toolPayload) {
+            $toolPath = Join-Path $toolsDir $tool
+            if (Test-Path $toolPath) {
+                $destPath = Join-Path $cliToolsDir $tool
+                Copy-Item $toolPath $destPath -Force
+                Write-Host "Copied $tool to CLI app-image tools directory" -ForegroundColor Gray
+            } else {
+                Write-Host "Warning: Could not find $tool to copy to CLI app-image tools directory" -ForegroundColor Yellow
             }
         }
 
