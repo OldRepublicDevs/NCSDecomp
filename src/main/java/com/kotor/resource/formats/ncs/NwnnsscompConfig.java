@@ -131,7 +131,7 @@ public class NwnnsscompConfig {
    /**
     * Gets the formatted decompile command-line arguments.
     *
-    * @param executable Path to the nwnnsscomp executable
+    * @param executable Path to the nwnnsscomp executable (or ncsdis.exe)
     * @return Array of command-line arguments
     * @throws UnsupportedOperationException If decompilation is not supported
     */
@@ -140,6 +140,18 @@ public class NwnnsscompConfig {
          throw new UnsupportedOperationException(
             "Compiler '" + chosenCompiler.getName() + "' does not support decompilation");
       }
+      
+      // Special handling for ncsdis.exe which uses a simpler command line: ncsdis.exe <input.ncs> <output.pcode>
+      // No -d, -o, or -g flags
+      if (chosenCompiler == KnownExternalCompilers.NCSDIS) {
+         // ncsdis command: ncsdis.exe <input.ncs> <output.pcode>
+         return new String[] {
+            executable,
+            sourceFile.getAbsolutePath(),
+            outputFile.getAbsolutePath()
+         };
+      }
+      
       return formatArgs(chosenCompiler.getDecompileArgs(), executable);
    }
 

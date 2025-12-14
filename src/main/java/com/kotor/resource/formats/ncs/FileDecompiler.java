@@ -864,6 +864,7 @@ public class FileDecompiler {
          String line1;
          String line2;
          int line = 1;
+         int instructionLine = 0; // Track actual instruction lines (excluding labels/separators)
 
          while (true) {
             line1 = reader1.readLine();
@@ -874,19 +875,206 @@ public class FileDecompiler {
                return null; // identical
             }
 
-            // Detect differences: missing line or differing content
-            if (line1 == null || line2 == null || !line1.equals(line2)) {
-               String left = line1 == null ? "<EOF>" : line1;
-               String right = line2 == null ? "<EOF>" : line2;
-               return "Mismatch at line " + line + " | original: " + left + " | generated: " + right;
+            // Normalize both lines to handle format differences between ncsdis and nwnnsscomp
+            String norm1 = normalizePcodeLine(line1);
+            String norm2 = normalizePcodeLine(line2);
+
+            // Skip lines that normalize to empty (comments, labels, separators)
+            while (norm1 != null && norm1.isEmpty()) {
+               line++;
+               line1 = reader1.readLine();
+               norm1 = normalizePcodeLine(line1);
+            }
+            while (norm2 != null && norm2.isEmpty()) {
+               line++;
+               line2 = reader2.readLine();
+               norm2 = normalizePcodeLine(line2);
             }
 
+            // both files ended after skipping -> identical
+            if (norm1 == null && norm2 == null) {
+               return null; // identical
+            }
+
+            // Detect differences: missing line or differing content
+            if (norm1 == null || norm2 == null || !norm1.equals(norm2)) {
+               instructionLine++;
+               String left = line1 == null ? "<EOF>" : line1;
+               String right = line2 == null ? "<EOF>" : line2;
+               String normLeft = norm1 == null ? "<EOF>" : norm1;
+               String normRight = norm2 == null ? "<EOF>" : norm2;
+               return "Mismatch at line " + line + " (instruction " + instructionLine + ")\n" +
+                     "  original: " + left + "\n" +
+                     "  generated: " + right + "\n" +
+                     "  normalized original: " + normLeft + "\n" +
+                     "  normalized generated: " + normRight;
+            }
+
+            instructionLine++;
             line++;
          }
       } catch (IOException ex) {
          System.out.println("IO exception in compare files: " + ex);
          return "IO exception during pcode comparison";
       }
+   }
+
+   /**
+    * Normalizes a pcode line to enable comparison between different pcode formats (ncsdis vs nwnnsscomp).
+    * <p>
+    * Normalization rules:
+    * <ul>
+    *   <li>Return empty string for: comments, label-only lines, separator lines, blank lines</li>
+    *   <li>Extract instruction content: address, opcode, operands</li>
+    *   <li>Normalize opcodes: STORESTATE <-> STORE_STATE, etc.</li>
+    *   <li>Normalize numeric formats: remove leading zeros, convert to canonical form</li>
+    *   <li>Normalize spacing: consistent whitespace between fields</li>
+    * </ul>
+    *
+    * @param line The raw pcode line from either ncsdis or nwnnsscomp
+    * @return Normalized line for comparison, or empty string if line should be skipped, or null if EOF
+    */
+   private String normalizePcodeLine(String line) {
+      if (line == null) {
+         return null;
+      }
+
+      String trimmed = line.trim();
+
+      // Skip empty lines
+      if (trimmed.isEmpty()) {
+         return "";
+      }
+
+      // Skip comment lines (ncsdis format)
+      if (trimmed.startsWith(";")) {
+         return "";
+      }
+
+      // Skip separator lines (ncsdis format): -------- -------------------------- ---
+      if (trimmed.matches("^-+\\s+-+\\s+-+$")) {
+         return "";
+      }
+
+      // Skip label-only lines (ncsdis format): _start:, main:, sta_XXXXXXXX:, loc_XXXXXXXX:
+      if (trimmed.matches("^[_a-zA-Z][_a-zA-Z0-9]*:$")) {
+         return "";
+      }
+
+      // Extract instruction pattern: ADDRESS BYTES... OPCODE [OPERANDS...]
+      // ncsdis format:   "  0000000D 1E 00 00000008             JSR main"
+      // nwnnsscomp format: "0000000D 1E 00 00000008           JSR fn_00000015"
+
+      // Try to parse instruction line
+      // Pattern: ADDRESS (hex bytes)+ OPCODE (operands)?
+      java.util.regex.Pattern instrPattern = java.util.regex.Pattern.compile(
+         "^\\s*([0-9A-Fa-f]{8})\\s+([0-9A-Fa-f\\s]+?)\\s{2,}(\\S+)(.*)$"
+      );
+      java.util.regex.Matcher matcher = instrPattern.matcher(line);
+
+      if (!matcher.matches()) {
+         // If pattern doesn't match, it might be a non-instruction line
+         // Return empty to skip it
+         return "";
+      }
+
+      String address = matcher.group(1); // e.g., "0000000D"
+      String bytesStr = matcher.group(2).trim(); // e.g., "1E 00 00000008" or "2C 01 10 00000000 00000000"
+      String opcode = matcher.group(3); // e.g., "JSR" or "STORESTATE" or "STORE_STATE"
+      String operands = matcher.group(4).trim(); // e.g., "main" or "fn_00000015"
+
+      // Normalize opcode: convert underscores to consistent format
+      String normalizedOpcode = opcode.toUpperCase().replace("_", "");
+
+      // Normalize operands: remove symbolic labels, keep only essential data
+      String normalizedOperands = normalizeOperands(operands, normalizedOpcode);
+
+      // Build normalized instruction: ADDRESS OPCODE OPERANDS
+      return address.toUpperCase() + " " + normalizedOpcode + " " + normalizedOperands;
+   }
+
+   /**
+    * Normalizes operands for comparison, removing format-specific differences.
+    */
+   private String normalizeOperands(String operands, String opcode) {
+      if (operands == null || operands.isEmpty()) {
+         return "";
+      }
+
+      // For JSR/JMP instructions, remove symbolic labels and keep only addresses
+      // ncsdis: "main" or "loc_00000048" or "sta_00000025"
+      // nwnnsscomp: "fn_00000015" or "off_00000048"
+      if (opcode.equals("JSR") || opcode.equals("JMP")) {
+         // Extract hex address from symbolic label if present
+         // Patterns: main, fn_XXXXXXXX, off_XXXXXXXX, loc_XXXXXXXX, sta_XXXXXXXX
+         java.util.regex.Pattern labelPattern = java.util.regex.Pattern.compile(
+            "(?:fn_|off_|loc_|sta_)?([0-9A-Fa-f]{8})|([a-zA-Z_][a-zA-Z0-9_]*)"
+         );
+         java.util.regex.Matcher matcher = labelPattern.matcher(operands);
+         if (matcher.find()) {
+            String hexPart = matcher.group(1);
+            if (hexPart != null) {
+               return hexPart.toUpperCase();
+            }
+            // If it's a symbolic name without address (like "main"), keep it as-is
+            // Both formats should have been using addresses consistently
+            return matcher.group(2);
+         }
+      }
+
+      // For STORESTATE/STORE_STATE, normalize format:
+      // ncsdis: "sta_00000025 0 0"
+      // nwnnsscomp: "10, 00000000, 00000000"
+      if (opcode.equals("STORESTATE")) {
+         // Remove commas, normalize spacing
+         String normalized = operands.replace(",", " ");
+         // Remove symbolic label prefixes
+         normalized = normalized.replaceAll("sta_([0-9A-Fa-f]{8})", "$1");
+         // Split and rejoin with single spaces
+         String[] parts = normalized.trim().split("\\s+");
+         return String.join(" ", parts).toUpperCase();
+      }
+
+      // For ACTION instructions, keep the action number but ignore function names
+      // ncsdis: "InvalidFunction200 2"
+      // nwnnsscomp: "GetObjectByTag(00C8), 02"
+      if (opcode.equals("ACTION")) {
+         // Extract hex numbers only
+         java.util.regex.Pattern hexPattern = java.util.regex.Pattern.compile("[0-9A-Fa-f]+");
+         java.util.regex.Matcher matcher = hexPattern.matcher(operands);
+         StringBuilder result = new StringBuilder();
+         while (matcher.find()) {
+            if (result.length() > 0) {
+               result.append(" ");
+            }
+            result.append(matcher.group().toUpperCase());
+         }
+         return result.toString();
+      }
+
+      // For CONSTI/CONSTF/CONSTS, normalize hex formatting
+      // Remove leading zeros, convert to uppercase
+      if (opcode.equals("CONSTI") || opcode.equals("CONSTF")) {
+         // Extract first hex number
+         java.util.regex.Pattern hexPattern = java.util.regex.Pattern.compile("[0-9A-Fa-f]+");
+         java.util.regex.Matcher matcher = hexPattern.matcher(operands);
+         if (matcher.find()) {
+            return matcher.group().toUpperCase();
+         }
+      }
+
+      // For string constants (CONSTS), extract the string content
+      if (opcode.equals("CONSTS")) {
+         // Pattern: CONSTS "string" or CONSTS 0007 str "string"
+         java.util.regex.Pattern strPattern = java.util.regex.Pattern.compile("\"([^\"]*)\"");
+         java.util.regex.Matcher matcher = strPattern.matcher(operands);
+         if (matcher.find()) {
+            return "\"" + matcher.group(1) + "\"";
+         }
+      }
+
+      // Default: normalize spacing and case
+      return operands.trim().toUpperCase().replaceAll("\\s+", " ").replace(",", " ");
    }
 
    /**

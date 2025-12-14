@@ -97,6 +97,24 @@ public enum KnownExternalCompilers {
       "Nick Hugi",
       new String[]{"-c", "{source}", "-o", "{output}"},
       new String[]{} // knsscomp doesn't support decompilation
+   ),
+
+   /**
+    * ncsdis - NCS disassembler (bytecode/pcode only, no compilation support).
+    * This tool produces pcode listings with a different format than nwnnsscomp:
+    * - Uses symbolic labels (_start, main, sta_XXXXX, loc_XXXXX)
+    * - Includes separator lines between sections
+    * - Uses single-word opcodes (STORESTATE vs STORE_STATE)
+    * - Shows minimal decimal formatting instead of zero-padded hex
+    * - No nwscript.nss dependency required
+    */
+   NCSDIS(
+      "B1F398C2F64F4ACF2F39C417E7C7EB6F5483369BB95853C63A009F925A2E257C",
+      "ncsdis",
+      LocalDate.of(2020, 8, 3),
+      "Unknown", // TODO: Identify original author
+      new String[]{}, // ncsdis doesn't support compilation
+      new String[]{"{source}", "{output}"} // ncsdis.exe <input.ncs> <output.pcode>
    );
 
    private final String sha256;

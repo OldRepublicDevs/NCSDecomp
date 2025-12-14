@@ -34,7 +34,8 @@ public class CompilerUtil {
       "nwnnsscomp_kscript.exe",      // Secondary - KOTOR Scripting Tool
 //      "nwnnsscomp_tslpatcher.exe",   // TSLPatcher variant
 //      "nwnnsscomp_v1.exe"            // v1.3 first public release
-      "nwnnsscomp_ktool.exe"         // KOTOR Tool variant
+      "nwnnsscomp_ktool.exe",        // KOTOR Tool variant
+      "ncsdis.exe"                   // NCS disassembler (decompile/pcode only)
    };
 
    /**
