@@ -1150,7 +1150,7 @@ public class FileDecompiler {
             System.out.println("[INFO] FileDecompiler.getCompilerFile: ncsdis.exe preferred but not found, falling back to nwnnsscomp");
          }
       }
-      
+
       // Fall back to nwnnsscomp.exe resolution
       // 1. CLI MODE: Use nwnnsscompPath if explicitly set via command-line argument
       if (nwnnsscompPath != null && !nwnnsscompPath.trim().isEmpty()) {

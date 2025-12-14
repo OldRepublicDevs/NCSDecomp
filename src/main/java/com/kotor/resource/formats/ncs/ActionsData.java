@@ -56,26 +56,80 @@ public class ActionsData {
     * Parses the action table, starting at the first {@code // 0} marker.
     */
    private void readActions() throws IOException {
-      Pattern p = Pattern.compile("^\\s*(\\w+)\\s+(\\w+)\\s*\\((.*)\\).*");
+      // KOTOR/TSL nwscript files interleave documentation comments like:
+      //   // 768. GetScriptParameter
+      // followed by a signature line:
+      //   int GetScriptParameter( int nIndex );
+      //
+      // Earlier implementations appended every signature line after the first "// 0",
+      // assuming indices were contiguous and that no other declarations existed.
+      // That is brittle and can desync action indices, breaking stack typing and
+      // round-trip fidelity. Instead, bind signatures to their explicit numeric
+      // indices in the comment headers.
+      Pattern header = Pattern.compile("^\\s*//\\s*(\\d+)\\b.*$");
+      Pattern sig = Pattern.compile("^\\s*(\\w+)\\s+(\\w+)\\s*\\((.*)\\)\\s*;?.*");
+
       String str;
-      while ((str = this.actionsreader.readLine()) != null && !str.startsWith("// 0")) {
-      }
+      boolean started = false;
+      int pendingIndex = -1;
+      int maxIndex = -1;
 
       while ((str = this.actionsreader.readLine()) != null) {
-         if (!str.startsWith("//") && str.length() != 0) {
-            Matcher m = p.matcher(str);
-            if (m.matches()) {
-               this.actions.add(new ActionsData.Action(m.group(1), m.group(2), m.group(3)));
+         Matcher h = header.matcher(str);
+         if (h.matches()) {
+            int idx;
+            try {
+               idx = Integer.parseInt(h.group(1));
+            } catch (NumberFormatException ignored) {
+               continue;
             }
+            // We only consider ourselves "in" the actions table once we see index 0.
+            if (idx == 0) {
+               started = true;
+            }
+            if (started) {
+               pendingIndex = idx;
+               if (idx > maxIndex) {
+                  maxIndex = idx;
+               }
+            }
+            continue;
+         }
+
+         if (!started) {
+            continue;
+         }
+
+         // Skip comments/blank lines between header and signature.
+         if (str.trim().isEmpty() || str.trim().startsWith("//")) {
+            continue;
+         }
+
+         // Bind the next signature line to the last seen numeric header.
+         if (pendingIndex >= 0) {
+            Matcher m = sig.matcher(str);
+            if (m.matches()) {
+               while (this.actions.size() <= pendingIndex) {
+                  this.actions.add(null);
+               }
+               this.actions.set(pendingIndex, new ActionsData.Action(m.group(1), m.group(2), m.group(3)));
+            }
+            pendingIndex = -1;
          }
       }
 
-      System.out.println("read actions.  There were " + Integer.toString(this.actions.size()));
+      // Ensure list size is at least maxIndex+1 (preserve stable indexing).
+      while (this.actions.size() <= maxIndex) {
+         this.actions.add(null);
+      }
    }
 
    public Type getReturnType(int index) {
       if (index < 0 || index >= this.actions.size()) {
          throw new RuntimeException("Invalid action index: " + index + " (actions list size: " + this.actions.size() + ")");
+      }
+      if (this.actions.get(index) == null) {
+         throw new RuntimeException("Missing action metadata for index: " + index + " (actions list size: " + this.actions.size() + ")");
       }
       return this.actions.get(index).returnType();
    }
@@ -84,12 +138,18 @@ public class ActionsData {
       if (index < 0 || index >= this.actions.size()) {
          throw new RuntimeException("Invalid action index: " + index + " (actions list size: " + this.actions.size() + ")");
       }
+      if (this.actions.get(index) == null) {
+         throw new RuntimeException("Missing action metadata for index: " + index + " (actions list size: " + this.actions.size() + ")");
+      }
       return this.actions.get(index).name();
    }
 
    public List<Type> getParamTypes(int index) {
       if (index < 0 || index >= this.actions.size()) {
          throw new RuntimeException("Invalid action index: " + index + " (actions list size: " + this.actions.size() + ")");
+      }
+      if (this.actions.get(index) == null) {
+         throw new RuntimeException("Missing action metadata for index: " + index + " (actions list size: " + this.actions.size() + ")");
       }
       return this.actions.get(index).params();
    }
@@ -98,12 +158,18 @@ public class ActionsData {
       if (index < 0 || index >= this.actions.size()) {
          throw new RuntimeException("Invalid action index: " + index + " (actions list size: " + this.actions.size() + ")");
       }
+      if (this.actions.get(index) == null) {
+         throw new RuntimeException("Missing action metadata for index: " + index + " (actions list size: " + this.actions.size() + ")");
+      }
       return this.actions.get(index).defaultValues();
    }
 
    public int getRequiredParamCount(int index) {
       if (index < 0 || index >= this.actions.size()) {
          throw new RuntimeException("Invalid action index: " + index + " (actions list size: " + this.actions.size() + ")");
+      }
+      if (this.actions.get(index) == null) {
+         throw new RuntimeException("Missing action metadata for index: " + index + " (actions list size: " + this.actions.size() + ")");
       }
       return this.actions.get(index).requiredParamCount();
    }

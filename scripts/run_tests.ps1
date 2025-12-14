@@ -30,9 +30,16 @@ param(
     [string]$ClassPath = ""
 )
 
+# Always anchor paths at repository root (one directory above /scripts).
+# This is critical because Start-Job runs in a different working directory by default.
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+
 # Set up file logging if LogFile parameter is provided
 $logFileStream = $null
 if ($LogFile) {
+    if (-not [System.IO.Path]::IsPathRooted($LogFile)) {
+        $LogFile = Join-Path $repoRoot $LogFile
+    }
     try {
         $logFileStream = [System.IO.StreamWriter]::new($LogFile, $false, [System.Text.Encoding]::UTF8)
         Write-Host "Logging output to: $LogFile" -ForegroundColor Gray
@@ -95,7 +102,7 @@ if ($PSVersionTable.PSVersion.Major -ge 6) {
 }
 
 # Ensure lib directory exists
-$libDir = Join-Path "." "lib"
+$libDir = Join-Path $repoRoot "lib"
 if (-not (Test-Path $libDir)) {
     New-Item -ItemType Directory -Path $libDir -Force | Out-Null
 }
@@ -154,11 +161,11 @@ if (-not [string]::IsNullOrEmpty($JUnitJar)) {
 
 # Ensure build directory exists and has compiled classes (Java/Maven idiomatic: target/classes)
 if ([string]::IsNullOrEmpty($BuildDir)) {
-    $buildDir = Join-Path "." (Join-Path "target" "classes")
+    $buildDir = Join-Path $repoRoot (Join-Path "target" "classes")
 } else {
     $buildDir = $BuildDir
     if (-not [System.IO.Path]::IsPathRooted($buildDir)) {
-        $buildDir = Join-Path "." $buildDir
+        $buildDir = Join-Path $repoRoot $buildDir
     }
 }
 if (-not (Test-Path $buildDir)) {
@@ -166,32 +173,74 @@ if (-not (Test-Path $buildDir)) {
     exit 1
 }
 
+# Ensure we don't accidentally run stale bytecode. The test runner compiles sources via javac,
+# but javac will prefer existing .class files on the classpath over newer sources unless forced.
+# Cleaning here keeps run_tests.ps1 self-contained and ensures code changes are reflected in tests.
+try {
+    $existingClassFiles = Get-ChildItem -Path $buildDir -Recurse -Filter "*.class" -ErrorAction SilentlyContinue
+    if ($existingClassFiles -and $existingClassFiles.Count -gt 0) {
+        Write-Host "Cleaning stale .class files in build dir..." -ForegroundColor Yellow
+        $existingClassFiles | Remove-Item -Force -ErrorAction SilentlyContinue
+    }
+} catch {
+    Write-Host "Warning: Could not clean .class files in build dir: $($_.Exception.Message)" -ForegroundColor Yellow
+}
+
 # Find test file in Maven test directory
-$testFile = Join-Path "." (Join-Path "src" (Join-Path "test" (Join-Path "java" (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "NCSDecompCLIRoundTripTest.java"))))))))
+$testFile = Join-Path $repoRoot (Join-Path "src" (Join-Path "test" (Join-Path "java" (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "NCSDecompCLIRoundTripTest.java"))))))))
 if (-not (Test-Path $testFile)) {
     # Try alternative location
-    $testFile = Join-Path "." (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "NCSDecompCLIRoundTripTest.java")))))
+    $testFile = Join-Path $repoRoot (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "NCSDecompCLIRoundTripTest.java")))))
     if (-not (Test-Path $testFile)) {
         Write-Host "Error: Test file not found" -ForegroundColor Red
         exit 1
     }
 }
 
-Write-Host "Compiling test..."
+Write-Host "Compiling sources (main + test)..."
 # Clear JAVA_TOOL_OPTIONS before compilation to avoid affecting javac
 $env:JAVA_TOOL_OPTIONS = ""
 
-$testSourceDir = Join-Path "." (Join-Path "src" (Join-Path "test" "java"))
-$mainSourceDir = Join-Path "." (Join-Path "src" (Join-Path "main" "java"))
+$testSourceDir = Join-Path $repoRoot (Join-Path "src" (Join-Path "test" "java"))
+$mainSourceDir = Join-Path $repoRoot (Join-Path "src" (Join-Path "main" "java"))
 $pathSeparator = if ($IsWindows) { ";" } else { ":" }
 $sourcepath = "$testSourceDir$pathSeparator$mainSourceDir"
+
+# Compile ALL sources to avoid stale/broken .class files being used at runtime.
+# (Compiling only the single test entrypoint can leave pre-existing classes on disk.)
+$javaFiles = @()
+if (Test-Path $mainSourceDir) {
+    $javaFiles += Get-ChildItem -Path $mainSourceDir -Recurse -Filter "*.java" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+}
+if (Test-Path $testSourceDir) {
+    $javaFiles += Get-ChildItem -Path $testSourceDir -Recurse -Filter "*.java" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
+}
+if (-not $javaFiles -or $javaFiles.Count -eq 0) {
+    Write-Host "Error: No Java source files found under src/main/java or src/test/java" -ForegroundColor Red
+    Close-LogFile
+    exit 1
+}
+
+# Use an argfile to avoid Windows command length limits.
+$javacArgFile = Join-Path ([System.IO.Path]::GetTempPath()) ("den_cs_javac_sources_" + [Guid]::NewGuid().ToString("N") + ".txt")
+try {
+    # javac @argfile treats backslashes as escapes (e.g. \r, \f) so normalize to forward slashes.
+    $quoted = $javaFiles | ForEach-Object { '"' + ($_ -replace '\\', '/') + '"' }
+    # Write without BOM; javac treats BOM as part of the first filename.
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllLines($javacArgFile, $quoted, $utf8NoBom)
+} catch {
+    Write-Host "Error: Failed to create javac argfile: $($_.Exception.Message)" -ForegroundColor Red
+    Close-LogFile
+    exit 1
+}
 
 # Build classpath - use custom if provided, otherwise construct from buildDir and JUnit JAR
 if (-not [string]::IsNullOrEmpty($ClassPath)) {
     $cp = $ClassPath
     Write-Host "Using custom classpath: $cp" -ForegroundColor Gray
 } else {
-    $cp = "$buildDir$pathSeparator$junitStandalone$pathSeparator."
+    $cp = "$buildDir$pathSeparator$junitStandalone"
 }
 
 # Detect Java version and use appropriate flags for Java 8 compatibility
@@ -229,19 +278,22 @@ $compileOutput = $null
 if ($javaMajorVersion -ge 9) {
     # Use --release 8 (best practice for Java 9+)
     if ($ShowCompilationErrors) {
-        $compileOutput = javac -cp $cp -d $buildDir -encoding UTF-8 --release 8 -sourcepath $sourcepath $testFile 2>&1
+        $compileOutput = javac -cp $cp -d $buildDir -encoding UTF-8 --release 8 -sourcepath $sourcepath "@$javacArgFile" 2>&1
     } else {
-        javac -cp $cp -d $buildDir -encoding UTF-8 --release 8 -sourcepath $sourcepath $testFile
+        javac -cp $cp -d $buildDir -encoding UTF-8 --release 8 -sourcepath $sourcepath "@$javacArgFile"
     }
 } else {
     # Java 8: use -source 8 -target 8 with -Xlint:-options to suppress warnings
     if ($ShowCompilationErrors) {
-        $compileOutput = javac -cp $cp -d $buildDir -encoding UTF-8 -source 8 -target 8 -Xlint:-options -sourcepath $sourcepath $testFile 2>&1
+        $compileOutput = javac -cp $cp -d $buildDir -encoding UTF-8 -source 8 -target 8 -Xlint:-options -sourcepath $sourcepath "@$javacArgFile" 2>&1
     } else {
-        javac -cp $cp -d $buildDir -encoding UTF-8 -source 8 -target 8 -Xlint:-options -sourcepath $sourcepath $testFile
+        javac -cp $cp -d $buildDir -encoding UTF-8 -source 8 -target 8 -Xlint:-options -sourcepath $sourcepath "@$javacArgFile"
     }
 }
 $exitCode = $LASTEXITCODE
+
+# Clean up javac argfile
+try { Remove-Item -LiteralPath $javacArgFile -Force -ErrorAction SilentlyContinue } catch {}
 
 if ($exitCode -ne 0) {
     Write-Host "Compilation failed!" -ForegroundColor Red
@@ -254,7 +306,7 @@ if ($exitCode -ne 0) {
 }
 
 # Ensure test-work directory exists
-$testWorkDir = "test-work"
+$testWorkDir = Join-Path $repoRoot "test-work"
 if (-not (Test-Path $testWorkDir)) {
     New-Item -ItemType Directory -Path $testWorkDir -Force | Out-Null
 }
@@ -315,7 +367,8 @@ if ($hprofAvailable) {
 
 # Create a scriptblock that runs java and outputs directly (for job execution)
 $scriptBlock = {
-    param($cp, $profilePath, $noResume, $useHprof, $suppressStderr)
+    param($repoRoot, $cp, $profilePath, $noResume, $useHprof, $suppressStderr)
+    Set-Location -LiteralPath $repoRoot
     if ($useHprof) {
         $env:JAVA_TOOL_OPTIONS = "-agentlib:hprof=cpu=times,file=$profilePath"
     } else {
@@ -328,8 +381,10 @@ $scriptBlock = {
     if ($suppressStderr) {
         & java -cp $cp com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest @javaArgs 2>$null
     } else {
-        & java -cp $cp com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest @javaArgs
+        # Merge stderr into stdout so Receive-Job can stream it and it can be logged.
+        & java -cp $cp com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest @javaArgs 2>&1
     }
+    Write-Output "###JAVA_EXIT_CODE:$LASTEXITCODE###"
 }
 
 # Choose execution mode: direct or job-based
@@ -384,7 +439,8 @@ if ($DirectExecution) {
 }
 
 # Start job (only if not using direct execution)
-$job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $cp, $profileTextFile, $NoResume, $hprofAvailable, $SuppressStderr
+$job = Start-Job -ScriptBlock $scriptBlock -ArgumentList $repoRoot, $cp, $profileTextFile, $NoResume, $hprofAvailable, $SuppressStderr
+$javaExitCode = $null
 
 if ($BatchOutput) {
     # Batch output mode: wait for job completion and output all at once (like run_tests_with_timeout.ps1)
@@ -405,7 +461,12 @@ if ($BatchOutput) {
     $output = Receive-Job -Job $job
     if ($output) {
         foreach ($line in $output) {
-            Write-RawToConsoleAndLog -Message $line
+            $text = $line.ToString()
+            if ($text -match '^###JAVA_EXIT_CODE:(\d+)###$') {
+                $javaExitCode = [int]$matches[1]
+                continue
+            }
+            Write-RawToConsoleAndLog -Message $text
         }
     }
 } else {
@@ -434,7 +495,12 @@ if ($BatchOutput) {
         if ($output) {
             # Output directly to console - preserves both stdout and stderr
             foreach ($line in $output) {
-                Write-RawToConsoleAndLog -Message $line
+                $text = $line.ToString()
+                if ($text -match '^###JAVA_EXIT_CODE:(\d+)###$') {
+                    $javaExitCode = [int]$matches[1]
+                    continue
+                }
+                Write-RawToConsoleAndLog -Message $text
             }
         }
 
@@ -451,19 +517,36 @@ if ($BatchOutput) {
     $remainingOutput = Receive-Job -Job $job
     if ($remainingOutput) {
         foreach ($line in $remainingOutput) {
-            Write-RawToConsoleAndLog -Message $line
+            $text = $line.ToString()
+            if ($text -match '^###JAVA_EXIT_CODE:(\d+)###$') {
+                $javaExitCode = [int]$matches[1]
+                continue
+            }
+            Write-RawToConsoleAndLog -Message $text
         }
     }
 }
 
+# Capture final state before cleanup
+$finalJobState = $job.State
+
 # Clean up job
 Remove-Job -Job $job -Force
 
-# Check exit code - for jobs, we check the state
-# If the job failed or was stopped, exit with error code
-if ($job.State -eq "Failed" -or $job.State -eq "Stopped") {
+# Check exit code/state.
+if ($finalJobState -eq "Failed" -or $finalJobState -eq "Stopped") {
     Close-LogFile
     exit 1
+}
+if ($null -eq $javaExitCode) {
+    Write-ToConsoleAndLog -Message "Warning: Could not determine Java exit code (job did not emit sentinel). Treating as failure." -ForegroundColor Yellow
+    Close-LogFile
+    exit 1
+}
+if ($javaExitCode -ne 0) {
+    Write-ToConsoleAndLog -Message "Java process exited with code: $javaExitCode" -ForegroundColor Red
+    Close-LogFile
+    exit $javaExitCode
 }
 
 # Analyze profile if it exists and hprof was used

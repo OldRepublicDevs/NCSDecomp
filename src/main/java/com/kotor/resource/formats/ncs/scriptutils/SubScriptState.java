@@ -221,13 +221,6 @@ public class SubScriptState {
    }
 
    public Vector<Variable> getVariables() {
-      // #region agent log
-      try {
-         java.nio.file.Files.write(java.nio.file.Paths.get("g:\\GitHub\\HoloPatcher.NET\\vendor\\DeNCS\\.cursor\\debug.log"),
-            (java.nio.charset.StandardCharsets.UTF_8.encode("{\"id\":\"log_" + System.currentTimeMillis() + "_getvars\",\"timestamp\":" + System.currentTimeMillis() + ",\"location\":\"SubScriptState.java:222\",\"message\":\"getVariables called\",\"data\":{\"subroutine\":\"" + (this.root != null ? this.root.name() : "null") + "\",\"vardecsSize\":" + (this.vardecs != null ? this.vardecs.size() : 0) + "},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}\n").array()),
-            java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
-      } catch (Exception e) {}
-      // #endregion
       Vector<Variable> vars = new Vector<>(this.vardecs.keySet());
       TreeSet<VarStruct> varstructs = new TreeSet<>();
       Iterator<Variable> it = vars.iterator();
@@ -242,31 +235,7 @@ public class SubScriptState {
 
       vars.addAll(varstructs);
       java.util.ArrayList<Variable> paramVars = this.root.getParamVars();
-      // #region agent log
-      try {
-         int placeholderCount = 0;
-         if (paramVars != null) {
-            for (Variable v : paramVars) {
-               if (v.toString().contains("__unknown_param_")) placeholderCount++;
-            }
-         }
-         java.nio.file.Files.write(java.nio.file.Paths.get("g:\\GitHub\\HoloPatcher.NET\\vendor\\DeNCS\\.cursor\\debug.log"),
-            (java.nio.charset.StandardCharsets.UTF_8.encode("{\"id\":\"log_" + System.currentTimeMillis() + "_params\",\"timestamp\":" + System.currentTimeMillis() + ",\"location\":\"SubScriptState.java:236\",\"message\":\"paramVars retrieved\",\"data\":{\"paramCount\":" + (paramVars != null ? paramVars.size() : 0) + ",\"placeholderCount\":" + placeholderCount + "},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}\n").array()),
-            java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
-      } catch (Exception e) {}
-      // #endregion
       vars.addAll(paramVars);
-      // #region agent log
-      try {
-         int totalPlaceholders = 0;
-         for (Variable v : vars) {
-            if (v.toString().contains("__unknown_param_")) totalPlaceholders++;
-         }
-         java.nio.file.Files.write(java.nio.file.Paths.get("g:\\GitHub\\HoloPatcher.NET\\vendor\\DeNCS\\.cursor\\debug.log"),
-            (java.nio.charset.StandardCharsets.UTF_8.encode("{\"id\":\"log_" + System.currentTimeMillis() + "_final\",\"timestamp\":" + System.currentTimeMillis() + ",\"location\":\"SubScriptState.java:237\",\"message\":\"getVariables returning\",\"data\":{\"totalVars\":" + vars.size() + ",\"totalPlaceholders\":" + totalPlaceholders + "},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"B\"}\n").array()),
-            java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
-      } catch (Exception e) {}
-      // #endregion
       return vars;
    }
 
@@ -1977,63 +1946,55 @@ public class SubScriptState {
    }
 
    private AVarRef buildPlaceholderParam(int ordinal) {
-      // #region agent log
-      try {
-         java.nio.file.Files.write(java.nio.file.Paths.get("g:\\GitHub\\HoloPatcher.NET\\vendor\\DeNCS\\.cursor\\debug.log"),
-            (java.nio.charset.StandardCharsets.UTF_8.encode("{\"id\":\"log_" + System.currentTimeMillis() + "_" + ordinal + "\",\"timestamp\":" + System.currentTimeMillis() + ",\"location\":\"SubScriptState.java:1312\",\"message\":\"buildPlaceholderParam called\",\"data\":{\"ordinal\":" + ordinal + ",\"subroutine\":\"" + (this.root != null ? this.root.name() : "null") + "\"},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\"}\n").array()),
-            java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
-      } catch (Exception e) {}
-      // #endregion
       Variable placeholder = new Variable(new Type((byte)-1));
       placeholder.name("__unknown_param_" + ordinal);
       placeholder.isParam(true);
-      // #region agent log
-      try {
-         java.nio.file.Files.write(java.nio.file.Paths.get("g:\\GitHub\\HoloPatcher.NET\\vendor\\DeNCS\\.cursor\\debug.log"),
-            (java.nio.charset.StandardCharsets.UTF_8.encode("{\"id\":\"log_" + System.currentTimeMillis() + "_" + ordinal + "_2\",\"timestamp\":" + System.currentTimeMillis() + ",\"location\":\"SubScriptState.java:1316\",\"message\":\"placeholder created\",\"data\":{\"ordinal\":" + ordinal + ",\"isParam\":" + placeholder.isParam() + ",\"type\":\"" + placeholder.type() + "\"},\"sessionId\":\"debug-session\",\"runId\":\"run1\",\"hypothesisId\":\"A\"}\n").array()),
-            java.nio.file.StandardOpenOption.CREATE, java.nio.file.StandardOpenOption.APPEND);
-      } catch (Exception e) {}
-      // #endregion
       return new AVarRef(placeholder);
    }
 
    private List<AExpression> removeActionParams(AActionCommand node) {
       ArrayList<AExpression> params = new ArrayList<>();
+      int nodePos = this.nodedata.getPos(node);
+      Logger.trace("removeActionParams: pos=" + nodePos + ", current=" + this.current.getClass().getSimpleName() +
+            ", hasChildren=" + this.current.hasChildren() + ", childrenCount=" + (this.current.hasChildren() ? this.current.size() : 0));
+
       List<Type> paramtypes;
       try {
          paramtypes = NodeUtils.getActionParamTypes(node, this.actions);
+         Logger.trace("removeActionParams: got paramtypes, count=" + (paramtypes != null ? paramtypes.size() : 0));
       } catch (RuntimeException e) {
          // Action metadata missing or invalid - use placeholder params based on arg count
          int paramcount = NodeUtils.getActionParamCount(node);
+         Logger.trace("removeActionParams: action metadata missing, using paramcount=" + paramcount);
          for (int i = 0; i < paramcount; i++) {
             try {
                AExpression exp = this.removeLastExp(false);
+               Logger.trace("removeActionParams: removed param " + (i + 1) + "=" + exp.getClass().getSimpleName());
                params.add(exp);
             } catch (RuntimeException expEx) {
                // Stack doesn't have enough entries - use placeholder
+               Logger.trace("removeActionParams: failed to remove param " + (i + 1) + ", using placeholder");
                params.add(this.buildPlaceholderParam(i + 1));
             }
          }
+         Logger.trace("removeActionParams: returning " + params.size() + " params (metadata missing case)");
          return params;
       }
       // getActionParamCount returns bytes, not parameter count
-      // Convert bytes to parameter count by summing parameter type sizes
+      // paramtypes contains the actual parameter types from the action definition
+      // Use paramtypes.size() as the parameter count - it represents the function signature
       int argBytes = NodeUtils.getActionParamCount(node);
-      int paramcount = 0;
-      int totalBytes = 0;
-      for (int i = 0; i < paramtypes.size(); i++) {
-         int paramSize = paramtypes.get(i).typeSize();
-         if (totalBytes + paramSize > argBytes) {
-            break;
-         }
-         totalBytes += paramSize;
-         paramcount++;
-      }
+      int paramcount = paramtypes.size();
+
+      Logger.trace("removeActionParams: argBytes=" + argBytes + ", paramtypes.size()=" + paramtypes.size() +
+            ", using paramcount=" + paramcount);
 
       for (int i = 0; i < paramcount; i++) {
          Type paramtype = paramtypes.get(i);
          AExpression exp;
          try {
+            Logger.trace("removeActionParams: removing param " + (i + 1) + "/" + paramcount + ", type=" + paramtype.typeSize() +
+                  ", current hasChildren=" + this.current.hasChildren());
             if (paramtype.equals((byte) -16)) {
                exp = this.getLastExp();
                if (!exp.stackentry().type().equals((byte) -16) && !exp.stackentry().type().equals((byte) -15)) {
@@ -2049,14 +2010,20 @@ public class SubScriptState {
             } else {
                exp = this.removeLastExp(false);
             }
+            Logger.trace("removeActionParams: successfully removed param " + (i + 1) + "=" + exp.getClass().getSimpleName());
          } catch (RuntimeException expEx) {
             // Stack doesn't have enough entries - use placeholder
+            Logger.trace("removeActionParams: failed to remove param " + (i + 1) + ", using placeholder: " + expEx.getMessage());
             exp = this.buildPlaceholderParam(i + 1);
          }
 
          params.add(exp);
       }
 
+      // Parameters are removed from the AST children list using removeLastExp, which removes from the end
+      // The order in which they're removed depends on how they were added to the AST
+      // Based on testing, they appear to be in the correct order already, so no reversal needed
+      Logger.trace("removeActionParams: returning " + params.size() + " params, remaining children=" + (this.current.hasChildren() ? this.current.size() : 0));
       return params;
    }
 

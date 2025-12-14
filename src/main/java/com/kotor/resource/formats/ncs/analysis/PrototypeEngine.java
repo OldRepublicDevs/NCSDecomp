@@ -128,9 +128,10 @@ public class PrototypeEngine {
             }
             state.startPrototyping();
             state.setParamCount(inferredParams);
-            // Default to void when return type is still unknown.
+            // If we failed to prototype the subroutine, pick a safe, compilable default return type.
+            // Using void here suppresses later return-slot inference and can corrupt signatures.
             if (!state.type().isTyped()) {
-               state.setReturnType(new Type(Type.VT_NONE), 0);
+               state.setReturnType(new Type(Type.VT_INTEGER), 0);
             }
             state.ensureParamPlaceholders();
             state.stopPrototyping(true);

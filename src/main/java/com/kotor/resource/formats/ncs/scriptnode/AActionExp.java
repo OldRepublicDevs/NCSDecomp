@@ -57,7 +57,12 @@ public class AActionExp extends ScriptNode implements AExpression {
       buff.append(this.action + "(");
       String prefix = "";
 
+      // For round-trip testing, we need to output all parameters exactly as they were in the original
+      // Disable parameter trimming to ensure bytecode matches
       int paramCount = this.params.size();
+      // Parameter trimming disabled for round-trip accuracy
+      // Original trimming logic commented out:
+      /*
       if (this.actionsData != null) {
          try {
             List<String> defaults = this.actionsData.getDefaultValues(this.id);
@@ -111,6 +116,7 @@ public class AActionExp extends ScriptNode implements AExpression {
             paramCount = this.params.size();
          }
       }
+      */
 
       for (int i = 0; i < paramCount; i++) {
          buff.append(prefix + this.params.get(i).toString());

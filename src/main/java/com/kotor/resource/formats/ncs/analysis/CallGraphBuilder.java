@@ -32,6 +32,14 @@ public class CallGraphBuilder extends PrunedDepthFirstAdapter {
    }
 
    public CallGraph build() {
+      // Include main + globals so reachability/prototyping sees calls from entrypoints.
+      // getSubroutines() intentionally excludes main/globals.
+      if (this.subdata.getGlobalsSub() != null) {
+         this.subdata.getGlobalsSub().apply(this);
+      }
+      if (this.subdata.getMainSub() != null) {
+         this.subdata.getMainSub().apply(this);
+      }
       this.subdata.getSubroutines().forEachRemaining(sub -> sub.apply(this));
       return new CallGraph(this.edges);
    }

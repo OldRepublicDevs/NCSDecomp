@@ -44,7 +44,10 @@ public class SubroutineState {
       this.paramstyped = true;
       this.paramsize = 0;
       this.status = 0;
-      this.type = new Type((byte)0);
+      // Default return type to "unknown" so typing passes are allowed to infer it.
+      // Using "void" here incorrectly suppresses return inference (DoTypes/protoreturn)
+      // and can corrupt signatures for returning subroutines (breaks round-tripping).
+      this.type = new Type((byte)-1);
       this.root = root;
       this.id = id;
    }
@@ -185,9 +188,6 @@ public class SubroutineState {
       this.paramsize = params;
       if (params > 0) {
          this.paramstyped = false;
-         if (this.returndepth <= params) {
-            this.type = new Type((byte)0);
-         }
       }
       this.ensureParamPlaceholders();
    }

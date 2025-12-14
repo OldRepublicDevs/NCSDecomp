@@ -49,6 +49,8 @@ Please do not create .md documentation unless it delivers public-facing informat
 
 **Running Tests**: Use `scripts/run_tests_with_timeout.ps1` (PowerShell) or `scripts/run_tests_with_timeout.sh` (bash). Tests compile original `.nss`→`.ncs`, decompile `.ncs`→`.nss`, recompile decompiled `.nss`→`.ncs`, then compare bytecode. Fast-fail stops on first mismatch.
 
+**MANDATORY**: When tests fail to start (timeouts, classpath issues, missing jars/classes, logging problems), **do not bypass** the test runner by invoking ad-hoc `javac`, `java`, Maven, or custom commands. **Fix `scripts/run_tests.ps1` instead** so the repository’s standard runner remains the single source of truth for how tests are compiled, executed, timed out, and logged.
+
 **Action Opcodes**: Action definitions in `src/main/resources/*_nwscript.nss` or `tools/*_nwscript.nss`. Format: `// N:` comment followed by function signature. Action index N maps to opcode N in bytecode. Search pattern: `^// (N):` where N is decimal action ID. Example: `// 120:` = `EffectDamageIncrease`, `// 57:` = `PauseGame`.
 
 **Common Mistakes**: Don't search for "action 120" in source files—look for `// 120:` comments. Don't assume `test_data/` exists—use `test-work/`. Don't use `NCSDecomp` class—use `NCSDecompCLI`. When bytecode mismatches, inspect decompiled output structure (missing spaces, malformed blocks) not just opcodes—structural issues cause wrong actions to be emitted.

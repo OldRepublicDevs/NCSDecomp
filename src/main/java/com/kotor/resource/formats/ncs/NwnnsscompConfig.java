@@ -86,7 +86,7 @@ public class NwnnsscompConfig {
       java.util.List<String> includeArgs = new java.util.ArrayList<>();
       if (includeDirs != null && !includeDirs.isEmpty()) {
          // Only add -i flags if compiler supports them (not KOTOR Tool or KOTOR Scripting Tool)
-         boolean supportsIncludeFlag = (chosenCompiler != KnownExternalCompilers.KOTOR_TOOL 
+         boolean supportsIncludeFlag = (chosenCompiler != KnownExternalCompilers.KOTOR_TOOL
                && chosenCompiler != KnownExternalCompilers.KOTOR_SCRIPTING_TOOL);
          if (supportsIncludeFlag) {
             for (File dir : includeDirs) {
@@ -140,7 +140,7 @@ public class NwnnsscompConfig {
          throw new UnsupportedOperationException(
             "Compiler '" + chosenCompiler.getName() + "' does not support decompilation");
       }
-      
+
       // Special handling for ncsdis.exe which uses a simpler command line: ncsdis.exe <input.ncs> <output.pcode>
       // No -d, -o, or -g flags
       if (chosenCompiler == KnownExternalCompilers.NCSDIS) {
@@ -151,7 +151,7 @@ public class NwnnsscompConfig {
             outputFile.getAbsolutePath()
          };
       }
-      
+
       return formatArgs(chosenCompiler.getDecompileArgs(), executable);
    }
 

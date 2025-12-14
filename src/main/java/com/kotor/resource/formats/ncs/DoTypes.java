@@ -18,6 +18,7 @@ import com.kotor.resource.formats.ncs.node.AJumpCommand;
 import com.kotor.resource.formats.ncs.node.AJumpToSubroutine;
 import com.kotor.resource.formats.ncs.node.ALogiiCommand;
 import com.kotor.resource.formats.ncs.node.AMoveSpCommand;
+import com.kotor.resource.formats.ncs.node.AReturn;
 import com.kotor.resource.formats.ncs.node.ARsaddCommand;
 import com.kotor.resource.formats.ncs.node.AStoreStateCommand;
 import com.kotor.resource.formats.ncs.node.ASubroutine;
@@ -121,6 +122,7 @@ public class DoTypes extends PrunedDepthFirstAdapter {
             } else {
                this.state.setReturnType(this.stack.get(1, this.state), loc - this.stack.size());
             }
+
          }
       }
    }
@@ -215,9 +217,10 @@ public class DoTypes extends PrunedDepthFirstAdapter {
          if (this.initialproto) {
             int remove = NodeUtils.stackOffsetToPos(node.getOffset());
             int params = this.stack.removePrototyping(remove);
-               if (params > 8) {
-                  params = 8; // sanity cap to avoid runaway counts from locals
-               }
+
+            if (params > 8) {
+               params = 8; // sanity cap to avoid runaway counts from locals
+            }
             if (params > 0) {
                int current = this.state.getParamCount();
                if (current == 0 || params < current) {
@@ -267,6 +270,12 @@ public class DoTypes extends PrunedDepthFirstAdapter {
          int paramsize = substate.getParamCount();
          if (substate.isTotallyPrototyped()) {
             this.stack.remove(paramsize);
+            // Even when the callee has a complete parameter prototype, its return type can still be unknown
+            // (especially when param counts were inferred before return typing converged). Infer the return
+            // type from the reserved return slot at the call site when possible.
+            if (this.protoreturn && substate.type().equals((byte)-1)) {
+               substate.setReturnType(this.stack.get(1, this.state), 0);
+            }
          } else {
             this.stack.removeParams(paramsize, substate);
             if (substate.type().equals((byte)-1)) {
@@ -311,6 +320,22 @@ public class DoTypes extends PrunedDepthFirstAdapter {
 
    @Override
    public void outACopyDownBpCommand(ACopyDownBpCommand node) {
+   }
+
+   @Override
+   public void outAReturn(AReturn node) {
+      // Some scripts rely on the explicit RETN opcode to convey the subroutine return type.
+      // If we ignore it during prototyping, MOVESP-based param inference can over-count by
+      // the return slot and the decompiler will emit incorrect signatures (breaking round-trip).
+      if (!this.protoskipping && !this.skipdeadcode && this.protoreturn) {
+         Type rtype = NodeUtils.getType(node);
+         if (rtype != null && rtype.isTyped()) {
+            if (this.state.type() == null || !this.state.type().isTyped() || this.state.type().equals((byte)-1)) {
+               this.state.setReturnType(rtype, 0);
+            }
+         }
+      }
+
    }
 
    @Override

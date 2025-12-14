@@ -12,7 +12,7 @@ NCSDecomp now supports **ncsdis.exe** as an alternative pcode decompiler alongsi
 
 ### ncsdis.exe Format
 
-```
+```h
 ; 941 bytes, 153 instructions
 
 _start:
@@ -25,6 +25,7 @@ main:
 ```
 
 **Characteristics:**
+
 - Comment header with file stats
 - Symbolic labels on separate lines (`_start:`, `main:`, `sta_XXXXX:`, `loc_XXXXX:`)
 - Separator lines between sections: `-------- -------------------------- ---`
@@ -34,7 +35,7 @@ main:
 
 ### nwnnsscomp_kscript.exe Format
 
-```
+```h
 00000008 42 000003AD              T 000003AD
 0000000D 1E 00 00000008           JSR fn_00000015
 00000013 20 00                    RETN
@@ -43,6 +44,7 @@ main:
 ```
 
 **Characteristics:**
+
 - Header line with bytecode marker (`T 000003AD`)
 - No separate label lines
 - No separator lines
@@ -79,6 +81,7 @@ main:
 The pcode comparison now normalizes both formats to a canonical form:
 
 **Normalization Rules:**
+
 1. Skip comments, labels, separators, blank lines
 2. Extract: `ADDRESS OPCODE OPERANDS`
 3. Normalize opcodes: `STORESTATE` ↔ `STORE_STATE`
@@ -92,17 +95,20 @@ The pcode comparison now normalizes both formats to a canonical form:
 **Example:**
 
 ncsdis line:
-```
+
+```h
   00000015 2C 01 10 00000000 00000000 STORESTATE sta_00000025 0 0
 ```
 
 nwnnsscomp line:
-```
+
+```h
 00000015 2C 10 00000000 00000000  STORE_STATE 10, 00000000, 00000000
 ```
 
 Both normalize to:
-```
+
+```h
 00000015 STORESTATE 10 00000000 00000000
 ```
 
@@ -171,7 +177,7 @@ The pcode comparison automatically handles format differences.
 
 ### Test Results
 
-```
+```Lua
 ncsdis lines:     231 (includes labels, separators, comments)
 nwnnsscomp lines: 154 (instructions only)
 

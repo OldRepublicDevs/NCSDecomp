@@ -275,7 +275,12 @@ public class SubroutineAnalysisData {
    private void addMain(ASubroutine sub, boolean conditional) {
       this.mainsub = sub;
       if (conditional) {
-         this.addSubState(this.mainsub, (byte)0, new Type((byte)3));
+         // Conditional programs use StartingConditional() which returns int.
+         // Use return-depth 0 here so later typing/stack setup can infer the
+         // correct calling convention without being skewed by a pre-filled depth.
+         SubroutineState state = new SubroutineState(this.nodedata, this.mainsub, (byte)0);
+         state.setReturnType(new Type((byte)3), 0);
+         this.substates.put(this.mainsub, state);
       } else {
          this.addSubState(this.mainsub, (byte)0);
       }

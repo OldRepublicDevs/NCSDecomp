@@ -55,8 +55,16 @@ public class CallSiteAnalyzer extends PrunedDepthFirstAdapter {
     * @return map of destination bytecode offsets to inferred parameter counts
     */
    public Map<Integer, Integer> analyze() {
-      Iterator<ASubroutine> subs = this.subdata.getSubroutines();
+      // Include globals + main so we see call-sites from entrypoints.
+      // getSubroutines() intentionally excludes main/globals.
+      if (this.subdata.getGlobalsSub() != null) {
+         this.analyzeSubroutine(this.subdata.getGlobalsSub());
+      }
+      if (this.subdata.getMainSub() != null) {
+         this.analyzeSubroutine(this.subdata.getMainSub());
+      }
 
+      Iterator<ASubroutine> subs = this.subdata.getSubroutines();
       while (subs.hasNext()) {
          this.analyzeSubroutine(subs.next());
       }
@@ -192,12 +200,16 @@ public class CallSiteAnalyzer extends PrunedDepthFirstAdapter {
    public void outAJumpToSubroutine(AJumpToSubroutine node) {
       if (!this.skipdeadcode) {
          int dest = NodeUtils.getJumpDestinationPos(node);
+         // Growth tracks pushes since the last statement boundary/reset. For JSR call-sites,
+         // that growth includes the reserved return slot (RSADD) plus the actual arguments.
+         // We want argument count, so subtract the return slot when present.
          int inferred = Math.max(0, this.growth);
-         if (inferred == 0) {
-            inferred = Math.max(0, this.height);
+         if (inferred > 0) {
+            inferred = Math.max(0, inferred - 1);
          }
 
          this.inferredParams.merge(dest, inferred, Math::max);
+         // Pop only the arguments; the return slot remains on the stack.
          this.pop(inferred);
          this.resetGrowth();
       }
