@@ -53,6 +53,11 @@ Please do not create .md documentation unless it delivers public-facing informat
 
 **Common Mistakes**: Don't search for "action 120" in source files—look for `// 120:` comments. Don't assume `test_data/` exists—use `test-work/`. Don't use `NCSDecomp` class—use `NCSDecompCLI`. When bytecode mismatches, inspect decompiled output structure (missing spaces, malformed blocks) not just opcodes—structural issues cause wrong actions to be emitted.
 
+
+## Decompiling/bytecode
+
+Use `tools\ncsdis.exe` to get bytecode disassembly: `ncsdis --kotor input.ncs output_BYTECODE.nss` (or `--kotor2`, `--nwn`, etc.). Alternatively use `tools\nwnnsscomp_kscript.exe` decompiler. Don't manually read raw bytes from `.ncs` files.
+
 ## Debug Statements
 
 **ALWAYS add comprehensive debug statements when working on control flow, bytecode processing, or complex logic issues.** Debug statements are valuable for diagnosing problems and should be added exhaustively and thoroughly throughout relevant code paths.
