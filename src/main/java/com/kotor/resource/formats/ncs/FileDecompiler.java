@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -192,7 +191,7 @@ public class FileDecompiler {
             return result;
          } else {
             throw new DecompilerException("Error: cannot open actions file " + actionfile.getAbsolutePath() + ".\n" +
-                  "Searched in app directory: " + CompilerUtil.getNCSDecompDirectory().getAbsolutePath() + "\n" +
+                  "Searched in app directory: " + CompilerUtil.getDeNCSDirectory().getAbsolutePath() + "\n" +
                   "And CWD: " + System.getProperty("user.dir"));
          }
       } catch (IOException ex) {
@@ -203,13 +202,13 @@ public class FileDecompiler {
    /**
     * Loads preferSwitches setting from configuration file if present.
     * <p>
-    * Checks for {@code Prefer Switches} property in {@code .\config\ncsdecomp.conf}.
+    * Checks for {@code Prefer Switches} property in {@code .\config\dencs.conf}.
     * If not found or unparseable, leaves the current value unchanged.
     */
    private static void loadPreferSwitchesFromConfig() {
       try {
-         // Use getNCSDecompDirectory() to handle both JAR and EXE cases correctly
-         File baseDir = CompilerUtil.getNCSDecompDirectory();
+         // Use getDeNCSDirectory() to handle both JAR and EXE cases correctly
+         File baseDir = CompilerUtil.getDeNCSDirectory();
          File configDir = new File(baseDir, "config");
          // Ensure config directory exists (though it may not have files yet)
          if (!configDir.exists()) {
@@ -220,7 +219,7 @@ public class FileDecompiler {
                System.out.println("[INFO] loadPreferSwitchesFromConfig: Created config directory: " + configDir.getAbsolutePath());
             }
          }
-         File configFile = new File(configDir, "ncsdecomp.conf");
+         File configFile = new File(configDir, "dencs.conf");
          if (!configFile.exists()) {
             configFile = new File(configDir, "dencs.conf");
          }
@@ -358,7 +357,7 @@ public class FileDecompiler {
       // This allows viewing bytecode even without round-trip validation
       if (this.checkCompilerExists()) {
          try {
-            Logger.ncsdecomp("Attempting to capture original bytecode from NCS file...");
+            Logger.dencs("Attempting to capture original bytecode from NCS file...");
             // Use temp directory to avoid creating files outside temp without user consent
             File olddecompiled = this.externalDecompile(file, isK2Selected, null);
             if (olddecompiled != null && olddecompiled.exists()) {
@@ -644,7 +643,7 @@ public class FileDecompiler {
       File olddecompiled = null;
 
       try {
-         Logger.ncsdecomp("Decompiling original NCS file to capture bytecode...");
+         Logger.dencs("Decompiling original NCS file to capture bytecode...");
          Logger.startCompilerSection();
          // Use temp directory to avoid creating files outside temp without user consent
          olddecompiled = this.externalDecompile(file, isK2Selected, null);
@@ -660,7 +659,7 @@ public class FileDecompiler {
          }
 
          data.setOriginalByteCode(this.readFile(olddecompiled));
-         Logger.ncsdecomp("Compiling generated NSS file...");
+         Logger.dencs("Compiling generated NSS file...");
          Logger.startCompilerSection();
          // Use same directory as input NSS file for output NCS (user has already chosen
          // this location via save dialog)
@@ -676,7 +675,7 @@ public class FileDecompiler {
             return PARTIAL_COMPILE;
          }
 
-         Logger.ncsdecomp("Decompiling newly compiled NCS file to capture bytecode...");
+         Logger.dencs("Decompiling newly compiled NCS file to capture bytecode...");
          Logger.startCompilerSection();
          // Use temp directory for pcode files (intermediate files, cleaned up after use)
          newdecompiled = this.externalDecompile(newcompiled, isK2Selected, null);
@@ -780,7 +779,7 @@ public class FileDecompiler {
 
       try {
          // Use temp directory for compileNss (used internally, not user-initiated save)
-         File tempDir = new File(System.getProperty("java.io.tmpdir"), "ncsdecomp_roundtrip");
+         File tempDir = new File(System.getProperty("java.io.tmpdir"), "dencs_roundtrip");
          if (!tempDir.exists()) {
             System.out.println("[INFO] compileNss: CREATING directory: " + tempDir.getAbsolutePath());
             tempDir.mkdirs();
@@ -1275,7 +1274,7 @@ public class FileDecompiler {
          actualOutputDir = outputDir;
       } else {
          // Default to temp directory to avoid creating files without user consent
-         actualOutputDir = new File(System.getProperty("java.io.tmpdir"), "ncsdecomp_roundtrip");
+         actualOutputDir = new File(System.getProperty("java.io.tmpdir"), "dencs_roundtrip");
          if (!actualOutputDir.exists()) {
             System.out.println("[INFO] externalDecompile: CREATING output directory: " + actualOutputDir.getAbsolutePath());
             if (!actualOutputDir.mkdirs()) {
@@ -1303,7 +1302,7 @@ public class FileDecompiler {
       try {
          config = new NwnnsscompConfig(compiler, in, result, k2);
       } catch (IOException e) {
-         System.out.println("[NCSDecomp] ERROR: Failed to create compiler config: " + e.getMessage());
+         System.out.println("[DeNCS] ERROR: Failed to create compiler config: " + e.getMessage());
          return null;
       }
 
@@ -1319,14 +1318,14 @@ public class FileDecompiler {
       try {
          String[] args = config.getDecompileArgs(compiler.getAbsolutePath());
 
-         Logger.startNCSDecompSection();
-         Logger.ncsdecomp("Using compiler: " + chosenCompiler.getName() + " (SHA256: "
+         Logger.startDeNCSSection();
+         Logger.dencs("Using compiler: " + chosenCompiler.getName() + " (SHA256: "
                + config.getSha256Hash().substring(0, 16) + "...)");
-         Logger.ncsdecomp("Input file: " + in.getAbsolutePath());
-         Logger.ncsdecomp("Expected output: " + result.getAbsolutePath());
+         Logger.dencs("Input file: " + in.getAbsolutePath());
+         Logger.dencs("Expected output: " + result.getAbsolutePath());
 
          // First attempt: try without registry spoofing
-         Logger.ncsdecomp("First decompilation attempt (without registry spoofing)");
+         Logger.dencs("First decompilation attempt (without registry spoofing)");
 
          // Determine working directory
          File workingDir;
@@ -1388,7 +1387,7 @@ public class FileDecompiler {
             try {
                spoofer = new RegistrySpoofer(toolsDir, k2);
                ((RegistrySpoofer) spoofer).activate(); // This creates chitin.key and directories
-               Logger.ncsdecomp("Registry spoofing activated, retrying decompilation");
+               Logger.dencs("Registry spoofing activated, retrying decompilation");
             } catch (SecurityException e) {
                Logger.warn("Registry spoofing failed (permission denied): " + e.getMessage());
                Logger.warn("Cannot proceed without registry spoofing");
@@ -1444,7 +1443,7 @@ public class FileDecompiler {
             envOverrides.put("KOTOR_ROOT", resolvedRoot);
 
             // Retry decompilation with registry spoofing
-            Logger.ncsdecomp("Retry decompilation attempt (with registry spoofing)");
+            Logger.dencs("Retry decompilation attempt (with registry spoofing)");
             pb = new ProcessBuilder(args);
             pb.directory(workingDir);
             pb.environment().putAll(envOverrides);
@@ -1539,7 +1538,7 @@ public class FileDecompiler {
    private File writeCode(String code) {
       try {
          // Use temp directory to avoid creating files outside temp without user consent
-         File tempDir = new File(System.getProperty("java.io.tmpdir"), "ncsdecomp_roundtrip");
+         File tempDir = new File(System.getProperty("java.io.tmpdir"), "dencs_roundtrip");
          if (!tempDir.exists()) {
             System.out.println("[INFO] writeCode: CREATING directory: " + tempDir.getAbsolutePath());
             if (!tempDir.mkdirs()) {
@@ -1604,7 +1603,7 @@ public class FileDecompiler {
             actualOutputDir = outputDir;
          } else {
          // Default to temp directory to avoid creating files without user consent
-         actualOutputDir = new File(System.getProperty("java.io.tmpdir"), "ncsdecomp_roundtrip");
+         actualOutputDir = new File(System.getProperty("java.io.tmpdir"), "dencs_roundtrip");
          if (!actualOutputDir.exists()) {
             System.out.println("[INFO] externalCompile: CREATING directory: " + actualOutputDir.getAbsolutePath());
             if (!actualOutputDir.mkdirs()) {
@@ -1636,18 +1635,18 @@ public class FileDecompiler {
             java.util.Map<String, String> env = wrapper.getEnvironmentOverrides();
             File workingDir = wrapper.getWorkingDirectory();
 
-            Logger.startNCSDecompSection();
-            Logger.ncsdecomp("Using compiler: " + wrapper.getCompiler().getName());
-            Logger.ncsdecomp("Input file: " + file.getAbsolutePath());
-            Logger.ncsdecomp("Expected output: " + result.getAbsolutePath());
-            Logger.ncsdecomp("Working directory: " + workingDir.getAbsolutePath());
+            Logger.startDeNCSSection();
+            Logger.dencs("Using compiler: " + wrapper.getCompiler().getName());
+            Logger.dencs("Input file: " + file.getAbsolutePath());
+            Logger.dencs("Expected output: " + result.getAbsolutePath());
+            Logger.dencs("Working directory: " + workingDir.getAbsolutePath());
 
             // Capture compiler output to check for NwnStdLoader error
             boolean needsRegistrySpoof = false;
 
             try {
                // First compilation attempt
-               Logger.ncsdecomp("First compilation attempt (without registry spoofing)");
+               Logger.dencs("First compilation attempt (without registry spoofing)");
                Logger.startCompilerSection();
                String output = executeCompilerAndCaptureOutput(args, workingDir, env);
                Logger.endSection();
@@ -1674,7 +1673,7 @@ public class FileDecompiler {
                   return null;
                }
             } catch (IOException ioEx) {
-               System.out.println("[NCSDecomp] IOException during first compilation attempt: " + ioEx.getMessage());
+               System.out.println("[DeNCS] IOException during first compilation attempt: " + ioEx.getMessage());
                // Continue to try with registry spoofing if we have a spoofer available
                AutoCloseable testSpoofer = wrapper.createRegistrySpoofer();
                if (testSpoofer instanceof RegistrySpoofer) {
@@ -1690,7 +1689,7 @@ public class FileDecompiler {
                   if (spoofer instanceof RegistrySpoofer) {
                      try {
                         ((RegistrySpoofer) spoofer).activate();
-                        Logger.ncsdecomp("Registry spoofing activated, retrying compilation");
+                        Logger.dencs("Registry spoofing activated, retrying compilation");
                      } catch (SecurityException e) {
                         Logger.warn("Registry spoofing failed (permission denied): " + e.getMessage());
                         Logger.warn("Attempting compilation without registry spoofing (may fail)");
@@ -1698,7 +1697,7 @@ public class FileDecompiler {
                   }
 
                   // Retry compilation with registry spoofing
-                  Logger.ncsdecomp("Retry compilation attempt (with registry spoofing)");
+                  Logger.dencs("Retry compilation attempt (with registry spoofing)");
                   Logger.startCompilerSection();
                   String output = executeCompilerAndCaptureOutput(args, workingDir, env);
                   Logger.endSection();
@@ -1714,7 +1713,7 @@ public class FileDecompiler {
 
                   return result;
                } catch (Exception spooferEx) {
-                  System.out.println("[NCSDecomp] Exception with registry spoofer: " + spooferEx.getMessage());
+                  System.out.println("[DeNCS] Exception with registry spoofer: " + spooferEx.getMessage());
                   throw new IOException("Registry spoofer error: " + spooferEx.getMessage(), spooferEx);
                }
             }
@@ -1781,7 +1780,7 @@ public class FileDecompiler {
 
       try {
          int exitCode = proc.waitFor();
-         Logger.ncsdecomp("Compiler exit code: " + exitCode);
+         Logger.dencs("Compiler exit code: " + exitCode);
       } catch (InterruptedException e) {
          Thread.currentThread().interrupt();
          throw new IOException("Compiler process interrupted", e);

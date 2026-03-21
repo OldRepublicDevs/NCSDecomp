@@ -1,7 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// Visit https://bolabaden.org for more information and other ventures
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -36,7 +34,7 @@ import java.util.concurrent.TimeUnit;
  * Exhaustive round-trip tests for the decompiler and compiler:
  * 1) Clone or reuse the Vanilla_KOTOR_Script_Source repository
  * 2) Compile each .nss to .ncs for each game using nwnnsscomp.exe
- * 3) Decompile each .ncs back to .nss using NCSDecompCLI
+ * 3) Decompile each .ncs back to .nss using DeNCSCLI
  * 4) Normalize both original and decompiled NSS for comparison (whitespace, formatting only)
  * 5) Fail immediately on the first mismatch
  *
@@ -70,7 +68,7 @@ import java.util.concurrent.TimeUnit;
  * - Investigate root causes and correct them in the decompiler source itself
  * - Testing code is for validation, not for altering broken decompiled output in any way
  */
-public class NCSDecompCLIRoundTripTest {
+public class DeNCSCLIRoundTripTest {
    /** Optional time budget for CLI runs (0 = unlimited). */
    private long maxSuiteNanos = 0L;
    /** How often to persist progress during long runs (<=0 disables). */
@@ -3181,13 +3179,13 @@ public class NCSDecompCLIRoundTripTest {
     * Entry point for running the round-trip suite.
     *
     * Usage:
-    *   java NCSDecompCLIRoundTripTest                    - Run all tests (with resume from last failure)
-    *   java NCSDecompCLIRoundTripTest --no-resume         - Run all tests from start (ignore resume file)
-    *   java NCSDecompCLIRoundTripTest <filename>         - Test single file (e.g., "k_def_buff.nss")
-    *   java NCSDecompCLIRoundTripTest <filename> <game>  - Test single file with game flag (k1/k2)
+    *   java DeNCSCLIRoundTripTest                    - Run all tests (with resume from last failure)
+    *   java DeNCSCLIRoundTripTest --no-resume         - Run all tests from start (ignore resume file)
+    *   java DeNCSCLIRoundTripTest <filename>         - Test single file (e.g., "k_def_buff.nss")
+    *   java DeNCSCLIRoundTripTest <filename> <game>  - Test single file with game flag (k1/k2)
     */
    public static void main(String[] args) {
-      NCSDecompCLIRoundTripTest runner = new NCSDecompCLIRoundTripTest();
+      DeNCSCLIRoundTripTest runner = new DeNCSCLIRoundTripTest();
       int exitCode;
       boolean useResume = true;
       // Basic CLI arg parsing (supports long-running chunked runs).

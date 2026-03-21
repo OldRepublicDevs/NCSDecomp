@@ -1,5 +1,5 @@
 #!/usr/bin/env pwsh
-# Script to run NCSDecomp GUI
+# Script to run DeNCS GUI
 # Usage: ./scripts/run_gui.ps1
 
 $ErrorActionPreference = "Stop"
@@ -13,7 +13,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 # Run GUI
-Write-Host "Starting NCSDecomp GUI..." -ForegroundColor Cyan
+Write-Host "Starting DeNCS GUI..." -ForegroundColor Cyan
 Write-Host ""
 
 java -cp "target/classes;lib/*" `

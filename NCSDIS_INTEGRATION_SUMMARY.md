@@ -1,7 +1,7 @@
 # NCSDIS.exe Integration Summary
 
 ## Objective
-Identify the exact discrepancy between ncsdis.exe and nwnnsscomp_kscript.exe pcode formats and update NCSDecomp to support both compilers seamlessly.
+Identify the exact discrepancy between ncsdis.exe and nwnnsscomp_kscript.exe pcode formats and update DeNCS to support both compilers seamlessly.
 
 ## Key Findings
 
@@ -135,14 +135,14 @@ Java Compilation
 
 ### Automatic Detection
 ```bash
-java -cp "target/classes;lib/*" com.kotor.resource.formats.ncs.NCSDecompCLI \
+java -cp "target/classes;lib/*" com.kotor.resource.formats.ncs.DeNCSCLI \
   -i input.ncs -o output.nss -g k1
 ```
-NCSDecomp will automatically find and use ncsdis.exe if available.
+DeNCS will automatically find and use ncsdis.exe if available.
 
 ### Explicit Path
 ```bash
-java -cp "target/classes;lib/*" com.kotor.resource.formats.ncs.NCSDecompCLI \
+java -cp "target/classes;lib/*" com.kotor.resource.formats.ncs.DeNCSCLI \
   -i input.ncs -o output.nss -g k1 --compiler tools/ncsdis.exe
 ```
 
@@ -195,4 +195,4 @@ Works identically with either ncsdis.exe or nwnnsscomp_kscript.exe.
 
 **Task completed successfully!** ✓
 
-NCSDecomp now supports both ncsdis.exe and nwnnsscomp with transparent format unification.
+DeNCS now supports both ncsdis.exe and nwnnsscomp with transparent format unification.

@@ -1,4 +1,4 @@
-# NCSDecomp
+# DeNCS
 
 KotOR Script Decompiler - A decompiler for Knights of the Old Republic NCS script files.
 
@@ -71,7 +71,7 @@ The PowerShell build script will:
 1. Automatically clean up old build artifacts (.class files, build directory, JAR)
 2. Compile all Java source files from `src/main/java`
 3. Copy resources from `src/main/resources` to the build directory
-4. Create a JAR file named `NCSDecompCLI.jar` in the project root
+4. Create a JAR file named `DeNCSCLI.jar` in the project root
 5. Optionally create self-contained executables (when using `-BuildExecutable`)
 6. Automatically detect the platform and use appropriate settings
 
@@ -100,7 +100,7 @@ The Maven build process will:
 2. Copy resources from `src/main/resources` to the output directory
 3. Run all tests from `src/test/java`
 4. Create a JAR file in the `target/` directory
-5. Create a fat JAR (with dependencies) named `nCSDecompCLI-1.0.2.jar`
+5. Create a fat JAR (with dependencies) named `dencs-CLI-1.0.2.jar` (from `${project.artifactId}-CLI-${project.version}` in `pom.xml`)
 
 ## Running
 
@@ -108,17 +108,17 @@ The Maven build process will:
 
 ```bash
 # Run the CLI application
-mvn exec:java -Dexec.mainClass="com.kotor.resource.formats.ncs.NCSDecompCLI" -Dexec.args="[arguments]"
+mvn exec:java -Dexec.mainClass="com.kotor.resource.formats.ncs.DeNCSCLI" -Dexec.args="[arguments]"
 ```
 
 ### Using the JAR file
 
 ```bash
 # After building with PowerShell script
-java -jar NCSDecompCLI.jar [arguments]
+java -jar DeNCSCLI.jar [arguments]
 
 # Or after building with Maven
-java -jar target/nCSDecompCLI-1.0.2.jar [arguments]
+java -jar target/dencs-CLI-1.0.2.jar [arguments]
 ```
 
 **Note:** When using the JAR file, ensure `k1_nwscript.nss` or `tsl_nwscript.nss` is in the `tools/` directory (or current working directory for legacy support), or use the `--nwscript <path>` option to specify the location.
@@ -160,14 +160,14 @@ choco install maven -y
 mvn test
 
 # Run a specific test class
-mvn test -Dtest=NCSDecompCLIRoundTripTest
+mvn test -Dtest=DeNCSCLIRoundTripTest
 ```
 
 ## License
 
-Copyright 2021-2025 NCSDecomp
-Licensed under the Business Source License 1.1 (BSL 1.1).
-See LICENSE.txt file in the project root for full license information.
+Copyright 2021-2025 DeNCS
+Licensed under the MIT License (see LICENSE).
+See LICENSE file in the project root for full license information.
 
 ## Credits
 

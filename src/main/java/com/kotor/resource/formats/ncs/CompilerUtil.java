@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -135,7 +134,7 @@ public class CompilerUtil {
     *   <li>If cliPath is specified and valid, use it</li>
     *   <li>Try tools/ directory with all known compiler names</li>
     *   <li>Try current working directory with all known compiler names</li>
-    *   <li>Try NCSDecomp installation directory (jar location)</li>
+    *   <li>Try DeNCS installation directory (jar location)</li>
     * </ol>
     *
     * @param cliPath Path specified via CLI argument (can be null or empty)
@@ -161,23 +160,23 @@ public class CompilerUtil {
          }
       }
 
-      // 2. Try NCSDecomp installation directory's tools/ FIRST (app directory)
+      // 2. Try DeNCS installation directory's tools/ FIRST (app directory)
       // This ensures the packaged app finds its bundled tools
-      File ncsDecompDir = getNCSDecompDirectory();
-      if (ncsDecompDir != null) {
-         File ncsToolsDir = new File(ncsDecompDir, "tools");
+      File deNCSDir = getDeNCSDirectory();
+      if (deNCSDir != null) {
+         File ncsToolsDir = new File(deNCSDir, "tools");
          for (String name : COMPILER_NAMES) {
             File candidate = new File(ncsToolsDir, name);
             if (candidate.exists() && candidate.isFile()) {
-               System.out.println("[INFO] CompilerUtil.resolveCompilerPathWithFallbacks: Found in NCSDecomp tools/: " + candidate.getAbsolutePath());
+               System.out.println("[INFO] CompilerUtil.resolveCompilerPathWithFallbacks: Found in DeNCS tools/: " + candidate.getAbsolutePath());
                return candidate;
             }
          }
-         // Also try NCSDecomp directory itself
+         // Also try DeNCS directory itself
          for (String name : COMPILER_NAMES) {
-            File candidate = new File(ncsDecompDir, name);
+            File candidate = new File(deNCSDir, name);
             if (candidate.exists() && candidate.isFile()) {
-               System.out.println("[INFO] CompilerUtil.resolveCompilerPathWithFallbacks: Found in NCSDecomp dir: " + candidate.getAbsolutePath());
+               System.out.println("[INFO] CompilerUtil.resolveCompilerPathWithFallbacks: Found in DeNCS dir: " + candidate.getAbsolutePath());
                return candidate;
             }
          }
@@ -185,7 +184,7 @@ public class CompilerUtil {
 
       // 3. Try CWD tools/ directory (if different from app directory)
       Path cwd = Paths.get(System.getProperty("user.dir"));
-      if (ncsDecompDir == null || !ncsDecompDir.equals(cwd.toFile())) {
+      if (deNCSDir == null || !deNCSDir.equals(cwd.toFile())) {
          Path toolsDir = cwd.resolve("tools");
          for (String name : COMPILER_NAMES) {
             Path candidate = toolsDir.resolve(name);
@@ -280,29 +279,29 @@ public class CompilerUtil {
          }
       }
 
-      // 2. Try NCSDecomp installation directory's tools/ FIRST (app directory)
+      // 2. Try DeNCS installation directory's tools/ FIRST (app directory)
       // This ensures the packaged app finds its bundled tools
-      File ncsDecompDir = getNCSDecompDirectory();
-      if (ncsDecompDir != null) {
-         File ncsToolsDir = new File(ncsDecompDir, "tools");
+      File deNCSDir = getDeNCSDirectory();
+      if (deNCSDir != null) {
+         File ncsToolsDir = new File(deNCSDir, "tools");
          for (String name : compilerNames) {
             File candidate = new File(ncsToolsDir, name);
             if (candidate.exists() && candidate.isFile()) {
-               return new CompilerResolutionResult(candidate, true, "Fallback: NCSDecomp tools/ directory");
+               return new CompilerResolutionResult(candidate, true, "Fallback: DeNCS tools/ directory");
             }
          }
-         // Also try NCSDecomp directory itself
+         // Also try DeNCS directory itself
          for (String name : compilerNames) {
-            File candidate = new File(ncsDecompDir, name);
+            File candidate = new File(deNCSDir, name);
             if (candidate.exists() && candidate.isFile()) {
-               return new CompilerResolutionResult(candidate, true, "Fallback: NCSDecomp directory");
+               return new CompilerResolutionResult(candidate, true, "Fallback: DeNCS directory");
             }
          }
       }
 
       // 3. Try CWD tools/ directory - all compiler filenames (if different from app dir)
       File cwd = new File(System.getProperty("user.dir"));
-      if (ncsDecompDir == null || !ncsDecompDir.equals(cwd)) {
+      if (deNCSDir == null || !deNCSDir.equals(cwd)) {
          File toolsDir = new File(cwd, "tools");
          for (String name : compilerNames) {
             File candidate = new File(toolsDir, name);
@@ -325,47 +324,47 @@ public class CompilerUtil {
    }
 
    /**
-    * Gets the NCSDecomp installation directory (the app root where config/ and tools/ are located).
+    * Gets the DeNCS installation directory (the app root where config/ and tools/ are located).
     * <p>
     * This method handles multiple execution contexts:
     * <ul>
-    *   <li>jpackage EXE: Returns the directory containing the EXE (e.g., NCSDecomp/)</li>
+    *   <li>jpackage EXE: Returns the directory containing the EXE (e.g., DeNCS/)</li>
     *   <li>JAR in jpackage app/: Returns the app ROOT (parent of app/), not app/ itself</li>
     *   <li>Standalone JAR: Returns the directory containing the JAR</li>
     *   <li>Fallback: Returns current working directory</li>
     * </ul>
     *
-    * @return The NCSDecomp base directory (where config/ and tools/ should exist), or user.dir as fallback
+    * @return The DeNCS base directory (where config/ and tools/ should exist), or user.dir as fallback
     */
-   public static File getNCSDecompDirectory() {
+   public static File getDeNCSDirectory() {
       // Cache the result to avoid repeated filesystem checks
-      if (cachedNCSDecompDirectory != null) {
-         return cachedNCSDecompDirectory;
+      if (cachedDeNCSDirectory != null) {
+         return cachedDeNCSDirectory;
       }
 
-      File result = detectNCSDecompDirectory();
-      cachedNCSDecompDirectory = result;
+      File result = detectDeNCSDirectory();
+      cachedDeNCSDirectory = result;
       return result;
    }
 
-   /** Cached result of getNCSDecompDirectory() to avoid repeated filesystem checks. */
-   private static File cachedNCSDecompDirectory = null;
+   /** Cached result of getDeNCSDirectory() to avoid repeated filesystem checks. */
+   private static File cachedDeNCSDirectory = null;
 
    /**
-    * Clears the cached NCSDecomp directory. Useful for testing.
+    * Clears the cached DeNCS directory. Useful for testing.
     */
-   public static void clearNCSDecompDirectoryCache() {
-      cachedNCSDecompDirectory = null;
+   public static void clearDeNCSDirectoryCache() {
+      cachedDeNCSDirectory = null;
    }
 
    /**
-    * Internal method to detect the NCSDecomp installation directory.
+    * Internal method to detect the DeNCS installation directory.
     */
-   private static File detectNCSDecompDirectory() {
+   private static File detectDeNCSDirectory() {
       try {
          // Strategy 1: Try jpackage-specific system property (jdk.module.path or java.home)
          // For jpackage apps, java.home points to the bundled runtime inside the app
-         // E.g., NCSDecomp/runtime/... so we go up to find NCSDecomp/
+         // E.g., DeNCS/runtime/... so we go up to find DeNCS/
          String javaHome = System.getProperty("java.home");
          if (javaHome != null && !javaHome.isEmpty()) {
             File javaHomeDir = new File(javaHome);
@@ -384,7 +383,7 @@ public class CompilerUtil {
                         if (new File(appRoot, "app").exists() ||
                             new File(appRoot, "tools").exists() ||
                             new File(appRoot, "config").exists()) {
-                           System.out.println("[INFO] CompilerUtil.getNCSDecompDirectory: Using jpackage app root (from java.home): " + appRoot.getAbsolutePath());
+                           System.out.println("[INFO] CompilerUtil.getDeNCSDirectory: Using jpackage app root (from java.home): " + appRoot.getAbsolutePath());
                            return appRoot;
                         }
                      }
@@ -422,7 +421,7 @@ public class CompilerUtil {
                      // Look for tools/ or config/ directory going up
                      for (int i = 0; i < 5 && parent != null; i++) {
                         if (new File(parent, "tools").exists() || new File(parent, "config").exists()) {
-                           System.out.println("[INFO] CompilerUtil.getNCSDecompDirectory: Using classes root directory: " + parent.getAbsolutePath());
+                           System.out.println("[INFO] CompilerUtil.getDeNCSDirectory: Using classes root directory: " + parent.getAbsolutePath());
                            return parent;
                         }
                         parent = parent.getParentFile();
@@ -440,25 +439,25 @@ public class CompilerUtil {
                      if ("app".equalsIgnoreCase(parent.getName())) {
                         File appRoot = parent.getParentFile();
                         if (appRoot != null && appRoot.exists()) {
-                           System.out.println("[INFO] CompilerUtil.getNCSDecompDirectory: Using jpackage app root (from JAR): " + appRoot.getAbsolutePath());
+                           System.out.println("[INFO] CompilerUtil.getDeNCSDirectory: Using jpackage app root (from JAR): " + appRoot.getAbsolutePath());
                            return appRoot;
                         }
                      }
                      // Check if this directory has tools/ or config/ - good sign it's the app root
                      if (new File(parent, "tools").exists() || new File(parent, "config").exists()) {
-                        System.out.println("[INFO] CompilerUtil.getNCSDecompDirectory: Using JAR parent directory: " + parent.getAbsolutePath());
+                        System.out.println("[INFO] CompilerUtil.getDeNCSDirectory: Using JAR parent directory: " + parent.getAbsolutePath());
                         return parent;
                      }
                      // Try going up one more level (JAR might be in a subdirectory)
                      File grandparent = parent.getParentFile();
                      if (grandparent != null && grandparent.exists()) {
                         if (new File(grandparent, "tools").exists() || new File(grandparent, "config").exists()) {
-                           System.out.println("[INFO] CompilerUtil.getNCSDecompDirectory: Using JAR grandparent directory: " + grandparent.getAbsolutePath());
+                           System.out.println("[INFO] CompilerUtil.getDeNCSDirectory: Using JAR grandparent directory: " + grandparent.getAbsolutePath());
                            return grandparent;
                         }
                      }
                      // Return parent even if no tools/config found
-                     System.out.println("[INFO] CompilerUtil.getNCSDecompDirectory: Using JAR parent directory (no tools/config): " + parent.getAbsolutePath());
+                     System.out.println("[INFO] CompilerUtil.getDeNCSDirectory: Using JAR parent directory (no tools/config): " + parent.getAbsolutePath());
                      return parent;
                   }
                }
@@ -466,18 +465,18 @@ public class CompilerUtil {
          }
       } catch (Exception e) {
          // Log but don't fail - fall through to user.dir
-         System.err.println("[WARNING] CompilerUtil.getNCSDecompDirectory: Could not determine base directory: " + e.getMessage());
+         System.err.println("[WARNING] CompilerUtil.getDeNCSDirectory: Could not determine base directory: " + e.getMessage());
       }
 
       // Strategy 3: Check if CWD has tools/ or config/ directories
       File cwd = new File(System.getProperty("user.dir"));
       if (new File(cwd, "tools").exists() || new File(cwd, "config").exists()) {
-         System.out.println("[INFO] CompilerUtil.getNCSDecompDirectory: Using CWD (has tools/config): " + cwd.getAbsolutePath());
+         System.out.println("[INFO] CompilerUtil.getDeNCSDirectory: Using CWD (has tools/config): " + cwd.getAbsolutePath());
          return cwd;
       }
 
       // Fallback: Use current working directory
-      System.out.println("[INFO] CompilerUtil.getNCSDecompDirectory: Using CWD fallback: " + cwd.getAbsolutePath());
+      System.out.println("[INFO] CompilerUtil.getDeNCSDirectory: Using CWD fallback: " + cwd.getAbsolutePath());
       return cwd;
    }
 
@@ -496,7 +495,7 @@ public class CompilerUtil {
     * <p>
     * Searches in order:
     * <ol>
-    *   <li>App directory's tools/ subdirectory (getNCSDecompDirectory()/tools)</li>
+    *   <li>App directory's tools/ subdirectory (getDeNCSDirectory()/tools)</li>
     *   <li>Current working directory's tools/ subdirectory</li>
     *   <li>Creates and returns app directory's tools/ if nothing exists</li>
     * </ol>
@@ -505,7 +504,7 @@ public class CompilerUtil {
     */
    public static File getToolsDirectory() {
       // First, try app directory
-      File appDir = getNCSDecompDirectory();
+      File appDir = getDeNCSDirectory();
       File appToolsDir = new File(appDir, "tools");
       if (appToolsDir.exists() && appToolsDir.isDirectory()) {
          return appToolsDir;
@@ -540,7 +539,7 @@ public class CompilerUtil {
     * @return The resolved File (may not exist), preferring app directory locations
     */
    public static File resolveToolsFile(String filename) {
-      File appDir = getNCSDecompDirectory();
+      File appDir = getDeNCSDirectory();
       File cwd = new File(System.getProperty("user.dir"));
 
       // Search locations in priority order
@@ -573,11 +572,11 @@ public class CompilerUtil {
     *   <li>Current working directory's config/ subdirectory</li>
     * </ol>
     *
-    * @param filename The filename to search for (e.g., "ncsdecomp.conf")
+    * @param filename The filename to search for (e.g., "dencs.conf")
     * @return The resolved File (may not exist), preferring app directory locations
     */
    public static File resolveConfigFile(String filename) {
-      File appDir = getNCSDecompDirectory();
+      File appDir = getDeNCSDirectory();
       File cwd = new File(System.getProperty("user.dir"));
 
       // Search locations in priority order

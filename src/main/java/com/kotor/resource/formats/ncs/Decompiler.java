@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -182,9 +181,9 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
    static {
       settings.load();
       String outputDir = settings.getProperty("Output Directory");
-      // If output directory is not set or empty, use default: ./ncsdecomp_converted
+      // If output directory is not set or empty, use default: ./dencs_converted
       if (outputDir == null || outputDir.isEmpty() || !new File(outputDir).isDirectory()) {
-         String defaultOutputDir = new File(System.getProperty("user.dir"), "ncsdecomp_converted").getAbsolutePath();
+         String defaultOutputDir = new File(System.getProperty("user.dir"), "dencs_converted").getAbsolutePath();
          // If default doesn't exist, try to create it, otherwise prompt user
          File defaultDir = new File(defaultOutputDir);
          if (!defaultDir.exists()) {
@@ -210,7 +209,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
    }
 
    public Decompiler() throws HeadlessException, DecompilerException {
-      super("NCSDecomp");
+      super("DeNCS");
       this.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
       this.setJMenuBar(this.buildMenuBar());
       this.registerKeyboardShortcuts();
@@ -647,7 +646,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                return LogSeverity.TRACE;
             }
             return LogSeverity.DEBUG;
-         } else if (upper.contains("[INFO]") || upper.contains("INFO:") || upper.contains("[NCSDECOMP]")) {
+         } else if (upper.contains("[INFO]") || upper.contains("INFO:") || upper.contains("[DENCS]")) {
             return LogSeverity.INFO;
          } else if (upper.contains("[WARN]") || upper.contains("WARNING:") || upper.contains("WARNING -")) {
             return LogSeverity.WARNING;
@@ -938,7 +937,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       helpMenu.addSeparator();
       helpMenu.add(this.menuItem("bolabaden.org", KeyEvent.VK_F2, false));
       helpMenu.add(this.menuItem("GitHub Repo", KeyEvent.VK_F3, false));
-      helpMenu.add(this.menuItem("Sponsor NCSDecomp", KeyEvent.VK_F4, false));
+      helpMenu.add(this.menuItem("Sponsor DeNCS", KeyEvent.VK_F4, false));
       menuBar.add(helpMenu);
 
       return menuBar;
@@ -1353,7 +1352,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
    }
 
    private void showAboutDialog() {
-      String aboutHtml = "<html>" + "<h2>NCSDecomp</h2>"
+      String aboutHtml = "<html>" + "<h2>DeNCS</h2>"
             + "<p>KotOR / TSL NCS script decompiler rebuilt with modern workflows. "
             + "Origins in the classic DeNCS tooling; re-implemented with improved heuristics, UI, and headless/CLI support.</p>"
             + "<ul>"
@@ -1367,7 +1366,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
 
       JLabel content = new JLabel(aboutHtml);
       content.setBorder(new EmptyBorder(12, 12, 12, 12));
-      JOptionPane.showMessageDialog(this, content, "About NCSDecomp", JOptionPane.INFORMATION_MESSAGE);
+      JOptionPane.showMessageDialog(this, content, "About DeNCS", JOptionPane.INFORMATION_MESSAGE);
    }
 
    @Override
@@ -1621,7 +1620,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
          this.openLink(PROJECT_URL, "Opening bolabaden.org");
       } else if (cmd.equals("GitHub Repo")) {
          this.openLink(GITHUB_URL, "Opening GitHub repository");
-      } else if (cmd.equals("Sponsor NCSDecomp")) {
+      } else if (cmd.equals("Sponsor DeNCS")) {
          this.openLink(SPONSOR_URL, "Opening sponsor page");
       }
    }
@@ -2260,7 +2259,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                         // Now compile the round-trip NSS to get second NCS, then capture its bytecode (right panel)
                         try {
                            // Write round-trip NSS to temp file
-                           File tempDir = new File(System.getProperty("java.io.tmpdir"), "ncsdecomp_roundtrip");
+                           File tempDir = new File(System.getProperty("java.io.tmpdir"), "dencs_roundtrip");
                            if (!tempDir.exists()) {
                               System.out.println("[INFO] Decompiler: CREATING directory: " + tempDir.getAbsolutePath());
                               if (!tempDir.mkdirs()) {
@@ -2521,7 +2520,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
 
                      try {
                         // Create temp directory for round-trip
-                        File tempDir = new File(System.getProperty("java.io.tmpdir"), "ncsdecomp_roundtrip");
+                        File tempDir = new File(System.getProperty("java.io.tmpdir"), "dencs_roundtrip");
                         if (!tempDir.exists()) {
                            System.out.println("[INFO] Decompiler: CREATING directory: " + tempDir.getAbsolutePath());
                            if (!tempDir.mkdirs()) {
@@ -2619,7 +2618,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
                         String errorMsg = ex.getMessage();
                         if (errorMsg != null && errorMsg.contains("error=740")) {
                            errorMsg = "Compiler requires administrator privileges.\n"
-                                 + "Please run NCSDecomp as administrator.";
+                                 + "Please run DeNCS as administrator.";
                         }
                         roundTripPane.setText("// Round-trip validation error: " + errorMsg
                               + "\n// Check that nwnnsscomp.exe is configured in Settings.");
@@ -3849,7 +3848,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       // Main message
       JLabel messageLabel = new JLabel("<html><div style='text-align:center; margin-top:12px; margin-bottom:16px;'>" +
             "<span style='color:#333333; font-size:13px;'>" +
-            "If you enjoy using NCSDecomp, please consider supporting its development!</span></div></html>");
+            "If you enjoy using DeNCS, please consider supporting its development!</span></div></html>");
       messageLabel.setHorizontalAlignment(SwingConstants.CENTER);
       card.add(messageLabel, BorderLayout.CENTER);
 

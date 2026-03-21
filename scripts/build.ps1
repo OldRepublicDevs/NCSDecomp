@@ -1,9 +1,9 @@
-# Copyright 2021-2025 NCSDecomp
-# Licensed under the Business Source License 1.1 (BSL 1.1).
+# Copyright 2021-2025 DeNCS
+# Licensed under the MIT License (see LICENSE).
 # Visit https://bolabaden.org for more information and other ventures
-# See LICENSE.txt file in the project root for full license information.
+# See LICENSE file in the project root for full license information.
 
-# Build script for NCSDecomp CLI and GUI
+# Build script for DeNCS CLI and GUI
 # Compiles all Java files and creates self-contained JARs
 # Optionally creates self-contained executables using jpackage
 # Cross-platform compatible (Windows, macOS, Linux)
@@ -19,7 +19,7 @@ $MinimumJavaVersion = 8
 
 # Show help if requested
 if ($Help) {
-    Write-Host "NCSDecomp Build Script" -ForegroundColor Green
+    Write-Host "DeNCS Build Script" -ForegroundColor Green
     Write-Host ""
     Write-Host "Usage:" -ForegroundColor Cyan
     Write-Host "  .\scripts\build.ps1                    # Build JAR file only"
@@ -45,7 +45,7 @@ if ($PSVersionTable.PSVersion.Major -ge 6) {
 }
 
 $platformName = if ($IsWindows) { "Windows" } elseif ($IsMacOS) { "macOS" } elseif ($IsLinux) { "Linux" } else { "Unknown" }
-Write-Host "Building NCSDecomp CLI..." -ForegroundColor Green
+Write-Host "Building DeNCS CLI..." -ForegroundColor Green
 Write-Host "Platform: $platformName" -ForegroundColor Gray
 if ($BuildExecutable) {
     Write-Host "Mode: JAR + Executable" -ForegroundColor Cyan
@@ -73,8 +73,8 @@ function Remove-ClassFiles {
 $targetDir = Join-Path "." "target"
 $buildDir = Join-Path $targetDir "classes"
 $jarDir = Join-Path $targetDir "jar"
-$cliJarFile = Join-Path $jarDir "NCSDecompCLI.jar"
-$guiJarFile = Join-Path $jarDir "NCSDecomp.jar"
+$cliJarFile = Join-Path $jarDir "DeNCSCLI.jar"
+$guiJarFile = Join-Path $jarDir "DeNCS.jar"
 $javaSourceDir = Join-Path "." (Join-Path "src" (Join-Path "main" "java"))
 
 Write-Host "Cleaning previous build artifacts..." -ForegroundColor Yellow
@@ -103,7 +103,7 @@ if ($BuildExecutable) {
             Remove-Item -Recurse -Force $exeOutputDir -ErrorAction Stop
         } catch {
             Write-Host "Warning: Could not delete $exeOutputDir (files may be locked)" -ForegroundColor Yellow
-            Write-Host "Please close any running NCSDecomp processes and try again." -ForegroundColor Yellow
+            Write-Host "Please close any running DeNCS processes and try again." -ForegroundColor Yellow
             Write-Host "Or manually delete the target/dist folder." -ForegroundColor Yellow
             exit 1
         }
@@ -127,7 +127,7 @@ function New-NcsJar {
     $manifestFile = Join-Path $manifestDir "MANIFEST.MF"
     $manifestContent = @"
 Manifest-Version: 1.0
-Created-By: NCSDecomp Build Script
+Created-By: DeNCS Build Script
 Main-Class: $MainClass
 
 "@
@@ -293,7 +293,7 @@ try {
     Write-Host "Compilation successful!" -ForegroundColor Green
 
     # Verify main classes were compiled
-    $cliMainClassFile = Join-Path $buildDir (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "NCSDecompCLI.class")))))
+    $cliMainClassFile = Join-Path $buildDir (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "DeNCSCLI.class")))))
     $guiMainClassFile = Join-Path $buildDir (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "Decompiler.class")))))
 
     if (-not (Test-Path $cliMainClassFile)) {
@@ -308,7 +308,7 @@ try {
         }
         exit 1
     }
-    Write-Host "Verified CLI main class compiled: NCSDecompCLI.class" -ForegroundColor Gray
+    Write-Host "Verified CLI main class compiled: DeNCSCLI.class" -ForegroundColor Gray
 
     if (-not (Test-Path $guiMainClassFile)) {
         Write-Host "Error: GUI main class not found after compilation: $guiMainClassFile" -ForegroundColor Red
@@ -329,7 +329,7 @@ try {
 }
 
 try {
-    New-NcsJar -JarFile $cliJarFile -MainClass "com.kotor.resource.formats.ncs.NCSDecompCLI" -JarLabel "CLI"
+    New-NcsJar -JarFile $cliJarFile -MainClass "com.kotor.resource.formats.ncs.DeNCSCLI" -JarLabel "CLI"
 } catch {
     Write-Host "Failed to create CLI JAR: $_" -ForegroundColor Red
     exit 1
@@ -372,9 +372,9 @@ if ($BuildExecutable) {
         exit 1
     }
 
-    $mainClassInJar = $jarList | Where-Object { $_ -like "com/kotor/resource/formats/ncs/NCSDecompCLI.class" }
+    $mainClassInJar = $jarList | Where-Object { $_ -like "com/kotor/resource/formats/ncs/DeNCSCLI.class" }
     if (-not $mainClassInJar) {
-        Write-Host "Error: JAR file does not contain main class com.kotor.resource.formats.ncs.NCSDecompCLI" -ForegroundColor Red
+        Write-Host "Error: JAR file does not contain main class com.kotor.resource.formats.ncs.DeNCSCLI" -ForegroundColor Red
         exit 1
     }
 
@@ -390,7 +390,7 @@ if ($BuildExecutable) {
         $manifestPath = if ($IsWindows) { "META-INF\MANIFEST.MF" } else { "META-INF/MANIFEST.MF" }
         if (Test-Path $manifestPath) {
             $manifestContent = Get-Content $manifestPath -Raw
-            if ($manifestContent -notmatch "Main-Class: com\.kotor\.resource\.formats\.ncs\.NCSDecompCLI") {
+            if ($manifestContent -notmatch "Main-Class: com\.kotor\.resource\.formats\.ncs\.DeNCSCLI") {
                 Write-Host "Error: JAR manifest has incorrect main class!" -ForegroundColor Red
                 Write-Host "Manifest content:" -ForegroundColor Yellow
                 Get-Content $manifestPath | Write-Host
@@ -424,7 +424,7 @@ if ($BuildExecutable) {
     New-Item -ItemType Directory -Path $jpackageInput -Force | Out-Null
 
     # Copy JAR to input directory
-    $jarDest = Join-Path $jpackageInput "NCSDecompCLI.jar"
+    $jarDest = Join-Path $jpackageInput "DeNCSCLI.jar"
     Copy-Item $cliJarFile $jarDest
 
     # Copy nwscript files as resources (they'll be in the app directory)
@@ -456,8 +456,8 @@ if ($BuildExecutable) {
 
     try {
         # Build CLI executable
-        $cliAppName = "NCSDecompCLI"
-        $cliMainClass = "com.kotor.resource.formats.ncs.NCSDecompCLI"
+        $cliAppName = "DeNCSCLI"
+        $cliMainClass = "com.kotor.resource.formats.ncs.DeNCSCLI"
         $appVersion = "1.0.2"
 
         Write-Host "Building CLI executable ($cliAppName)..." -ForegroundColor Yellow
@@ -470,7 +470,7 @@ if ($BuildExecutable) {
             try {
                 Remove-Item -Recurse -Force $cliDestDir -ErrorAction Stop
             } catch {
-                Write-Host "Warning: Could not delete $cliDestDir (files may be locked). Please close any running NCSDecompCLI processes and retry." -ForegroundColor Yellow
+                Write-Host "Warning: Could not delete $cliDestDir (files may be locked). Please close any running DeNCSCLI processes and retry." -ForegroundColor Yellow
                 throw
             }
         }
@@ -479,10 +479,10 @@ if ($BuildExecutable) {
             "--type", $packageType,
             "--input", $jpackageInput,
             "--name", $cliAppName,
-            "--main-jar", "NCSDecompCLI.jar",
+            "--main-jar", "DeNCSCLI.jar",
             "--main-class", $cliMainClass,
             "--app-version", $appVersion,
-            "--description", "KotOR NCSDecomp Script Decompiler - CLI Version",
+            "--description", "KotOR DeNCS Script Decompiler - CLI Version",
             "--vendor", "bolabaden.org",
             "--copyright", "Original: JdNoa, Dashus | Modified by: th3w1zard1",
             "--dest", $exeOutputDir,
@@ -500,8 +500,8 @@ if ($BuildExecutable) {
             throw "jpackage CLI build failed with exit code $LASTEXITCODE"
         }
 
-        # Build GUI executable (if NCSDecomp.jar exists)
-        $guiAppName = "NCSDecomp"
+        # Build GUI executable (if DeNCS.jar exists)
+        $guiAppName = "DeNCS"
         $guiMainClass = "com.kotor.resource.formats.ncs.Decompiler"
         $guiJarPath = $guiJarFile
 
@@ -514,7 +514,7 @@ if ($BuildExecutable) {
                 try {
                     Remove-Item -Recurse -Force $guiDestDir -ErrorAction Stop
                 } catch {
-                    Write-Host "Warning: Could not delete $guiDestDir (files may be locked). Please close any running NCSDecomp processes and retry." -ForegroundColor Yellow
+                    Write-Host "Warning: Could not delete $guiDestDir (files may be locked). Please close any running DeNCS processes and retry." -ForegroundColor Yellow
                     throw
                 }
             }
@@ -525,17 +525,17 @@ if ($BuildExecutable) {
                 Remove-Item -Recurse -Force $guiInputDir
             }
             New-Item -ItemType Directory -Path $guiInputDir -Force | Out-Null
-            $guiJarDest = if ($IsWindows) { "$guiInputDir\NCSDecomp.jar" } else { "$guiInputDir/NCSDecomp.jar" }
+            $guiJarDest = if ($IsWindows) { "$guiInputDir\DeNCS.jar" } else { "$guiInputDir/DeNCS.jar" }
             Copy-Item $guiJarPath $guiJarDest
 
             $guiJpackageArgs = @(
                 "--type", $packageType,
                 "--input", $guiInputDir,
                 "--name", $guiAppName,
-                "--main-jar", "NCSDecomp.jar",
+                "--main-jar", "DeNCS.jar",
                 "--main-class", $guiMainClass,
                 "--app-version", $appVersion,
-                "--description", "KotOR NCSDecomp Script Decompiler - GUI Version",
+                "--description", "KotOR DeNCS Script Decompiler - GUI Version",
                 "--vendor", "bolabaden.org",
                 "--copyright", "Original: JdNoa, Dashus | Modified by: th3w1zard1",
                 "--dest", $exeOutputDir,
@@ -587,7 +587,7 @@ if ($BuildExecutable) {
                 Remove-Item -Recurse -Force $guiInputDir
             }
         } else {
-            Write-Host "Note: NCSDecomp.jar not found, skipping GUI executable build" -ForegroundColor Yellow
+            Write-Host "Note: DeNCS.jar not found, skipping GUI executable build" -ForegroundColor Yellow
             Write-Host "      (Only CLI executable will be created)" -ForegroundColor Yellow
         }
 
@@ -789,9 +789,9 @@ Categories=Utility;
         Write-Host ""
         Write-Host "CLI Usage examples:" -ForegroundColor Cyan
         $exePathExample = if ($IsWindows) {
-            ".\target\dist\NCSDecompCLI\NCSDecompCLI.exe"
+            ".\target\dist\DeNCSCLI\DeNCSCLI.exe"
         } else {
-            "./target/dist/NCSDecompCLI/NCSDecompCLI"
+            "./target/dist/DeNCSCLI/DeNCSCLI"
         }
         Write-Host "  $exePathExample --help" -ForegroundColor White
         Write-Host "  $exePathExample --version" -ForegroundColor White

@@ -1,46 +1,38 @@
-# Script to add Business Source License 1.1 headers to all source files
+# Script to add MIT license headers to source files (see ../LICENSE).
 
 $javaHeader = @"
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-# Visit https://bolabaden.org for more information and other ventures
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 "@
 
 $ps1Header = @"
-# Copyright 2021-2025 NCSDecomp
-# Licensed under the Business Source License 1.1 (BSL 1.1).
-# Visit https://bolabaden.org for more information and other ventures
-# See LICENSE.txt file in the project root for full license information.
+# Copyright 2021-2025 DeNCS
+# Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 "@
 
 $batHeader = @"
-@REM Copyright 2021-2025 NCSDecomp
-@REM Licensed under the Business Source License 1.1 (BSL 1.1).
-@REM See LICENSE.txt file in the project root for full license information.
+@REM Copyright 2021-2025 DeNCS
+@REM Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 "@
 
 $mdHeader = @"
-<!-- Copyright 2021-2025 NCSDecomp -->
-<!-- Licensed under the Business Source License 1.1 (BSL 1.1). -->
-<!-- See LICENSE.txt file in the project root for full license information. -->
+<!-- Copyright 2021-2025 DeNCS -->
+<!-- Licensed under the MIT License. See LICENSE in the project root for full license text. -->
 
 "@
 
 $txtHeader = @"
-Copyright 2021-2025 NCSDecomp
-Licensed under the Business Source License 1.1 (BSL 1.1).
-See LICENSE.txt file in the project root for full license information.
+Copyright 2021-2025 DeNCS
+Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 "@
 
 $cfgHeader = @"
-# Copyright 2021-2025 NCSDecomp
-# Licensed under the Business Source License 1.1 (BSL 1.1).
-# See LICENSE.txt file in the project root for full license information.
+# Copyright 2021-2025 DeNCS
+# Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 "@
 
@@ -66,7 +58,7 @@ function Add-HeadersToFiles {
         } |
         ForEach-Object {
             $content = Get-Content $_.FullName -First 10 -ErrorAction SilentlyContinue | Out-String
-            if ($content -and $content -notmatch 'Copyright 2021-2025 NCSDecomp') {
+            if ($content -and $content -notmatch 'Copyright 2021-2025 DeNCS') {
                 $_
             }
         }
@@ -120,5 +112,3 @@ if ($totalCount -eq 0) {
 } else {
     Write-Host "`nTotal: Added headers to $totalCount file(s)."
 }
-
-

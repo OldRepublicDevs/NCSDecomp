@@ -1,9 +1,9 @@
-# Copyright 2021-2025 NCSDecomp
-# Licensed under the Business Source License 1.1 (BSL 1.1).
+# Copyright 2021-2025 DeNCS
+# Licensed under the MIT License (see LICENSE).
 # Visit https://bolabaden.org for more information and other ventures
-# See LICENSE.txt file in the project root for full license information.
+# See LICENSE file in the project root for full license information.
 
-# Publish script for NCSDecomp CLI and GUI
+# Publish script for DeNCS CLI and GUI
 # Packages everything needed for end-user distribution
 # Cross-platform compatible (Windows, macOS, Linux)
 
@@ -20,7 +20,7 @@ if ($PSVersionTable.PSVersion.Major -ge 6) {
     if (-not (Test-Path variable:IsMacOS)) { $script:IsMacOS = $false }
 }
 
-Write-Host "NCSDecomp CLI + GUI - Publishing Package" -ForegroundColor Green
+Write-Host "DeNCS CLI + GUI - Publishing Package" -ForegroundColor Green
 Write-Host "=======================================" -ForegroundColor Green
 Write-Host ""
 
@@ -93,12 +93,12 @@ Write-Host "Step 2: Packaging distribution files..." -ForegroundColor Yellow
 
 # Get JAR file paths first (needed for copying next to executables)
 $jarDir = Join-Path $targetDir "jar"
-$cliJarSource = Join-Path $jarDir "NCSDecompCLI.jar"
-$guiJarSource = Join-Path $jarDir "NCSDecomp.jar"
+$cliJarSource = Join-Path $jarDir "DeNCSCLI.jar"
+$guiJarSource = Join-Path $jarDir "DeNCS.jar"
 
 # Copy complete jpackage app-image directories (not just the .exe files!)
 # jpackage creates app-images that REQUIRE their sibling app/ + runtime/ folders to run.
-# Without these folders, the .exe launcher fails with "Error opening NCSDecomp.cfg".
+# Without these folders, the .exe launcher fails with "Error opening DeNCS.cfg".
 $distDir = Join-Path $targetDir "dist"
 
 # Helper function to copy jpackage app-image and add config/tools
@@ -132,37 +132,37 @@ function Copy-JPackageApp {
 }
 
 # Copy CLI app-image
-$cliCopied = Copy-JPackageApp -AppName "NCSDecompCLI" -SourceDir $distDir -DestDir $publishDir
+$cliCopied = Copy-JPackageApp -AppName "DeNCSCLI" -SourceDir $distDir -DestDir $publishDir
 if ($cliCopied) {
-    Write-Host "    - Copied complete NCSDecompCLI app-image" -ForegroundColor Gray
+    Write-Host "    - Copied complete DeNCSCLI app-image" -ForegroundColor Gray
 } else {
-    Write-Host "  Note: NCSDecompCLI app-image not found (executable build skipped - requires JDK 14+ with jpackage)" -ForegroundColor Gray
+    Write-Host "  Note: DeNCSCLI app-image not found (executable build skipped - requires JDK 14+ with jpackage)" -ForegroundColor Gray
     Write-Host "         JAR files are provided instead (Java 8+ compatible)" -ForegroundColor Gray
 }
 
 # Copy GUI app-image
-$guiCopied = Copy-JPackageApp -AppName "NCSDecomp" -SourceDir $distDir -DestDir $publishDir
+$guiCopied = Copy-JPackageApp -AppName "DeNCS" -SourceDir $distDir -DestDir $publishDir
 if ($guiCopied) {
-    Write-Host "    - Copied complete NCSDecomp app-image" -ForegroundColor Gray
+    Write-Host "    - Copied complete DeNCS app-image" -ForegroundColor Gray
 } else {
-    Write-Host "  Note: NCSDecomp app-image not found (GUI executable build skipped)" -ForegroundColor Gray
+    Write-Host "  Note: DeNCS app-image not found (GUI executable build skipped)" -ForegroundColor Gray
 }
 
 # Copy JAR files to root as well (for standalone usage)
 
 if (Test-Path $cliJarSource) {
-    Copy-Item $cliJarSource (Join-Path $publishDir "NCSDecompCLI.jar")
-    Write-Host "  - Copied NCSDecompCLI.jar" -ForegroundColor Cyan
+    Copy-Item $cliJarSource (Join-Path $publishDir "DeNCSCLI.jar")
+    Write-Host "  - Copied DeNCSCLI.jar" -ForegroundColor Cyan
 } else {
-    Write-Host "  Warning: NCSDecompCLI.jar not found at $cliJarSource" -ForegroundColor Yellow
+    Write-Host "  Warning: DeNCSCLI.jar not found at $cliJarSource" -ForegroundColor Yellow
 }
 
 # Copy GUI JAR if present
 if (Test-Path $guiJarSource) {
-    Copy-Item $guiJarSource (Join-Path $publishDir "NCSDecomp.jar")
-    Write-Host "  - Copied NCSDecomp.jar (GUI)" -ForegroundColor Cyan
+    Copy-Item $guiJarSource (Join-Path $publishDir "DeNCS.jar")
+    Write-Host "  - Copied DeNCS.jar (GUI)" -ForegroundColor Cyan
 } else {
-    Write-Host "  Warning: NCSDecomp.jar not found at $guiJarSource" -ForegroundColor Yellow
+    Write-Host "  Warning: DeNCS.jar not found at $guiJarSource" -ForegroundColor Yellow
 }
 
 # Copy tools/ payload (compiler + nwscript) into tools/ folder in the archive
@@ -191,8 +191,8 @@ $toolPayload = @(
 
 # Collect destinations: root tools/ plus each app-image tools/
 $toolDestinations = @($toolsPublishDir)
-$cliToolsDir = Join-Path (Join-Path $publishDir "NCSDecompCLI") "tools"
-$guiToolsDir = Join-Path (Join-Path $publishDir "NCSDecomp") "tools"
+$cliToolsDir = Join-Path (Join-Path $publishDir "DeNCSCLI") "tools"
+$guiToolsDir = Join-Path (Join-Path $publishDir "DeNCS") "tools"
 if (Test-Path $cliToolsDir) { $toolDestinations += $cliToolsDir }
 if (Test-Path $guiToolsDir) { $toolDestinations += $guiToolsDir }
 
@@ -213,10 +213,10 @@ foreach ($tool in $toolPayload) {
 $configPublishDir = Join-Path $publishDir "config"
 New-Item -ItemType Directory -Path $configPublishDir -Force | Out-Null
 $defaultConfig = @"
-# NCSDecomp Configuration
+# DeNCS Configuration
 # key=value (Java .properties format)
 #
-# The GUI reads this file from: config/ncsdecomp.conf
+# The GUI reads this file from: config/dencs.conf
 # (legacy name also supported: config/dencs.conf)
 #
 # NOTE: Leave path settings empty to use automatic detection.
@@ -245,20 +245,20 @@ K2 nwscript Path=
 
 # Collect destinations: root config/ plus each app-image config/
 $configDestinations = @($configPublishDir)
-$cliConfigDir = Join-Path (Join-Path $publishDir "NCSDecompCLI") "config"
-$guiConfigDir = Join-Path (Join-Path $publishDir "NCSDecomp") "config"
+$cliConfigDir = Join-Path (Join-Path $publishDir "DeNCSCLI") "config"
+$guiConfigDir = Join-Path (Join-Path $publishDir "DeNCS") "config"
 if (Test-Path $cliConfigDir) { $configDestinations += $cliConfigDir }
 if (Test-Path $guiConfigDir) { $configDestinations += $guiConfigDir }
 
 foreach ($dest in $configDestinations) {
-    $configOutPath = Join-Path $dest "ncsdecomp.conf"
+    $configOutPath = Join-Path $dest "dencs.conf"
     if ($IsWindows) {
         $defaultConfig | Out-File $configOutPath -Encoding ASCII
     } else {
         $defaultConfig | Out-File $configOutPath -Encoding utf8NoBOM
     }
 }
-Write-Host "  - Wrote config/ncsdecomp.conf (to $($configDestinations.Count) locations)" -ForegroundColor Cyan
+Write-Host "  - Wrote config/dencs.conf (to $($configDestinations.Count) locations)" -ForegroundColor Cyan
 
 # Copy docs into archive root (verbatim names)
 $docsDir = Join-Path "." "docs"
@@ -284,9 +284,9 @@ foreach ($doc in $docPayload) {
 # Copy LICENSE file if it exists (check common locations and names)
 $licenseFiles = @(
     (Join-Path "." "LICENSE"),
-    (Join-Path "." "LICENSE.txt"),
+    (Join-Path "." "LICENSE"),
     (Join-Path "." "LICENSE.md"),
-    (Join-Path "." "LICENSE.TXT")
+    (Join-Path "." "LICENSE")
 )
 $licenseCopied = $false
 foreach ($licenseFile in $licenseFiles) {
@@ -312,7 +312,7 @@ if ($IsWindows) {
     $example1 = @"
 @echo off
 REM Example: Decompile a single file (KotOR 2/TSL)
-..\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k2
+..\DeNCSCLI.exe -i "script.ncs" -o "script.nss" --k2
 pause
 "@
     $example1 | Out-File (Join-Path $examplesDir "example1-decompile-single.bat") -Encoding ASCII
@@ -320,7 +320,7 @@ pause
     $example2 = @"
 @echo off
 REM Example: Decompile entire directory recursively (KotOR 1)
-..\NCSDecompCLI.exe -i "scripts_folder" -r --k1 -O "output_folder"
+..\DeNCSCLI.exe -i "scripts_folder" -r --k1 -O "output_folder"
 pause
 "@
     $example2 | Out-File (Join-Path $examplesDir "example2-decompile-folder.bat") -Encoding ASCII
@@ -328,7 +328,7 @@ pause
     $example3 = @"
 @echo off
 REM Example: View decompiled code in console
-..\NCSDecompCLI.exe -i "script.ncs" --stdout --k2
+..\DeNCSCLI.exe -i "script.ncs" --stdout --k2
 pause
 "@
     $example3 | Out-File (Join-Path $examplesDir "example3-view-in-console.bat") -Encoding ASCII
@@ -338,7 +338,7 @@ pause
     $example1 = @"
 #!/bin/bash
 # Example: Decompile a single file (KotOR 2/TSL)
-../NCSDecompCLI -i "script.ncs" -o "script.nss" --k2
+../DeNCSCLI -i "script.ncs" -o "script.nss" --k2
 "@
     $example1File = Join-Path $examplesDir "example1-decompile-single.sh"
     $example1 | Out-File $example1File -Encoding utf8NoBOM
@@ -350,7 +350,7 @@ pause
     $example2 = @"
 #!/bin/bash
 # Example: Decompile entire directory recursively (KotOR 1)
-../NCSDecompCLI -i "scripts_folder" -r --k1 -O "output_folder"
+../DeNCSCLI -i "scripts_folder" -r --k1 -O "output_folder"
 "@
     $example2File = Join-Path $examplesDir "example2-decompile-folder.sh"
     $example2 | Out-File $example2File -Encoding utf8NoBOM
@@ -361,7 +361,7 @@ pause
     $example3 = @"
 #!/bin/bash
 # Example: View decompiled code in console
-../NCSDecompCLI -i "script.ncs" --stdout --k2
+../DeNCSCLI -i "script.ncs" --stdout --k2
 "@
     $example3File = Join-Path $examplesDir "example3-view-in-console.sh"
     $example3 | Out-File $example3File -Encoding utf8NoBOM
@@ -389,7 +389,7 @@ if (Test-Path $docsVersionPath) {
         # ignore and keep default
     }
 }
-$zipFileName = "NCSDecomp-v$version-$platformSuffix.zip"
+$zipFileName = "DeNCS-v$version-$platformSuffix.zip"
 $zipPath = Join-Path $targetDir $zipFileName
 
 # Remove existing ZIP if it exists

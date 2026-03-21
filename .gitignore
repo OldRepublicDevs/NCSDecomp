@@ -87,7 +87,7 @@ Thumbs.db
 jpackage-input/
 
 # Other files/folders
-ncsdecomp_converted/
+dencs_converted/
 misc/
 tmp/
 config/

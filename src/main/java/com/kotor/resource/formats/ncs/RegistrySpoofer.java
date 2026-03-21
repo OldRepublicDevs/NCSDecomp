@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -40,7 +39,7 @@ public class RegistrySpoofer implements AutoCloseable {
    private final String spoofedPath;
    private String originalValue;
    private boolean wasModified = false;
-   private static final String DONT_SHOW_INFO_MARKER_FILE = "ncsdecomp_registry_info_dont_show.txt";
+   private static final String DONT_SHOW_INFO_MARKER_FILE = "dencs_registry_info_dont_show.txt";
 
    /**
     * Creates a new registry spoofer for the specified game.
@@ -485,7 +484,7 @@ public class RegistrySpoofer implements AutoCloseable {
     */
    private boolean attemptElevatedRegistryWrite() {
       // Show prompt to user
-      String message = "NCSDecomp needs administrator privileges to set a Windows registry key.\n\n" +
+      String message = "DeNCS needs administrator privileges to set a Windows registry key.\n\n" +
             "This is required for the " + (registryPath.contains("KotOR2") ? "KotOR 2" : "KotOR 1") +
             " compiler (nwnnsscomp_ktool.exe or nwnnsscomp_kscript.exe) to work correctly.\n\n" +
             "The registry key will be temporarily set to:\n" +
@@ -517,7 +516,7 @@ public class RegistrySpoofer implements AutoCloseable {
       try {
          // Create a temporary batch file to run the reg command elevated
          // This avoids complex PowerShell escaping issues
-         File tempBatch = File.createTempFile("ncsdecomp_reg_spoof_", ".bat");
+         File tempBatch = File.createTempFile("dencs_reg_spoof_", ".bat");
          tempBatch.deleteOnExit();
 
          // Write the batch file content
@@ -646,9 +645,9 @@ public class RegistrySpoofer implements AutoCloseable {
          return;
       }
 
-      String message = "NCSDecomp cannot set the Windows registry key (requires administrator privileges).\n\n" +
+      String message = "DeNCS cannot set the Windows registry key (requires administrator privileges).\n\n" +
             "To avoid this message, you can either:\n" +
-            "1. Run NCSDecomp as administrator, or\n" +
+            "1. Run DeNCS as administrator, or\n" +
             "2. Use a different nwnnsscomp.exe compiler if available\n\n" +
             "Compilation will be attempted anyway, but may fail if the registry key is not set correctly.";
 

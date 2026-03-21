@@ -1,13 +1,13 @@
-NCSDecomp - KotOR Script Decompiler
+DeNCS - KotOR Script Decompiler
 
-Copyright 2021-2025 NCSDecomp
-Licensed under the Business Source License 1.1 (BSL 1.1).
-See LICENSE.txt file in the project root for full license information.
+Copyright 2021-2025 DeNCS
+Licensed under the MIT License (see LICENSE).
+See LICENSE file in the project root for full license information.
 
 ---------------
 About
 ---------------
-NCSDecomp is a KotOR script decompiler based on the original DeNCS project.
+DeNCS is a KotOR script decompiler based on the original DeNCS project.
 
 Original Authors:
 	JdNoa - Script Decompiler - jdnoa@hotmail.com
@@ -152,27 +152,27 @@ For JAR Version:
 Quick Start
 ---------------
 Option 1: Using the Windows Executable (Recommended)
-	1. Navigate to the NCSDecompCLI folder
-	2. Run NCSDecompCLI.exe from Command Prompt
+	1. Navigate to the DeNCSCLI folder
+	2. Run DeNCSCLI.exe from Command Prompt
 	3. See examples below
 
 Option 2: Using the JAR File
-	java -jar NCSDecompCLI.jar [options]
+	java -jar DeNCSCLI.jar [options]
 
 ---------------
 Usage Examples
 ---------------
 Show help:
-	.\NCSDecompCLI.exe --help
+	.\DeNCSCLI.exe --help
 
 Decompile single file (KotOR 2/TSL):
-	.\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k2
+	.\DeNCSCLI.exe -i "script.ncs" -o "script.nss" --k2
 
 Decompile entire folder recursively:
-	.\NCSDecompCLI.exe -i "scripts_folder" -r --k2 -O "output_folder"
+	.\DeNCSCLI.exe -i "scripts_folder" -r --k2 -O "output_folder"
 
 View decompiled code in console:
-	.\NCSDecompCLI.exe -i "script.ncs" --stdout --k2
+	.\DeNCSCLI.exe -i "script.ncs" --stdout --k2
 
 For more detailed usage information, see README-CLI.md or README-USER.md in the
 distribution package.
@@ -180,7 +180,7 @@ distribution package.
 ---------------
 Game Support
 ---------------
-NCSDecomp supports both:
+DeNCS supports both:
 	- Knights of the Old Republic (KotOR 1) - use --k1 flag
 	- Knights of the Old Republic II: The Sith Lords (TSL) - use --k2 or --tsl flag
 
@@ -200,8 +200,8 @@ Source Code: https://github.com/bolabaden
 ---------------
 License
 ---------------
-This software is provided under the Business Source License 1.1 (BSL 1.1).
-See LICENSE.txt file in the project root for full license information.
+This software is provided under the MIT License (see LICENSE).
+See LICENSE file in the project root for full license information.
 
 ---------------
 Acknowledgments

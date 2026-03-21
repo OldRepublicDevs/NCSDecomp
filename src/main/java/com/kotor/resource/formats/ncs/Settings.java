@@ -1,7 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// Visit https://bolabaden.org for more information and other ventures
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -36,16 +34,16 @@ import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 
 /**
- * Persisted user preferences for the NCSDecomp GUI.
+ * Persisted user preferences for the DeNCS GUI.
  * <p>
  * Stores comprehensive settings matching all CLI options and offers a modern
- * tabbed dialog for editing preferences. Backed by a simple {@code ncsdecomp.conf}
+ * tabbed dialog for editing preferences. Backed by a simple {@code dencs.conf}
  * properties file in the working directory (with legacy {@code dencs.conf} support
  * for backward compatibility).
  */
 public class Settings extends Properties implements ActionListener {
    private static final long serialVersionUID = 1L;
-   private static final String CONFIG_FILE = "ncsdecomp.conf";
+   private static final String CONFIG_FILE = "dencs.conf";
    private static final String LEGACY_CONFIG_FILE = "dencs.conf";
 
    // UI Components
@@ -309,11 +307,11 @@ public class Settings extends Properties implements ActionListener {
       // File/Directory Settings
       // Get the app installation directory (where EXE/JAR is located)
       // This ensures paths work when app is run from any working directory
-      File appDir = CompilerUtil.getNCSDecompDirectory();
+      File appDir = CompilerUtil.getDeNCSDirectory();
       File toolsDir = CompilerUtil.getToolsDirectory();
 
-      // Default output directory: ./ncsdecomp_converted relative to app directory
-      String defaultOutputDir = new File(appDir, "ncsdecomp_converted").getAbsolutePath();
+      // Default output directory: ./dencs_converted relative to app directory
+      String defaultOutputDir = new File(appDir, "dencs_converted").getAbsolutePath();
       this.outputDirectoryField.setText(this.getProperty("Output Directory", defaultOutputDir));
       this.openDirectoryField.setText(this.getProperty("Open Directory", appDir.getAbsolutePath()));
 
@@ -438,8 +436,8 @@ public class Settings extends Properties implements ActionListener {
     * Loads preferences from disk, creating a default config if none exists.
     */
    public void load() {
-      // Use getNCSDecompDirectory() to handle both JAR and EXE cases correctly
-      File baseDir = CompilerUtil.getNCSDecompDirectory();
+      // Use getDeNCSDirectory() to handle both JAR and EXE cases correctly
+      File baseDir = CompilerUtil.getDeNCSDirectory();
       File configDir = new File(baseDir, "config");
       // Ensure config directory exists
       if (!configDir.exists()) {
@@ -519,7 +517,7 @@ public class Settings extends Properties implements ActionListener {
       if (!ncsdisPathProp.isEmpty()) {
          File ncsdisFile = new File(ncsdisPathProp);
          if (!ncsdisFile.isAbsolute()) {
-            ncsdisFile = new File(CompilerUtil.getNCSDecompDirectory(), ncsdisPathProp);
+            ncsdisFile = new File(CompilerUtil.getDeNCSDirectory(), ncsdisPathProp);
          }
          FileDecompiler.ncsdisPath = ncsdisFile.getAbsolutePath();
          System.out.println("[INFO] Settings.load: ncsdis path: " + FileDecompiler.ncsdisPath);
@@ -535,7 +533,7 @@ public class Settings extends Properties implements ActionListener {
          File folder = new File(folderPath);
          if (!folder.isAbsolute()) {
             // Relative path - resolve relative to app directory, NOT CWD
-            folder = new File(CompilerUtil.getNCSDecompDirectory(), folderPath);
+            folder = new File(CompilerUtil.getDeNCSDirectory(), folderPath);
          }
          File compilerFile = new File(folder, filename);
          FileDecompiler.nwnnsscompPath = compilerFile.getAbsolutePath();
@@ -547,7 +545,7 @@ public class Settings extends Properties implements ActionListener {
             // Resolve relative paths to absolute paths using app directory
             File compilerFile = new File(nwnnsscompPath);
             if (!compilerFile.isAbsolute()) {
-               compilerFile = new File(CompilerUtil.getNCSDecompDirectory(), nwnnsscompPath);
+               compilerFile = new File(CompilerUtil.getDeNCSDirectory(), nwnnsscompPath);
             }
             FileDecompiler.nwnnsscompPath = compilerFile.getAbsolutePath();
             System.out.println("[INFO] Settings.load: Compiler path from old property: " + FileDecompiler.nwnnsscompPath);
@@ -558,11 +556,11 @@ public class Settings extends Properties implements ActionListener {
    }
 
    /**
-    * Writes preferences to {@code ncsdecomp.conf}.
+    * Writes preferences to {@code dencs.conf}.
     */
    public void save() {
-      // Use getNCSDecompDirectory() to handle both JAR and EXE cases correctly
-      File baseDir = CompilerUtil.getNCSDecompDirectory();
+      // Use getDeNCSDirectory() to handle both JAR and EXE cases correctly
+      File baseDir = CompilerUtil.getDeNCSDirectory();
       File configDir = new File(baseDir, "config");
       if (!configDir.exists()) {
          System.out.println("[INFO] Settings: CREATING config directory: " + configDir.getAbsolutePath());
@@ -575,7 +573,7 @@ public class Settings extends Properties implements ActionListener {
       File configFile = new File(configDir, CONFIG_FILE);
       System.out.println("[INFO] Settings: WRITING config file: " + configFile.getAbsolutePath());
       try (FileOutputStream fos = new FileOutputStream(configFile)) {
-         this.store(fos, "NCSDecomp Configuration");
+         this.store(fos, "DeNCS Configuration");
          System.out.println("[INFO] Settings: Wrote config file: " + configFile.getAbsolutePath());
       } catch (FileNotFoundException var2) {
          System.err.println("[ERROR] Settings: Config file not found: " + configFile.getAbsolutePath());
@@ -594,11 +592,11 @@ public class Settings extends Properties implements ActionListener {
    public void reset() {
       // Get the app installation directory (where EXE/JAR is located)
       // This ensures paths work when app is run from any working directory
-      File appDir = CompilerUtil.getNCSDecompDirectory();
+      File appDir = CompilerUtil.getDeNCSDirectory();
       System.out.println("[INFO] Settings.reset: Using app directory: " + appDir.getAbsolutePath());
 
-      // Default output directory: ./ncsdecomp_converted relative to app directory
-      String defaultOutputDir = new File(appDir, "ncsdecomp_converted").getAbsolutePath();
+      // Default output directory: ./dencs_converted relative to app directory
+      String defaultOutputDir = new File(appDir, "dencs_converted").getAbsolutePath();
       this.setProperty("Output Directory", defaultOutputDir);
       this.setProperty("Open Directory", appDir.getAbsolutePath());
 
@@ -643,7 +641,7 @@ public class Settings extends Properties implements ActionListener {
     * Opens the comprehensive settings dialog with all options organized into tabs.
     */
    public void show() {
-      this.frame = new JFrame("NCSDecomp Settings");
+      this.frame = new JFrame("DeNCS Settings");
       this.frame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
       this.frame.setResizable(true);
 

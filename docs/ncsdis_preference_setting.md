@@ -102,7 +102,7 @@ fallback to nwnnsscomp resolution
 
 ### Configuration Properties
 
-**Saved to ncsdecomp.conf:**
+**Saved to dencs.conf:**
 ```properties
 # ncsdis preference (boolean)
 Prefer ncsdis=true

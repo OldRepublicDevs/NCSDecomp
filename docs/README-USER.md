@@ -1,12 +1,12 @@
-<!-- Copyright 2021-2025 NCSDecomp -->
-<!-- Licensed under the Business Source License 1.1 (BSL 1.1). -->
-<!-- See LICENSE.txt file in the project root for full license information. -->
+<!-- Copyright 2021-2025 DeNCS -->
+<!-- Licensed under the MIT License (see LICENSE). -->
+<!-- See LICENSE file in the project root for full license information. -->
 
-# NCSDecomp - KotOR Script Decompiler
+# DeNCS - KotOR Script Decompiler
 
 ## Welcome
 
-**NCSDecomp** is a tool that converts compiled KotOR game scripts (`.ncs` files) back into readable source code (`.nss` files). This version includes both a simple-to-use Windows program and command-line tools.
+**DeNCS** is a tool that converts compiled KotOR game scripts (`.ncs` files) back into readable source code (`.nss` files). This version includes both a simple-to-use Windows program and command-line tools.
 
 ---
 
@@ -14,14 +14,14 @@
 
 ### Option 1: Using the Self-Contained Executable (Easiest!)
 
-1. **Download** the `NCSDecompCLI` folder (for command-line) or `NCSDecomp` folder (for GUI)
+1. **Download** the `DeNCSCLI` folder (for command-line) or `DeNCS` folder (for GUI)
 2. **For CLI:**
-   - **Windows:** Navigate to the `NCSDecompCLI` folder and run `NCSDecompCLI.exe` from Command Prompt
-   - **macOS/Linux:** Navigate to the `NCSDecompCLI` folder and run `./NCSDecompCLI` from Terminal
+   - **Windows:** Navigate to the `DeNCSCLI` folder and run `DeNCSCLI.exe` from Command Prompt
+   - **macOS/Linux:** Navigate to the `DeNCSCLI` folder and run `./DeNCSCLI` from Terminal
 3. **For GUI:**
-   - **Windows:** Navigate to the `NCSDecomp` folder and double-click `NCSDecomp.exe`
-   - **macOS:** Navigate to the `NCSDecomp` folder and double-click `NCSDecomp.app`
-   - **Linux:** Navigate to the `NCSDecomp` folder and run `./NCSDecomp`
+   - **Windows:** Navigate to the `DeNCS` folder and double-click `DeNCS.exe`
+   - **macOS:** Navigate to the `DeNCS` folder and double-click `DeNCS.app`
+   - **Linux:** Navigate to the `DeNCS` folder and run `./DeNCS`
 
 That's it! No Java installation needed - everything is included in the folders.
 
@@ -30,7 +30,7 @@ That's it! No Java installation needed - everything is included in the folders.
 If you prefer the JAR version, you'll need Java installed on your computer. Then you can run:
 
 ```bash
-java -jar NCSDecompCLI.jar [options]
+java -jar DeNCSCLI.jar [options]
 ```
 
 ---
@@ -43,45 +43,45 @@ java -jar NCSDecompCLI.jar [options]
 
 1. Press `Windows Key + R`
 2. Type `cmd` and press Enter
-3. Navigate to the folder where NCSDecomp is located:
+3. Navigate to the folder where DeNCS is located:
 
    ```powershell
-   cd C:\path\to\NCSDecomp
+   cd C:\path\to\DeNCS
    ```
 
 **macOS/Linux:**
 
 1. Open Terminal
-2. Navigate to the folder where NCSDecomp is located:
+2. Navigate to the folder where DeNCS is located:
 
    ```bash
-   cd /path/to/NCSDecomp
+   cd /path/to/DeNCS
    ```
 
 ### Basic Examples
 
-**Note:** You can run the executable from any directory. If you're in the `NCSDecompCLI` folder, use `NCSDecompCLI.exe` (Windows) or `./NCSDecompCLI` (macOS/Linux). If you're in the parent directory, use `NCSDecompCLI\NCSDecompCLI.exe` (Windows) or `./NCSDecompCLI/NCSDecompCLI` (macOS/Linux).
+**Note:** You can run the executable from any directory. If you're in the `DeNCSCLI` folder, use `DeNCSCLI.exe` (Windows) or `./DeNCSCLI` (macOS/Linux). If you're in the parent directory, use `DeNCSCLI\DeNCSCLI.exe` (Windows) or `./DeNCSCLI/DeNCSCLI` (macOS/Linux).
 
 #### Decompile a Single File (KotOR 2 / TSL)
 
 **Windows:**
 
 ```powershell
-# From within NCSDecompCLI folder:
-.\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k2
+# From within DeNCSCLI folder:
+.\DeNCSCLI.exe -i "script.ncs" -o "script.nss" --k2
 
 # Or from parent directory:
-.\NCSDecompCLI\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k2
+.\DeNCSCLI\DeNCSCLI.exe -i "script.ncs" -o "script.nss" --k2
 ```
 
 **macOS/Linux:**
 
 ```bash
-# From within NCSDecompCLI folder:
-./NCSDecompCLI -i "script.ncs" -o "script.nss" --k2
+# From within DeNCSCLI folder:
+./DeNCSCLI -i "script.ncs" -o "script.nss" --k2
 
 # Or from parent directory:
-./NCSDecompCLI/NCSDecompCLI -i "script.ncs" -o "script.nss" --k2
+./DeNCSCLI/DeNCSCLI -i "script.ncs" -o "script.nss" --k2
 ```
 
 This will:
@@ -95,13 +95,13 @@ This will:
 **Windows:**
 
 ```powershell
-.\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k1
+.\DeNCSCLI.exe -i "script.ncs" -o "script.nss" --k1
 ```
 
 **macOS/Linux:**
 
 ```bash
-./NCSDecompCLI -i "script.ncs" -o "script.nss" --k1
+./DeNCSCLI -i "script.ncs" -o "script.nss" --k1
 ```
 
 #### Decompile an Entire Folder
@@ -109,13 +109,13 @@ This will:
 **Windows:**
 
 ```powershell
-.\NCSDecompCLI.exe -i "scripts_folder" -r --k2 -O "output_folder"
+.\DeNCSCLI.exe -i "scripts_folder" -r --k2 -O "output_folder"
 ```
 
 **macOS/Linux:**
 
 ```bash
-./NCSDecompCLI -i "scripts_folder" -r --k2 -O "output_folder"
+./DeNCSCLI -i "scripts_folder" -r --k2 -O "output_folder"
 ```
 
 This will:
@@ -130,13 +130,13 @@ This will:
 **Windows:**
 
 ```powershell
-.\NCSDecompCLI.exe -i "script.ncs" --stdout --k2
+.\DeNCSCLI.exe -i "script.ncs" --stdout --k2
 ```
 
 **macOS/Linux:**
 
 ```bash
-./NCSDecompCLI -i "script.ncs" --stdout --k2
+./DeNCSCLI -i "script.ncs" --stdout --k2
 ```
 
 This displays the code directly in the terminal/command window instead of saving to a file.
@@ -145,7 +145,7 @@ This displays the code directly in the terminal/command window instead of saving
 
 ## 🎮 Game Mode Selection
 
-NCSDecomp needs to know which game you're working with:
+DeNCS needs to know which game you're working with:
 
 - **`--k1`** or **`--game=k1`** - For Knights of the Old Republic (KotOR 1)
 - **`--k2`** or **`--tsl`** or **`--game=k2`** - For Knights of the Old Republic II: The Sith Lords (TSL)
@@ -156,12 +156,12 @@ If you don't specify, it defaults to KotOR 1 mode.
 
 ## 📁 Required Files
 
-For the **CLI version** (`NCSDecompCLI.exe`), the required files are automatically included:
+For the **CLI version** (`DeNCSCLI.exe`), the required files are automatically included:
 
 - `k1_nwscript.nss` - Required for KotOR 1 scripts (automatically in `app` folder)
 - `tsl_nwscript.nss` - Required for KotOR 2/TSL scripts (automatically in `app` folder)
 
-**Note:** The self-contained `NCSDecompCLI.exe` includes these files automatically in the `app` subdirectory. The executable will find them automatically - no manual setup needed!
+**Note:** The self-contained `DeNCSCLI.exe` includes these files automatically in the `app` subdirectory. The executable will find them automatically - no manual setup needed!
 
 If using the JAR version, you need to have them in your current working directory.
 
@@ -192,8 +192,8 @@ If using the JAR version, you need to have them in your current working director
 
 ```batch
 @echo off
-cd /d "%~dp0NCSDecompCLI"
-NCSDecompCLI.exe -i "C:\KotOR\scripts" -r --k2 -O "C:\KotOR\decompiled"
+cd /d "%~dp0DeNCSCLI"
+DeNCSCLI.exe -i "C:\KotOR\scripts" -r --k2 -O "C:\KotOR\decompiled"
 pause
 ```
 
@@ -201,26 +201,26 @@ pause
 
 ```bash
 #!/bin/bash
-cd "$(dirname "$0")/NCSDecompCLI"
-./NCSDecompCLI -i "/path/to/scripts" -r --k2 -O "/path/to/decompiled"
+cd "$(dirname "$0")/DeNCSCLI"
+./DeNCSCLI -i "/path/to/scripts" -r --k2 -O "/path/to/decompiled"
 ```
 
 Make it executable: `chmod +x decompile.sh`
 
-This script changes to the NCSDecompCLI directory first, then runs the executable.
+This script changes to the DeNCSCLI directory first, then runs the executable.
 
 ### Example 2: Process Multiple Files
 
 **Windows:**
 
 ```powershell
-.\NCSDecompCLI.exe -i file1.ncs -i file2.ncs -i file3.ncs --k2 -O output
+.\DeNCSCLI.exe -i file1.ncs -i file2.ncs -i file3.ncs --k2 -O output
 ```
 
 **macOS/Linux:**
 
 ```bash
-./NCSDecompCLI -i file1.ncs -i file2.ncs -i file3.ncs --k2 -O output
+./DeNCSCLI -i file1.ncs -i file2.ncs -i file3.ncs --k2 -O output
 ```
 
 ### Example 3: Add Custom Suffix
@@ -228,13 +228,13 @@ This script changes to the NCSDecompCLI directory first, then runs the executabl
 **Windows:**
 
 ```powershell
-.\NCSDecompCLI.exe -i script.ncs --suffix "_decompiled" --k2
+.\DeNCSCLI.exe -i script.ncs --suffix "_decompiled" --k2
 ```
 
 **macOS/Linux:**
 
 ```bash
-./NCSDecompCLI -i script.ncs --suffix "_decompiled" --k2
+./DeNCSCLI -i script.ncs --suffix "_decompiled" --k2
 ```
 
 This creates `script_decompiled.nss` instead of `script.nss`.
@@ -249,7 +249,7 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 
 **Solution**:
 
-- For `NCSDecompCLI.exe`: The files should be automatically in the `app` subdirectory. If you get this error, ensure the executable folder structure is intact and the `app` folder contains the nwscript files.
+- For `DeNCSCLI.exe`: The files should be automatically in the `app` subdirectory. If you get this error, ensure the executable folder structure is intact and the `app` folder contains the nwscript files.
 - For JAR version: Make sure `k1_nwscript.nss` or `tsl_nwscript.nss` is in the `tools/` directory (or current working directory for legacy support).
 - You can also use `--nwscript <path>` to specify the exact location of the nwscript file.
 
@@ -261,11 +261,11 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 
 ### Program won't start
 
-**Windows:** Windows security might be blocking it. Right-click `NCSDecomp.exe` → Properties → Check "Unblock" → Apply
+**Windows:** Windows security might be blocking it. Right-click `DeNCS.exe` → Properties → Check "Unblock" → Apply
 
 **macOS:** You may need to allow the app in System Preferences → Security & Privacy
 
-**Linux:** Ensure the executable has execute permissions: `chmod +x NCSDecompCLI/NCSDecompCLI`
+**Linux:** Ensure the executable has execute permissions: `chmod +x DeNCSCLI/DeNCSCLI`
 
 ---
 
@@ -273,13 +273,13 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 
 **Windows:**
 
-- Run `.\NCSDecompCLI.exe --help` for a full list of CLI options (from within the NCSDecompCLI folder)
-- Run `.\NCSDecompCLI.exe --version` for version information
+- Run `.\DeNCSCLI.exe --help` for a full list of CLI options (from within the DeNCSCLI folder)
+- Run `.\DeNCSCLI.exe --version` for version information
 
 **macOS/Linux:**
 
-- Run `./NCSDecompCLI --help` for a full list of CLI options (from within the NCSDecompCLI folder)
-- Run `./NCSDecompCLI --version` for version information
+- Run `./DeNCSCLI --help` for a full list of CLI options (from within the DeNCSCLI folder)
+- Run `./DeNCSCLI --version` for version information
 
 - Visit [https://bolabaden.org](https://bolabaden.org) for more resources
 
@@ -310,7 +310,7 @@ For detailed technical documentation, see `README-TECHNICAL.md` included in this
 
 ## 📄 License
 
-This software is provided "as is" with no warranty. See the original NCSDecomp documentation for license details.
+This software is provided under the MIT License (see `LICENSE` in the project root). It is provided "as is", without warranty of any kind.
 
 ---
 

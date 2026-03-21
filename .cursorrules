@@ -1,4 +1,4 @@
-# NCSDecomp Rules and Conventions for AI LLM agents
+# DeNCS Rules and Conventions for AI LLM agents
 
 ## ⚠️ CRITICAL: Git Commit Requirement ⚠️
 
@@ -31,9 +31,9 @@ When creating ANY new `.md` files, always follow these guidelines:
 
 - Always place within `docs`
 - Never report on progression (changes and what still remains to be done).
-- Exclusively provide public-facing documentation, something an end user will need to read if they want to either develop for NCSDecomp or work with it.
+- Exclusively provide public-facing documentation, something an end user will need to read if they want to either develop for DeNCS or work with it.
 
-Please do not create .md documentation unless it delivers public-facing information or authoritative gameplay/platform references that an end user or developer genuinely needs for NCSDecomp or the games themselves.
+Please do not create .md documentation unless it delivers public-facing information or authoritative gameplay/platform references that an end user or developer genuinely needs for DeNCS or the games themselves.
 
 ## Helper Scripts
 
@@ -43,7 +43,7 @@ Please do not create .md documentation unless it delivers public-facing informat
 
 ## Tooling & Testing
 
-**CLI Usage**: Main class is `com.kotor.resource.formats.ncs.NCSDecompCLI` (NOT `NCSDecomp`). Run via: `java -cp "target/classes;lib/*" com.kotor.resource.formats.ncs.NCSDecompCLI -i <input.ncs> -o <output.nss> -g k1|k2`
+**CLI Usage**: Main class is `com.kotor.resource.formats.ncs.DeNCSCLI` (NOT `DeNCS`). Run via: `java -cp "target/classes;lib/*" com.kotor.resource.formats.ncs.DeNCSCLI -i <input.ncs> -o <output.nss> -g k1|k2`
 
 **Test Data**: Round-trip tests use `test-work/Vanilla_KOTOR_Script_Source/` (cloned repo, NOT `test_data/`). Test artifacts in `roundtrip-work/`. Original sources: `test-work/Vanilla_KOTOR_Script_Source/K1/Data/scripts.bif/*.nss` or `K2/Data/scripts.bif/*.nss`.
 
@@ -53,7 +53,7 @@ Please do not create .md documentation unless it delivers public-facing informat
 
 **Action Opcodes**: Action definitions in `src/main/resources/*_nwscript.nss` or `tools/*_nwscript.nss`. Format: `// N:` comment followed by function signature. Action index N maps to opcode N in bytecode. Search pattern: `^// (N):` where N is decimal action ID. Example: `// 120:` = `EffectDamageIncrease`, `// 57:` = `PauseGame`.
 
-**Common Mistakes**: Don't search for "action 120" in source files—look for `// 120:` comments. Don't assume `test_data/` exists—use `test-work/`. Don't use `NCSDecomp` class—use `NCSDecompCLI`. When bytecode mismatches, inspect decompiled output structure (missing spaces, malformed blocks) not just opcodes—structural issues cause wrong actions to be emitted.
+**Common Mistakes**: Don't search for "action 120" in source files—look for `// 120:` comments. Don't assume `test_data/` exists—use `test-work/`. Don't use `DeNCS` class—use `DeNCSCLI`. When bytecode mismatches, inspect decompiled output structure (missing spaces, malformed blocks) not just opcodes—structural issues cause wrong actions to be emitted.
 
 ## Decompiling/bytecode
 
@@ -71,7 +71,7 @@ Use `tools\ncsdis.exe` or `tools\nwnnsscomp_kscript.exe` to get bytecode disasse
 - Requires nwscript.nss in tools/ directory
 - Shows function names for ACTION opcodes
 
-Both formats are supported. NCSDecomp automatically normalizes for comparison. See `docs/ncsdis_integration.md` for format differences.
+Both formats are supported. DeNCS automatically normalizes for comparison. See `docs/ncsdis_integration.md` for format differences.
 
 Use `tools\ncsdis.exe` to get bytecode disassembly: `ncsdis --kotor input.ncs output_BYTECODE.nss` (or `--kotor2`, `--nwn`, etc.). Alternatively use `tools\nwnnsscomp_kscript.exe` decompiler. Don't manually read raw bytes from `.ncs` files.
 

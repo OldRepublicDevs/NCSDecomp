@@ -1,14 +1,14 @@
-# Copyright 2021-2025 NCSDecomp
-# Licensed under the Business Source License 1.1 (BSL 1.1).
+# Copyright 2021-2025 DeNCS
+# Licensed under the MIT License (see LICENSE).
 # Visit https://bolabaden.org for more information and other ventures
-# See LICENSE.txt file in the project root for full license information.
+# See LICENSE file in the project root for full license information.
 
 # Build, publish, and test chain - matches user's exact command format
 # Stops on any error to prevent continuing with broken builds
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "NCSDecomp Build and Test Chain" -ForegroundColor Green
+Write-Host "DeNCS Build and Test Chain" -ForegroundColor Green
 Write-Host "==============================" -ForegroundColor Green
 Write-Host ""
 
@@ -34,7 +34,7 @@ Write-Host ""
 
 # Step 3: Test CLI JAR
 Write-Host "[3/4] Testing CLI JAR..." -ForegroundColor Yellow
-$cliJar = Join-Path "." (Join-Path "target" (Join-Path "assembly" "NCSDecompCLI.jar"))
+$cliJar = Join-Path "." (Join-Path "target" (Join-Path "assembly" "DeNCSCLI.jar"))
 if (-not (Test-Path $cliJar)) {
     Write-Host "ERROR: CLI JAR not found at $cliJar" -ForegroundColor Red
     exit 1
@@ -49,7 +49,7 @@ Write-Host ""
 
 # Step 4: Test GUI JAR (just verify it exists and can be read)
 Write-Host "[4/4] Verifying GUI JAR..." -ForegroundColor Yellow
-$guiJar = Join-Path "." (Join-Path "target" (Join-Path "assembly" "NCSDecomp.jar"))
+$guiJar = Join-Path "." (Join-Path "target" (Join-Path "assembly" "DeNCS.jar"))
 if (-not (Test-Path $guiJar)) {
     Write-Host "ERROR: GUI JAR not found at $guiJar" -ForegroundColor Red
     exit 1

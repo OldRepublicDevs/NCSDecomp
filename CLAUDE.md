@@ -1,6 +1,6 @@
 <!-- BEGIN ContextStream -->
 # Workspace: Personal Workspace
-# Project: NCSDecomp
+# Project: DeNCS
 # Workspace ID: 99619ee8-05d8-44ab-a96c-e62d06b6184e
 
 # Claude Code Instructions

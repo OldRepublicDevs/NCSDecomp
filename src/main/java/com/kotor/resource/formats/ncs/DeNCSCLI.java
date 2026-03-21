@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -12,7 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Headless CLI entrypoint for NCSDecomp.
+ * Headless CLI entrypoint for DeNCS.
  * <p>
  * Responsibilities:
  * <ul>
@@ -21,8 +20,8 @@ import java.util.List;
  *   <li>Decompile NCS to NSS (stdout or files) without invoking external compilers.</li>
  * </ul>
  */
-public final class NCSDecompCLI {
-   private NCSDecompCLI() {
+public final class DeNCSCLI {
+   private DeNCSCLI() {
    }
 
    public static void main(String[] args) {
@@ -111,7 +110,7 @@ public final class NCSDecompCLI {
             if (!nwscriptFile.isFile()) {
                // Try JAR directory
                try {
-                  String jarPath = NCSDecompCLI.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+                  String jarPath = DeNCSCLI.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
                   File jarDir = new File(jarPath).getParentFile();
                   if (jarDir != null) {
                      nwscriptFile = new File(jarDir, nssName);
@@ -224,12 +223,12 @@ public final class NCSDecompCLI {
                   File outFile = resolveOutput(input, outputFileOrDir, cfg);
                   File parentDir = outFile.getParentFile();
                   if (parentDir != null && !parentDir.exists()) {
-                     System.out.println("[INFO] NCSDecompCLI: CREATING parent directory: " + parentDir.getAbsolutePath());
+                     System.out.println("[INFO] DeNCSCLI: CREATING parent directory: " + parentDir.getAbsolutePath());
                      if (!parentDir.mkdirs()) {
-                        System.err.println("[ERROR] NCSDecompCLI: Failed to create parent directory: " + parentDir.getAbsolutePath());
+                        System.err.println("[ERROR] DeNCSCLI: Failed to create parent directory: " + parentDir.getAbsolutePath());
                         continue;
                      }
-                     System.out.println("[INFO] NCSDecompCLI: Created parent directory: " + parentDir.getAbsolutePath());
+                     System.out.println("[INFO] DeNCSCLI: Created parent directory: " + parentDir.getAbsolutePath());
                   }
                   fd.decompileToFile(input.file, outFile, charset, cfg.overwrite);
                   if (!cfg.quiet) {
@@ -451,18 +450,18 @@ public final class NCSDecompCLI {
 
       // Otherwise, try to get JAR name
       try {
-         String jarPath = NCSDecompCLI.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
+         String jarPath = DeNCSCLI.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath();
          File jarFile = new File(jarPath);
          return jarFile.getName();
       } catch (Exception e) {
          // Fallback to default name if we can't determine it
-         return "NCSDecomp.jar";
+         return "DeNCS.jar";
       }
    }
 
    private static void printUsage() {
       String executableName = getExecutableName();
-      String summary = "KotOR NCSDecomp headless decompiler (Beta 2, May 30 2006). Decompiles NCS -> NSS without external tools.";
+      String summary = "KotOR DeNCS headless decompiler (Beta 2, May 30 2006). Decompiles NCS -> NSS without external tools.";
       String author = "Original: JdNoa (decompiler), Dashus (GUI); further mods: th3w1zard1 | https://bolabaden.org | https://github.com/bolabaden";
       System.out.println(summary);
       System.out.println(author);
@@ -471,7 +470,7 @@ public final class NCSDecompCLI {
       // Format usage line based on whether it's a JAR or EXE
       String usageLine;
       if (executableName.endsWith(".jar")) {
-         usageLine = "Usage: java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI [options] <files/dirs>";
+         usageLine = "Usage: java -cp " + executableName + " com.kotor.resource.formats.ncs.DeNCSCLI [options] <files/dirs>";
       } else {
          usageLine = "Usage: " + executableName + " [options] <files/dirs>";
       }
@@ -510,16 +509,16 @@ public final class NCSDecompCLI {
       // Format examples based on whether it's a JAR or EXE
       if (executableName.endsWith(".jar")) {
          System.out.println("  Decompile single file to stdout:");
-         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI -i foo.ncs --stdout");
+         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.DeNCSCLI -i foo.ncs --stdout");
          System.out.println("  Decompile single file to specific output:");
-         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI -i foo.ncs -o bar.nss");
+         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.DeNCSCLI -i foo.ncs -o bar.nss");
          System.out.println("  Decompile directory recursively preserving hierarchy:");
-         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI -i scripts_dir -r -o out_dir");
+         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.DeNCSCLI -i scripts_dir -r -o out_dir");
          System.out.println("  Decompile directory recursively to out folder using TSL definitions:");
-         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI -i scripts_dir -r -g k2 -O out_dir");
+         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.DeNCSCLI -i scripts_dir -r -g k2 -O out_dir");
          System.out.println("  Decompile with game selection using -g flag:");
-         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI -i file.ncs -g k1");
-         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.NCSDecompCLI -i file.ncs -g 2");
+         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.DeNCSCLI -i file.ncs -g k1");
+         System.out.println("    java -cp " + executableName + " com.kotor.resource.formats.ncs.DeNCSCLI -i file.ncs -g 2");
       } else {
          System.out.println("  Decompile single file to stdout:");
          System.out.println("    " + executableName + " -i foo.ncs --stdout");
@@ -536,7 +535,7 @@ public final class NCSDecompCLI {
    }
 
    private static void printVersion() {
-      System.out.println("NCSDecomp CLI headless decompiler (Beta 2, May 30 2006)");
+      System.out.println("DeNCS CLI headless decompiler (Beta 2, May 30 2006)");
       System.out.println("Modified by th3w1zard1 | https://bolabaden.org | https://github.com/bolabaden");
    }
 

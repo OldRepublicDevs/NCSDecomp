@@ -2,7 +2,7 @@
 
 ## Overview
 
-NCSDecomp now supports **ncsdis.exe** as an alternative pcode decompiler alongside nwnnsscomp variants. This integration provides:
+DeNCS now supports **ncsdis.exe** as an alternative pcode decompiler alongside nwnnsscomp variants. This integration provides:
 
 - **No nwscript.nss dependency** - ncsdis works standalone
 - **Simpler format** - Cleaner, more readable pcode output
@@ -118,11 +118,11 @@ Both normalize to:
 
 ```bash
 # Automatic detection (tries ncsdis.exe if available)
-java -cp "target/classes;lib/*" com.kotor.resource.formats.ncs.NCSDecompCLI \
+java -cp "target/classes;lib/*" com.kotor.resource.formats.ncs.DeNCSCLI \
   -i input.ncs -o output.nss -g k1
 
 # Explicit ncsdis path
-java -cp "target/classes;lib/*" com.kotor.resource.formats.ncs.NCSDecompCLI \
+java -cp "target/classes;lib/*" com.kotor.resource.formats.ncs.DeNCSCLI \
   -i input.ncs -o output.nss -g k1 --compiler tools/ncsdis.exe
 ```
 
@@ -154,7 +154,7 @@ The pcode comparison automatically handles format differences.
 
 - ncsdis.exe and nwnnsscomp produce **semantically identical** bytecode
 - Only formatting differs
-- NCSDecomp handles both transparently
+- DeNCS handles both transparently
 - Round-trip tests pass with either tool
 
 ## Testing

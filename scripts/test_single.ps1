@@ -26,7 +26,7 @@ Write-Host "Testing: $Filename (game=$Game)" -ForegroundColor Cyan
 Write-Host ""
 
 java -cp "target/test-classes;target/classes;lib/*" `
-    com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest `
+    com.kotor.resource.formats.ncs.DeNCSCLIRoundTripTest `
     $Filename $Game
 
 exit $LASTEXITCODE

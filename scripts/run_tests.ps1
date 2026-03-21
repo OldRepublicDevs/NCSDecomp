@@ -1,7 +1,7 @@
-# Copyright 2021-2025 NCSDecomp
-# Licensed under the Business Source License 1.1 (BSL 1.1).
+# Copyright 2021-2025 DeNCS
+# Licensed under the MIT License (see LICENSE).
 # Visit https://bolabaden.org for more information and other ventures
-# See LICENSE.txt file in the project root for full license information.
+# See LICENSE file in the project root for full license information.
 
 # PowerShell script to run tests with profiling
 # Cross-platform compatible (Windows, macOS, Linux)
@@ -187,10 +187,10 @@ try {
 }
 
 # Find test file in Maven test directory
-$testFile = Join-Path $repoRoot (Join-Path "src" (Join-Path "test" (Join-Path "java" (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "NCSDecompCLIRoundTripTest.java"))))))))
+$testFile = Join-Path $repoRoot (Join-Path "src" (Join-Path "test" (Join-Path "java" (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "DeNCSCLIRoundTripTest.java"))))))))
 if (-not (Test-Path $testFile)) {
     # Try alternative location
-    $testFile = Join-Path $repoRoot (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "NCSDecompCLIRoundTripTest.java")))))
+    $testFile = Join-Path $repoRoot (Join-Path "com" (Join-Path "kotor" (Join-Path "resource" (Join-Path "formats" (Join-Path "ncs" "DeNCSCLIRoundTripTest.java")))))
     if (-not (Test-Path $testFile)) {
         Write-Host "Error: Test file not found" -ForegroundColor Red
         exit 1
@@ -392,10 +392,10 @@ $scriptBlock = {
         $javaArgs += @("--max-seconds", $maxSecondsBudget.ToString(), "--save-progress-every", $saveProgressEvery.ToString())
     }
     if ($suppressStderr) {
-        & java -cp $cp com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest @javaArgs 2>$null
+        & java -cp $cp com.kotor.resource.formats.ncs.DeNCSCLIRoundTripTest @javaArgs 2>$null
     } else {
         # Merge stderr into stdout so Receive-Job can stream it and it can be logged.
-        & java -cp $cp com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest @javaArgs 2>&1
+        & java -cp $cp com.kotor.resource.formats.ncs.DeNCSCLIRoundTripTest @javaArgs 2>&1
     }
     Write-Output "###JAVA_EXIT_CODE:$LASTEXITCODE###"
 }
@@ -413,7 +413,7 @@ if ($DirectExecution) {
     $exitCode = 0
     try {
         # Build the java command
-        $javaCmdArgs = @("-cp", $cp, "com.kotor.resource.formats.ncs.NCSDecompCLIRoundTripTest") + $javaArgs
+        $javaCmdArgs = @("-cp", $cp, "com.kotor.resource.formats.ncs.DeNCSCLIRoundTripTest") + $javaArgs
 
         if ($TeeOutput -and $LogFile) {
             # Use Tee-Object to both display and log output simultaneously

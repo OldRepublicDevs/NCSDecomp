@@ -1,4 +1,4 @@
-# Test that ncsdis.exe is properly recognized by NCSDecomp
+# Test that ncsdis.exe is properly recognized by DeNCS
 
 $ErrorActionPreference = "Stop"
 $RepoRoot = Split-Path -Parent $PSScriptRoot

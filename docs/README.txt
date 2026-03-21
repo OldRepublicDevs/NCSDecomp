@@ -1,12 +1,12 @@
-<!-- Copyright 2021-2025 NCSDecomp -->
-<!-- Licensed under the Business Source License 1.1 (BSL 1.1). -->
-<!-- See LICENSE.txt file in the project root for full license information. -->
+<!-- Copyright 2021-2025 DeNCS -->
+<!-- Licensed under the MIT License (see LICENSE). -->
+<!-- See LICENSE file in the project root for full license information. -->
 
-# NCSDecomp - KotOR Script Decompiler
+# DeNCS - KotOR Script Decompiler
 
 ## Welcome
 
-**NCSDecomp** is a tool that converts compiled KotOR game scripts (`.ncs` files) back into readable source code (`.nss` files).
+**DeNCS** is a tool that converts compiled KotOR game scripts (`.ncs` files) back into readable source code (`.nss` files).
 
 **What does this mean?** If you have a compiled script file from Knights of the Old Republic or Knights of the Old Republic II, this tool can turn it back into the original source code that you can read and edit. It's like having a translator that converts the game's internal script format back into human-readable code.
 
@@ -21,13 +21,13 @@ This version includes:
 
 ### For Most Users: Use the Graphical Program (GUI)
 
-**This is the easiest way to use NCSDecomp!**
+**This is the easiest way to use DeNCS!**
 
-1. **Find the `NCSDecomp` folder** in your download
+1. **Find the `DeNCS` folder** in your download
 2. **Double-click the program:**
-   - **Windows:** Double-click `NCSDecomp.exe`
-   - **macOS:** Double-click `NCSDecomp.app`
-   - **Linux:** Double-click `NCSDecomp` (or run `./NCSDecomp` from terminal)
+   - **Windows:** Double-click `DeNCS.exe`
+   - **macOS:** Double-click `DeNCS.app`
+   - **Linux:** Double-click `DeNCS` (or run `./DeNCS` from terminal)
 3. **That's it!** The program will open and you can:
    - Drag and drop `.ncs` files to decompile them
    - Open `.nss` files to view or edit them
@@ -41,11 +41,11 @@ This version includes:
 
 If you prefer using the command line or want to automate tasks:
 
-1. **Find the `NCSDecompCLI` folder** in your download
+1. **Find the `DeNCSCLI` folder** in your download
 2. **Open Command Prompt (Windows) or Terminal (Mac/Linux)**
 3. **Navigate to the folder** and run:
-   - **Windows:** `NCSDecompCLI.exe --help` (to see all options)
-   - **macOS/Linux:** `./NCSDecompCLI --help`
+   - **Windows:** `DeNCSCLI.exe --help` (to see all options)
+   - **macOS/Linux:** `./DeNCSCLI --help`
 
 See the examples below for common usage.
 
@@ -54,7 +54,7 @@ See the examples below for common usage.
 If you already have Java installed on your computer, you can use the JAR file instead:
 
 ```bash
-java -jar NCSDecompCLI.jar [options]
+java -jar DeNCSCLI.jar [options]
 ```
 
 **Note:** Most users should use the self-contained executable instead - it's easier and doesn't require Java!
@@ -65,7 +65,7 @@ java -jar NCSDecompCLI.jar [options]
 
 ### Using the Graphical Program (Recommended for Beginners)
 
-1. **Open the program** by double-clicking `NCSDecomp.exe` (Windows) or `NCSDecomp.app` (Mac)
+1. **Open the program** by double-clicking `DeNCS.exe` (Windows) or `DeNCS.app` (Mac)
 2. **Open a file:**
    - Drag and drop a `.ncs` or `.nss` file onto the window, OR
    - Click File → Open and browse for your file
@@ -85,42 +85,42 @@ java -jar NCSDecompCLI.jar [options]
 **Windows:**
 1. Press `Windows Key + R`
 2. Type `cmd` and press Enter
-3. Navigate to the folder where NCSDecomp is located:
+3. Navigate to the folder where DeNCS is located:
 
    ```powershell
-   cd C:\path\to\NCSDecomp
+   cd C:\path\to\DeNCS
    ```
 
 **macOS/Linux:**
 1. Open Terminal
-2. Navigate to the folder where NCSDecomp is located:
+2. Navigate to the folder where DeNCS is located:
 
    ```bash
-   cd /path/to/NCSDecomp
+   cd /path/to/DeNCS
    ```
 
 ### Command-Line Examples
 
-**Note:** Make sure you're in the `NCSDecompCLI` folder, or use the full path to the executable.
+**Note:** Make sure you're in the `DeNCSCLI` folder, or use the full path to the executable.
 
 #### Decompile a Single File (KotOR 2 / TSL)
 
 **Windows:**
 ```powershell
-# From within NCSDecompCLI folder:
-.\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k2
+# From within DeNCSCLI folder:
+.\DeNCSCLI.exe -i "script.ncs" -o "script.nss" --k2
 
 # Or from parent directory:
-.\NCSDecompCLI\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k2
+.\DeNCSCLI\DeNCSCLI.exe -i "script.ncs" -o "script.nss" --k2
 ```
 
 **macOS/Linux:**
 ```bash
-# From within NCSDecompCLI folder:
-./NCSDecompCLI -i "script.ncs" -o "script.nss" --k2
+# From within DeNCSCLI folder:
+./DeNCSCLI -i "script.ncs" -o "script.nss" --k2
 
 # Or from parent directory:
-./NCSDecompCLI/NCSDecompCLI -i "script.ncs" -o "script.nss" --k2
+./DeNCSCLI/DeNCSCLI -i "script.ncs" -o "script.nss" --k2
 ```
 
 This will:
@@ -133,24 +133,24 @@ This will:
 
 **Windows:**
 ```powershell
-.\NCSDecompCLI.exe -i "script.ncs" -o "script.nss" --k1
+.\DeNCSCLI.exe -i "script.ncs" -o "script.nss" --k1
 ```
 
 **macOS/Linux:**
 ```bash
-./NCSDecompCLI -i "script.ncs" -o "script.nss" --k1
+./DeNCSCLI -i "script.ncs" -o "script.nss" --k1
 ```
 
 #### Decompile an Entire Folder
 
 **Windows:**
 ```powershell
-.\NCSDecompCLI.exe -i "scripts_folder" -r --k2 -O "output_folder"
+.\DeNCSCLI.exe -i "scripts_folder" -r --k2 -O "output_folder"
 ```
 
 **macOS/Linux:**
 ```bash
-./NCSDecompCLI -i "scripts_folder" -r --k2 -O "output_folder"
+./DeNCSCLI -i "scripts_folder" -r --k2 -O "output_folder"
 ```
 
 This will:
@@ -164,12 +164,12 @@ This will:
 
 **Windows:**
 ```powershell
-.\NCSDecompCLI.exe -i "script.ncs" --stdout --k2
+.\DeNCSCLI.exe -i "script.ncs" --stdout --k2
 ```
 
 **macOS/Linux:**
 ```bash
-./NCSDecompCLI -i "script.ncs" --stdout --k2
+./DeNCSCLI -i "script.ncs" --stdout --k2
 ```
 
 This displays the code directly in the terminal/command window instead of saving to a file.
@@ -178,7 +178,7 @@ This displays the code directly in the terminal/command window instead of saving
 
 ## 🎮 Game Mode Selection
 
-NCSDecomp works with both KotOR games! The program usually detects which game automatically, but you can specify:
+DeNCS works with both KotOR games! The program usually detects which game automatically, but you can specify:
 
 - **`--k1`** - For Knights of the Old Republic (KotOR 1)
 - **`--k2`** or **`--tsl`** - For Knights of the Old Republic II: The Sith Lords (TSL)
@@ -226,8 +226,8 @@ These files are automatically found by the program - no setup needed! They're in
 
 ```batch
 @echo off
-cd /d "%~dp0NCSDecompCLI"
-NCSDecompCLI.exe -i "C:\KotOR\scripts" -r --k2 -O "C:\KotOR\decompiled"
+cd /d "%~dp0DeNCSCLI"
+DeNCSCLI.exe -i "C:\KotOR\scripts" -r --k2 -O "C:\KotOR\decompiled"
 pause
 ```
 
@@ -235,36 +235,36 @@ pause
 
 ```bash
 #!/bin/bash
-cd "$(dirname "$0")/NCSDecompCLI"
-./NCSDecompCLI -i "/path/to/scripts" -r --k2 -O "/path/to/decompiled"
+cd "$(dirname "$0")/DeNCSCLI"
+./DeNCSCLI -i "/path/to/scripts" -r --k2 -O "/path/to/decompiled"
 ```
 
 Make it executable: `chmod +x decompile.sh`
 
-This script changes to the NCSDecompCLI directory first, then runs the executable.
+This script changes to the DeNCSCLI directory first, then runs the executable.
 
 ### Example 2: Process Multiple Files
 
 **Windows:**
 ```powershell
-.\NCSDecompCLI.exe -i file1.ncs -i file2.ncs -i file3.ncs --k2 -O output
+.\DeNCSCLI.exe -i file1.ncs -i file2.ncs -i file3.ncs --k2 -O output
 ```
 
 **macOS/Linux:**
 ```bash
-./NCSDecompCLI -i file1.ncs -i file2.ncs -i file3.ncs --k2 -O output
+./DeNCSCLI -i file1.ncs -i file2.ncs -i file3.ncs --k2 -O output
 ```
 
 ### Example 3: Add Custom Suffix
 
 **Windows:**
 ```powershell
-.\NCSDecompCLI.exe -i script.ncs --suffix "_decompiled" --k2
+.\DeNCSCLI.exe -i script.ncs --suffix "_decompiled" --k2
 ```
 
 **macOS/Linux:**
 ```bash
-./NCSDecompCLI -i script.ncs --suffix "_decompiled" --k2
+./DeNCSCLI -i script.ncs --suffix "_decompiled" --k2
 ```
 
 This creates `script_decompiled.nss` instead of `script.nss`.
@@ -294,7 +294,7 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 ### Program won't start
 
 **Windows:**
-- Windows might be blocking the program. Right-click `NCSDecomp.exe` → Properties → Check "Unblock" → Apply
+- Windows might be blocking the program. Right-click `DeNCS.exe` → Properties → Check "Unblock" → Apply
 - Try running as Administrator if you get permission errors
 
 **macOS:**
@@ -302,7 +302,7 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 - Right-click the app and select "Open" the first time
 
 **Linux:**
-- Make sure the executable has permission to run: `chmod +x NCSDecompCLI/NCSDecompCLI`
+- Make sure the executable has permission to run: `chmod +x DeNCSCLI/DeNCSCLI`
 
 ### Other Issues
 
@@ -323,8 +323,8 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 - Look at the status bar at the bottom for hints and information
 
 **For the Command Line:**
-- Run `.\NCSDecompCLI.exe --help` (Windows) or `./NCSDecompCLI --help` (Mac/Linux) for all available options
-- Run `.\NCSDecompCLI.exe --version` (Windows) or `./NCSDecompCLI --version` (Mac/Linux) for version information
+- Run `.\DeNCSCLI.exe --help` (Windows) or `./DeNCSCLI --help` (Mac/Linux) for all available options
+- Run `.\DeNCSCLI.exe --version` (Windows) or `./DeNCSCLI --version` (Mac/Linux) for version information
 
 **Online Resources:**
 - Visit [https://bolabaden.org](https://bolabaden.org) for more information and resources
@@ -332,7 +332,7 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 
 ---
 
-## 🎯 What Can You Do With NCSDecomp?
+## 🎯 What Can You Do With DeNCS?
 
 **Basic Usage:**
 - Decompile `.ncs` files to see the original source code
@@ -374,8 +374,8 @@ For detailed technical documentation, see `README-TECHNICAL.md` included in this
 
 ## 📄 License
 
-This software is provided under the Business Source License 1.1 (BSL 1.1).
-See LICENSE.txt file in the project root for full license information.
+This software is provided under the MIT License (see LICENSE).
+See LICENSE file in the project root for full license information.
 
 ---
 

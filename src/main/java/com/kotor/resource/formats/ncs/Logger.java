@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -164,10 +163,10 @@ public final class Logger {
    }
 
    /**
-    * Logs a NCSDecomp operation message.
+    * Logs a DeNCS operation message.
     */
-   public static void ncsdecomp(String message) {
-      System.err.println(colorize("▶", GREEN) + " " + colorize("[NCSDecomp]", BOLD + CYAN) + " " + message);
+   public static void dencs(String message) {
+      System.err.println(colorize("▶", GREEN) + " " + colorize("[DeNCS]", BOLD + CYAN) + " " + message);
    }
 
    /**
@@ -196,11 +195,11 @@ public final class Logger {
    }
 
    /**
-    * Starts a new section for NCSDecomp operations.
+    * Starts a new section for DeNCS operations.
     */
-   public static void startNCSDecompSection() {
+   public static void startDeNCSSection() {
       printDivider('═', GREEN);
-      printSectionHeader("NCSDECOMP OPERATIONS", BG_BLUE, WHITE);
+      printSectionHeader("DENCS OPERATIONS", BG_BLUE, WHITE);
       printDivider('═', GREEN);
    }
 
