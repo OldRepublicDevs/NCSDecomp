@@ -3665,12 +3665,12 @@ public class DeNCSCLIRoundTripTest {
       message.append("  Offset: ").append(diff.offset).append(" (0x").append(Long.toHexString(diff.offset)).append(")\n");
       message.append("  Original: ").append(formatByteValue(diff.originalByte));
       if (originalAction != null) {
-         message.append(" → ").append(originalAction);
+         message.append(" -> ").append(originalAction);
       }
       message.append("\n");
       message.append("  Round-trip: ").append(formatByteValue(diff.roundTripByte));
       if (roundTripAction != null) {
-         message.append(" → ").append(roundTripAction);
+         message.append(" -> ").append(roundTripAction);
       }
       message.append("\n");
       message.append("\n");

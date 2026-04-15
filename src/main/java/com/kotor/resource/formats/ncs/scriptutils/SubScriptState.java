@@ -355,8 +355,8 @@ public class SubScriptState {
                      // Check if this is a pure else-if chain (AIf's else ends at parent AElse's end)
                      // or a nested if-else (there's more content in parent AElse after this AIf's else)
                      //
-                     // For pure else-if: destPos is at or past parent's end → use grandParent (siblings)
-                     // For nested: destPos is before parent's end → use parent (keep nested)
+                     // For pure else-if: destPos is at or past parent's end -> use grandParent (siblings)
+                     // For nested: destPos is before parent's end -> use parent (keep nested)
                      int parentEnd = parent.getEnd();
 
                      // If the JMP destination is at or past the parent AElse's end,

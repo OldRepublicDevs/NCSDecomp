@@ -19,7 +19,7 @@ There are two ways to use DeNCS - a simple graphical program (GUI) or command-li
 Once it opens:
 [list]
 [*]Drag and drop any .ncs file onto the window to decompile it
-[*]Or use File → Open to browse for files
+[*]Or use File -> Open to browse for files
 [*]The decompiled code will appear with syntax highlighting (color-coded keywords, functions, etc.)
 [*]You can edit the code right there if you want
 [*]Press Ctrl+S (or Cmd+S on Mac) to save your changes
@@ -78,13 +78,13 @@ This processes all .ncs files in the folder (including subfolders) and saves the
 
 [i]"Program won't start" (Windows)[/i]
 [list]
-[*]Windows might be blocking it. Right-click DeNCS.exe → Properties → Check "Unblock" → Apply
+[*]Windows might be blocking it. Right-click DeNCS.exe -> Properties -> Check "Unblock" -> Apply
 [*]Try running as Administrator if you get permission errors
 [/list]
 
 [i]"Program won't start" (Mac)[/i]
 [list]
-[*]You may need to allow the app in System Preferences → Security & Privacy
+[*]You may need to allow the app in System Preferences -> Security & Privacy
 [*]Right-click the app and select "Open" the first time
 [/list]
 

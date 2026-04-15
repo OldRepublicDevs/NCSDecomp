@@ -128,7 +128,7 @@ java -cp "target/classes;lib/*" com.kotor.resource.formats.ncs.DeNCSCLI \
 
 ### GUI Mode
 
-1. Settings → nwnnsscomp Path → Browse to `tools/` directory
+1. Settings -> nwnnsscomp Path -> Browse to `tools/` directory
 2. Select `ncsdis.exe` from dropdown
 3. Decompile NCS files as normal
 

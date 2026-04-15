@@ -31,7 +31,7 @@ This version includes:
 3. **That's it!** The program will open and you can:
    - Drag and drop `.ncs` files to decompile them
    - Open `.nss` files to view or edit them
-   - Use File → Open to browse for files
+   - Use File -> Open to browse for files
    - Edit code with syntax highlighting
    - Save your changes
 
@@ -68,7 +68,7 @@ java -jar DeNCSCLI.jar [options]
 1. **Open the program** by double-clicking `DeNCS.exe` (Windows) or `DeNCS.app` (Mac)
 2. **Open a file:**
    - Drag and drop a `.ncs` or `.nss` file onto the window, OR
-   - Click File → Open and browse for your file
+   - Click File -> Open and browse for your file
 3. **View the code:** The decompiled source code will appear in the main window
 4. **Edit if needed:** You can edit the code directly - syntax highlighting makes it easy to read
 5. **Save your work:** Press Ctrl+S (Windows/Linux) or Cmd+S (Mac) to save
@@ -294,11 +294,11 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 ### Program won't start
 
 **Windows:**
-- Windows might be blocking the program. Right-click `DeNCS.exe` → Properties → Check "Unblock" → Apply
+- Windows might be blocking the program. Right-click `DeNCS.exe` -> Properties -> Check "Unblock" -> Apply
 - Try running as Administrator if you get permission errors
 
 **macOS:**
-- You may need to allow the app in System Preferences → Security & Privacy
+- You may need to allow the app in System Preferences -> Security & Privacy
 - Right-click the app and select "Open" the first time
 
 **Linux:**

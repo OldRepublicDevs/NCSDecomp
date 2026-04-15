@@ -9,7 +9,7 @@ Added a dedicated GUI preference setting to control whether ncsdis.exe is priori
 ### GUI Controls
 
 1. **Checkbox**: "Prefer ncsdis.exe for pcode decompilation (faster, no nwscript.nss required)"
-   - Located in Settings → File/Directories tab
+   - Located in Settings -> File/Directories tab
    - Automatically enabled/disabled based on whether ncsdis.exe exists
    - Defaults to checked (true) when ncsdis.exe is found
    - Real-time updates when ncsdis.exe path changes
@@ -38,11 +38,11 @@ Added a dedicated GUI preference setting to control whether ncsdis.exe is priori
 
 All updates happen immediately without requiring settings dialog restart:
 
-1. **Path field changes** → triggers `updateNcsdisCheckboxState()`
-2. **File browse selection** → updates path → triggers state update
-3. **Checkbox toggle** → saves settings immediately
-4. **ncsdis.exe detection** → enables/disables checkbox
-5. **Settings save** → persists to config file
+1. **Path field changes** -> triggers `updateNcsdisCheckboxState()`
+2. **File browse selection** -> updates path -> triggers state update
+3. **Checkbox toggle** -> saves settings immediately
+4. **ncsdis.exe detection** -> enables/disables checkbox
+5. **Settings save** -> persists to config file
 
 ## Implementation Details
 
@@ -185,11 +185,11 @@ ncsdis Path=G:/GitHub/HoloPatcher.NET/vendor/DeNCS/tools/ncsdis.exe
 
 ### Edge Cases Handled
 
-- ✓ ncsdis.exe deleted after being configured → checkbox disables and unchecks
-- ✓ Invalid path entered → checkbox disables
-- ✓ Relative path entered → resolved relative to app directory
-- ✓ ncsdis.exe moved to new location → browse to update path
-- ✓ Both ncsdis and nwnnsscomp missing → appropriate error messages
+- ✓ ncsdis.exe deleted after being configured -> checkbox disables and unchecks
+- ✓ Invalid path entered -> checkbox disables
+- ✓ Relative path entered -> resolved relative to app directory
+- ✓ ncsdis.exe moved to new location -> browse to update path
+- ✓ Both ncsdis and nwnnsscomp missing -> appropriate error messages
 
 ## Future Enhancements
 

@@ -227,9 +227,9 @@ Check that your input path is correct and contains `.ncs` files.
 
 ### Executable won't start
 
-**Windows:** Windows security might be blocking it. Right-click the executable → Properties → Check "Unblock" → Apply.
+**Windows:** Windows security might be blocking it. Right-click the executable -> Properties -> Check "Unblock" -> Apply.
 
-**macOS:** You may need to allow the app in System Preferences → Security & Privacy.
+**macOS:** You may need to allow the app in System Preferences -> Security & Privacy.
 
 **Linux:** Ensure the executable has execute permissions: `chmod +x DeNCSCLI/DeNCSCLI`
 

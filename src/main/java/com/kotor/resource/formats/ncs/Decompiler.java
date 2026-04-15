@@ -262,7 +262,7 @@ public class Decompiler extends JFrame implements DropTargetListener, KeyListene
       // Workspace cards to show empty state when no files are open
       this.workspaceCards = new JPanel(new CardLayout());
       this.emptyStateLabel = new JLabel(
-            "<html><div style='text-align:center;'><h2>Drop .ncs or .nss files here</h2><div>Or use File → Open to start decompiling</div></div></html>",
+            "<html><div style='text-align:center;'><h2>Drop .ncs or .nss files here</h2><div>Or use File -> Open to start decompiling</div></div></html>",
             SwingConstants.CENTER);
       this.emptyStateLabel.setBorder(new EmptyBorder(32, 16, 32, 16));
 

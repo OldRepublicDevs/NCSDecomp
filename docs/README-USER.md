@@ -261,9 +261,9 @@ This creates `script_decompiled.nss` instead of `script.nss`.
 
 ### Program won't start
 
-**Windows:** Windows security might be blocking it. Right-click `DeNCS.exe` → Properties → Check "Unblock" → Apply
+**Windows:** Windows security might be blocking it. Right-click `DeNCS.exe` -> Properties -> Check "Unblock" -> Apply
 
-**macOS:** You may need to allow the app in System Preferences → Security & Privacy
+**macOS:** You may need to allow the app in System Preferences -> Security & Privacy
 
 **Linux:** Ensure the executable has execute permissions: `chmod +x DeNCSCLI/DeNCSCLI`
 
