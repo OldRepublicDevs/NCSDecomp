@@ -1,7 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// Visit https://bolabaden.org for more information and other ventures
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs.scriptutils;
 
@@ -79,6 +77,24 @@ public class CleanupPass {
 
          while (it.hasNext()) {
             ScriptNode node1 = (ScriptNode)it.next();
+         if (AVarDecl.class.isInstance(node1)) {
+            AVarDecl decl = (AVarDecl) node1;
+            if (decl.exp() == null && it.hasNext()) {
+               ScriptNode maybeAssign = (ScriptNode) it.next();
+               if (AExpressionStatement.class.isInstance(maybeAssign)
+                     && AModifyExp.class.isInstance(((AExpressionStatement) maybeAssign).exp())) {
+                  AModifyExp modexp = (AModifyExp) ((AExpressionStatement) maybeAssign).exp();
+                  if (modexp.varRef().var() == decl.var()) {
+                     decl.initializeExp(modexp.expression());
+                     it.remove(); // drop the now-merged assignment statement
+                  } else {
+                     it.previous();
+                  }
+               } else {
+                  it.previous();
+               }
+            }
+         }
             if (AVarDecl.class.isInstance(node1)) {
                Variable var = ((AVarDecl)node1).var();
                if (var != null && var.isStruct()) {
@@ -110,22 +126,6 @@ public class CleanupPass {
                   it.set(structdec);
                   node1 = structdec;
                }
-            }
-
-            if (AVarDecl.class.isInstance(node1) && it.hasNext()) {
-               ScriptNode node2 = (ScriptNode)it.next();
-               it.previous();
-               if (AExpressionStatement.class.isInstance(node2) && AModifyExp.class.isInstance(((AExpressionStatement)node2).exp())) {
-                  AModifyExp modexp = (AModifyExp)((AExpressionStatement)node2).exp();
-                  if (((AVarDecl)node1).var() == modexp.varRef().var()) {
-                     it.remove();
-                     node2.parent(null);
-                     ((AVarDecl)node1).initializeExp(modexp.expression());
-                  }
-               }
-
-               it.previous();
-               it.next();
             }
 
             if (this.isDanglingExpression(node1)) {

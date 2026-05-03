@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs.analysis;
 
@@ -12,9 +11,9 @@ import com.kotor.resource.formats.ncs.utils.NodeUtils;
 import com.kotor.resource.formats.ncs.utils.SubroutineAnalysisData;
 import com.kotor.resource.formats.ncs.utils.SubroutinePathFinder;
 import com.kotor.resource.formats.ncs.utils.SubroutineState;
+import com.kotor.resource.formats.ncs.utils.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -115,11 +114,25 @@ public class PrototypeEngine {
             }
             int pos = this.nodedata.getPos(sub);
             int inferredParams = callsiteParams.getOrDefault(pos, 0);
-            if (inferredParams == 0) {
-               inferredParams = this.estimateParamsFromMovesp(sub);
+            int movespParams = this.estimateParamsFromMovesp(sub);
+            // Prefer the smaller non-zero estimate to avoid over-counting locals;
+            // fall back to whichever is available when the other is zero.
+            if (inferredParams > 0 && movespParams > 0) {
+               inferredParams = Math.min(inferredParams, movespParams);
+            } else if (inferredParams == 0 && movespParams > 0) {
+               inferredParams = movespParams;
+            }
+            if (inferredParams < 0) {
+               inferredParams = 0;
             }
             state.startPrototyping();
             state.setParamCount(inferredParams);
+            // If we failed to prototype the subroutine, pick a safe, compilable default return type.
+            // Using void here suppresses later return-slot inference and can corrupt signatures.
+            if (!state.type().isTyped()) {
+               state.setReturnType(new Type(Type.VT_INTEGER), 0);
+            }
+            state.ensureParamPlaceholders();
             state.stopPrototyping(true);
          }
       }

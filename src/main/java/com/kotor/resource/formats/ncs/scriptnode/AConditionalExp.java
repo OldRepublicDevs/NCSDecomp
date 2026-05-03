@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs.scriptnode;
 
@@ -11,6 +10,7 @@ public class AConditionalExp extends ScriptNode implements AExpression {
    private AExpression right;
    private String op;
    private StackEntry stackentry;
+   private boolean forceParens; // For bytecode-perfect round-tripping of grouped expressions
 
    public AConditionalExp(AExpression left, AExpression right, String op) {
       this.left(left);
@@ -36,9 +36,21 @@ public class AConditionalExp extends ScriptNode implements AExpression {
       return this.right;
    }
 
+   public String op() {
+      return this.op;
+   }
+
+   public boolean forceParens() {
+      return this.forceParens;
+   }
+
+   public void forceParens(boolean forceParens) {
+      this.forceParens = forceParens;
+   }
+
    @Override
    public String toString() {
-      return "(" + this.left.toString() + " " + this.op + " " + this.right.toString() + ")";
+      return ExpressionFormatter.format(this);
    }
 
    @Override

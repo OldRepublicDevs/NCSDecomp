@@ -28,6 +28,14 @@
 *.zip
 *.tar.gz
 *.rar
+*.exe
+!tools/nwnnsscomp_incompatible_tslpatcher.exe
+!tools/nwnnsscomp_incompatible_v1.exe
+!tools/nwnnsscomp_kscript.exe
+!tools/nwnnsscomp_ktool.exe
+*.app
+!.mvn/extensions/guice-hiddenclass-patch.jar
+!build-support/guice-hiddenclass-patch/**
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
@@ -49,23 +57,26 @@ buildNumber.properties
 .gradle/
 build/
 !gradle/wrapper/gradle-wrapper.jar
+!build-support/**
 
-# Test output
+# Test output (moved to target/test-output/)
 test_*.txt
 test_output.txt
 test_results*.txt
 test_udiff*.txt
 test_fastfail.txt
 test_profile.txt
+test-output.txt
 
 # Test working directories (created by tests)
-test-work/
-roundtrip-work/
-addcompile-temp/
 
-# Build artifacts
+# Build artifacts (old locations - now using target/)
 dist-exe/
 publish/
+build/
+build-gui/
+META-INF/
+*.ncs
 
 # Vendor dependencies (external code)
 vendor/
@@ -74,3 +85,13 @@ vendor/
 .DS_Store
 Thumbs.db
 jpackage-input/
+
+# Other files/folders
+dencs_converted/
+misc/
+tmp/
+config/
+test-output.txt
+tmp/
+tests/
+test-work/

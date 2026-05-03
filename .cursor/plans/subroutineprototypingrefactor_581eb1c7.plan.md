@@ -67,7 +67,7 @@ Goal: Replace the current ad-hoc multi-pass prototyping (spread across `FileDeco
 - adapt-FileDecompiler: Replace current `for(pass…)` block (≈ lines 740-770, 789-805) with single call to `PrototypeEngine.run()`.
 - slim-DoTypes: Remove prototype synthesis paths (`prototypeSubroutine`, fallback sections 246-279, 285-309); retain stack validation only.
 - migrate-on-demand: Where on-demand prototype was called, now just `assert substate.isPrototyped()`.
-- strict-flag: Add CLI flag `--strict-signatures` in `NCSDecompCLI` to abort if any `Any` types remain.
+- strict-flag: Add CLI flag `--strict-signatures` in `DeNCSCLI` to abort if any `Any` types remain.
 - tests-realworld: Add regression scripts under `tests/fixtures` with scripts previously failing; verify decompile completes and signatures make sense.
 
 ## File Touch Points
@@ -78,7 +78,7 @@ Goal: Replace the current ad-hoc multi-pass prototyping (spread across `FileDeco
 - Update existing:
 - `[src/main/java/com/kotor/resource/formats/ncs/FileDecompiler.java]`
 - `[src/main/java/com/kotor/resource/formats/ncs/DoTypes.java]`
-- `[src/main/java/com/kotor/resource/formats/ncs/NCSDecompCLI.java]`
+- `[src/main/java/com/kotor/resource/formats/ncs/DeNCSCLI.java]`
 
 ## Optional Enhancements
 

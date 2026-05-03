@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -18,7 +17,6 @@ import java.util.Map;
  * <p>
  * References for recorded hashes and argument shapes:
  * <ul>
- *    <li>vendor/TSLPatcher/TSLPatcher.pl - Original Perl TSLPatcher implementation</li>
  *    <li>vendor/Kotor.NET/Kotor.NET.Patcher/ - Incomplete C# patcher</li>
  *    <li>vendor/xoreos-tools/src/nwscript/compiler.cpp - Xoreos compiler</li>
  * </ul>
@@ -27,6 +25,7 @@ public enum KnownExternalCompilers {
    /**
     * TSLPatcher compiler version.
     */
+   /**
    TSLPATCHER(
       "539EB689D2E0D3751AEED273385865278BEF6696C46BC0CAB116B40C3B2FE820",
       "TSLPatcher",
@@ -35,6 +34,7 @@ public enum KnownExternalCompilers {
       new String[]{"-c", "{source}", "-o", "{output}"},
       new String[]{"-d", "{source}", "-o", "{output}"}
    ),
+   */
 
    /**
     * KOTOR Tool compiler version.
@@ -44,13 +44,14 @@ public enum KnownExternalCompilers {
       "KOTOR Tool",
       LocalDate.of(2005, 1, 1),
       "Fred Tetra",
-      new String[]{"-c", "--outputdir", "{output_dir}", "-o", "{output_name}", "-g", "{game_value}", "{source}"},
+      new String[]{"-c", "--outputdir", "{output_dir}", "-o", "{output_name}", "-g", "{game_value}", "{includes}", "{source}"},
       new String[]{"-d", "--outputdir", "{output_dir}", "-o", "{output_name}", "-g", "{game_value}", "{source}"}
    ),
 
    /**
     * v1.3 first public release.
     */
+   /**
    V1(
       "EC3E657C18A32AD13D28DA0AA3A77911B32D9661EA83CF0D9BCE02E1C4D8499D",
       "v1.3 first public release",
@@ -59,6 +60,7 @@ public enum KnownExternalCompilers {
       new String[]{"-c", "{source}", "{output}"},
       new String[]{"-d", "{source}", "{output}"}
    ),
+   */
 
    /**
     * KOTOR Scripting Tool compiler.
@@ -68,31 +70,19 @@ public enum KnownExternalCompilers {
       "KOTOR Scripting Tool",
       LocalDate.of(2016, 5, 18),
       "James Goad", // TODO: double check
-      new String[]{"-c", "--outputdir", "{output_dir}", "-o", "{output_name}", "-g", "{game_value}", "{source}"},
+      new String[]{"-c", "--outputdir", "{output_dir}", "-o", "{output_name}", "-g", "{game_value}", "{includes}", "{source}"},
       new String[]{"-d", "--outputdir", "{output_dir}", "-o", "{output_name}", "-g", "{game_value}", "{source}"}
    ),
 
    /**
-    * DeNCS compiler (same hash as TSLPATCHER in original Python code).
-    */
-   DENCS(
-      "539EB689D2E0D3751AEED273385865278BEF6696C46BC0CAB116B40C3B2FE820",
-      "DeNCS",
-      LocalDate.of(2006, 5, 30),
-      "todo",
-      new String[]{"-c", "{source}", "-o", "{output}"},
-      new String[]{"-d", "{source}", "-o", "{output}"}
-   ),
-
-   /**
-    * Xoreos Tools compiler (primarily for engine reimplementation).
+    * Xoreos Tools compiler/decompiler.
     */
    XOREOS(
       "",
       "Xoreos Tools",
-      LocalDate.of(2016, 1, 1), // Approximate based on project history
-      "Xoreos Team",
-      new String[]{}, // Xoreos tools are primarily for engine reimplementation
+      LocalDate.of(2016, 1, 1),
+      "DrMcFly",
+      new String[]{},
       new String[]{}
    ),
 
@@ -106,6 +96,24 @@ public enum KnownExternalCompilers {
       "Nick Hugi",
       new String[]{"-c", "{source}", "-o", "{output}"},
       new String[]{} // knsscomp doesn't support decompilation
+   ),
+
+   /**
+    * ncsdis - NCS disassembler (bytecode/pcode only, no compilation support).
+    * This tool produces pcode listings with a different format than nwnnsscomp:
+    * - Uses symbolic labels (_start, main, sta_XXXXX, loc_XXXXX)
+    * - Includes separator lines between sections
+    * - Uses single-word opcodes (STORESTATE vs STORE_STATE)
+    * - Shows minimal decimal formatting instead of zero-padded hex
+    * - No nwscript.nss dependency required
+    */
+   NCSDIS(
+      "B1F398C2F64F4ACF2F39C417E7C7EB6F5483369BB95853C63A009F925A2E257C",
+      "ncsdis",
+      LocalDate.of(2020, 8, 3),
+      "Unknown", // TODO: Identify original author
+      new String[]{}, // ncsdis doesn't support compilation
+      new String[]{"{source}", "{output}"} // ncsdis.exe <input.ncs> <output.pcode>
    );
 
    private final String sha256;

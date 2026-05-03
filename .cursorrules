@@ -1,4 +1,4 @@
-# NCSDecomp Rules and Conventions for AI LLM agents
+# DeNCS Rules and Conventions for AI LLM agents
 
 ## ⚠️ CRITICAL: Git Commit Requirement ⚠️
 
@@ -9,6 +9,8 @@
 3. **Verify the commit succeeded**: Check that `git commit` returns successfully with no errors
 
 **This is NOT optional.** Do NOT summarize changes without committing them. Do NOT skip this step. Every code change, file modification, or configuration update MUST be committed before you consider the task complete.
+
+**NEVER use `git add .` or `git add -A` to stage changes.** Always stage files individually. This is because we may have multiple agents working on multiple files simultaneously.
 
 **Commit message format**: Use conventional commits format:
 
@@ -29,12 +31,123 @@ When creating ANY new `.md` files, always follow these guidelines:
 
 - Always place within `docs`
 - Never report on progression (changes and what still remains to be done).
-- Exclusively provide public-facing documentation, something an end user will need to read if they want to either develop for NCSDecomp or work with it.
+- Exclusively provide public-facing documentation, something an end user will need to read if they want to either develop for DeNCS or work with it.
 
-Please do not create .md documentation unless it delivers public-facing information or authoritative gameplay/platform references that an end user or developer genuinely needs for NCSDecomp or the games themselves.
+Please do not create .md documentation unless it delivers public-facing information or authoritative gameplay/platform references that an end user or developer genuinely needs for DeNCS or the games themselves.
 
 ## Helper Scripts
 
 - Always place within `scripts`
 - Should be idempotent and flexible enough to be used for a plethora of scenarios, not just whatever the task you're working on involves.
 - Do not delete helper .py/.ps1/.sh scripts when you are finished with them; keep them in scripts folder
+
+## Tooling & Testing
+
+**CLI Usage**: Main class is `com.kotor.resource.formats.ncs.DeNCSCLI` (NOT `DeNCS`). Run via: `java -cp "target/classes;lib/*" com.kotor.resource.formats.ncs.DeNCSCLI -i <input.ncs> -o <output.nss> -g k1|k2`
+
+**Test Data**: Round-trip tests use `test-work/Vanilla_KOTOR_Script_Source/` (cloned repo, NOT `test_data/`). Test artifacts in `roundtrip-work/`. Original sources: `test-work/Vanilla_KOTOR_Script_Source/K1/Data/scripts.bif/*.nss` or `K2/Data/scripts.bif/*.nss`.
+
+**Running Tests**: Use `scripts/run_tests_with_timeout.ps1` (PowerShell) or `scripts/run_tests_with_timeout.sh` (bash). Tests compile original `.nss`->`.ncs`, decompile `.ncs`->`.nss`, recompile decompiled `.nss`->`.ncs`, then compare bytecode. Fast-fail stops on first mismatch.
+
+**MANDATORY**: When tests fail to start (timeouts, classpath issues, missing jars/classes, logging problems), **do not bypass** the test runner by invoking ad-hoc `javac`, `java`, Maven, or custom commands. **Fix `scripts/run_tests.ps1` instead** so the repository’s standard runner remains the single source of truth for how tests are compiled, executed, timed out, and logged.
+
+**Action Opcodes**: Action definitions in `src/main/resources/*_nwscript.nss` or `tools/*_nwscript.nss`. Format: `// N:` comment followed by function signature. Action index N maps to opcode N in bytecode. Search pattern: `^// (N):` where N is decimal action ID. Example: `// 120:` = `EffectDamageIncrease`, `// 57:` = `PauseGame`.
+
+**Common Mistakes**: Don't search for "action 120" in source files—look for `// 120:` comments. Don't assume `test_data/` exists—use `test-work/`. Don't use `DeNCS` class—use `DeNCSCLI`. When bytecode mismatches, inspect decompiled output structure (missing spaces, malformed blocks) not just opcodes—structural issues cause wrong actions to be emitted.
+
+## Decompiling/bytecode
+
+Use `tools\ncsdis.exe` or `tools\nwnnsscomp_kscript.exe` to get bytecode disassembly (pcode format).
+
+**ncsdis.exe** (preferred): `ncsdis.exe input.ncs output.pcode`
+
+- Simpler format with symbolic labels (_start, main, sta_XXX, loc_XXX)
+- No nwscript.nss dependency
+- Clean, readable output
+
+**nwnnsscomp_kscript.exe**: `nwnnsscomp_kscript.exe -d input.ncs -o output.pcode -g 1`
+
+- Different format but semantically identical bytecode
+- Requires nwscript.nss in tools/ directory
+- Shows function names for ACTION opcodes
+
+Both formats are supported. DeNCS automatically normalizes for comparison. See `docs/ncsdis_integration.md` for format differences.
+
+Use `tools\ncsdis.exe` to get bytecode disassembly: `ncsdis --kotor input.ncs output_BYTECODE.nss` (or `--kotor2`, `--nwn`, etc.). Alternatively use `tools\nwnnsscomp_kscript.exe` decompiler. Don't manually read raw bytes from `.ncs` files.
+
+## Debug Statements
+
+**ALWAYS add comprehensive debug statements when working on control flow, bytecode processing, or complex logic issues.** Debug statements are valuable for diagnosing problems and should be added exhaustively and thoroughly throughout relevant code paths.
+
+**Pattern and Format**:
+
+- Use `System.err.println()` (not `System.out.println()`) to avoid interfering with normal output
+- Format: `System.err.println("DEBUG <methodName>: <key information>");`
+- Include relevant variables: positions (nodePos, destPos, currentEnd), state values, types, decisions being made
+- Be information-packed but not overly verbose—include multiple useful variables in a single statement when possible
+- Show both input values and decision outcomes (e.g., "returning true/false", "creating X", "updating Y from A to B")
+
+**Example patterns**:
+
+```java
+// Method entry with key parameters
+System.err.println("DEBUG transformJump: pos=" + nodePos + " (0x" + Integer.toHexString(nodePos) +
+      "), destPos=" + destPos + ", state=" + this.state + ", current=" + this.current.getClass().getSimpleName() +
+      ", currentEnd=" + this.current.getEnd() + ", destType=" + (dest != null ? dest.getClass().getSimpleName() : "null"));
+
+// Decision points
+System.err.println("DEBUG isAtIfEnd: nodePos=" + nodePos + ", current=" + this.current.getClass().getSimpleName() +
+      ", currentEnd=" + this.current.getEnd());
+System.err.println("DEBUG isAtIfEnd: returning true (current is AIf)");
+
+// State changes
+System.err.println("DEBUG transformJZ: UPDATING AIf end from " + currentEnd + " to " + expectedEnd);
+
+// Conditional branches
+System.err.println("DEBUG checkEnd: destPos != aifEnd+6, creating else block");
+System.err.println("DEBUG checkEnd: AIf end=" + aifEnd + ", destPos=" + destPos + ", expectedElseStart=" + (aifEnd + 6));
+```
+
+**Where to add debug statements**:
+
+- Method entry points (show key parameters and current state)
+- Decision points (if/else branches, switch cases, return statements)
+- State changes (when `this.current` changes, when `this.state` changes, when node end positions are updated)
+- Loop iterations (when iterating through parent chains, processing children)
+- Error conditions or edge cases
+- Before and after critical operations (creating nodes, updating positions, transitioning states)
+
+**Keep debug statements in committed code**—they are valuable for future debugging and understanding control flow. They can be filtered out during normal operation using stderr redirection if needed.
+
+<!-- BEGIN ContextStream -->
+## ContextStream Dynamic Rules (Powered by our SmartRouter)
+
+All rules are served dynamically via `context_smart`. This file is minimal by design.
+
+### Every Message Protocol
+
+| Message | What to Call |
+|---------|--------------|
+| **1st message** | `session_init(folder_path="<cwd>", context_hint="<msg>")` then `context_smart(user_message="<msg>")` |
+| **2nd+ messages** | `context_smart(user_message="<msg>")` |
+
+### Follow the Instructions Field
+
+The `context_smart` response includes an `instructions` field with context-aware guidance.
+**Follow these instructions.** They are dynamically matched to your query and include:
+- Search guidance (when/how to search)
+- Git workflow rules (commit, PR, safety)
+- Planning rules (use ContextStream plans, not file-based)
+- Media/code analysis guidance
+- Lessons from past mistakes
+- And more...
+
+### Notices
+
+Handle notices from `context_smart` response:
+- **[VERSION_NOTICE]**: Tell user to update MCP
+- **[RULES_NOTICE]**: Run `generate_rules()`
+- **[LESSONS_WARNING]**: Apply lessons immediately
+
+Rules Version: 0.4.44
+<!-- END ContextStream -->

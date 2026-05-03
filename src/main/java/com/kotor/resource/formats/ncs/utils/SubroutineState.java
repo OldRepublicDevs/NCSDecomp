@@ -1,7 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// Visit https://bolabaden.org for more information and other ventures
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs.utils;
 
@@ -44,7 +42,10 @@ public class SubroutineState {
       this.paramstyped = true;
       this.paramsize = 0;
       this.status = 0;
-      this.type = new Type((byte)0);
+      // Default return type to "unknown" so typing passes are allowed to infer it.
+      // Using "void" here incorrectly suppresses return inference (DoTypes/protoreturn)
+      // and can corrupt signatures for returning subroutines (breaks round-tripping).
+      this.type = new Type((byte)-1);
       this.root = root;
       this.id = id;
    }
@@ -151,7 +152,7 @@ public class SubroutineState {
    }
 
    public boolean isTotallyPrototyped() {
-      return this.status == 2 && this.paramstyped && this.type.isTyped();
+      return this.status == 2 && this.params.size() >= this.paramsize;
    }
 
    public boolean getSkipStart(int pos) {
@@ -185,10 +186,8 @@ public class SubroutineState {
       this.paramsize = params;
       if (params > 0) {
          this.paramstyped = false;
-         if (this.returndepth <= params) {
-            this.type = new Type((byte)0);
-         }
       }
+      this.ensureParamPlaceholders();
    }
 
    public int getParamCount() {
@@ -212,24 +211,38 @@ public class SubroutineState {
       new Type((byte)-1);
       this.paramstyped = true;
       boolean redo = this.params.size() > 0;
-      if (types.size() != this.paramsize) {
-         throw new RuntimeException(
-            "Parameter count does not match: expected " + Integer.toString(this.paramsize) + " and got " + Integer.toString(types.size())
-         );
-      } else {
-         for (int i = 0; i < types.size(); i++) {
-            Type newtype = types.get(i);
-
-            if (redo && !this.params.get(i).isTyped()) {
-               this.params.set(i, newtype);
-            } else if (!redo) {
-               this.params.add(newtype);
-            }
-
-            if (!this.params.get(i).isTyped()) {
-               this.paramstyped = false;
-            }
+      if (types.size() < this.paramsize) {
+         while (types.size() < this.paramsize) {
+            types.addFirst(new Type((byte)-1));
          }
+      } else if (types.size() > this.paramsize) {
+         while (types.size() > this.paramsize) {
+            types.removeFirst();
+         }
+      }
+
+      for (int i = 0; i < types.size(); i++) {
+         Type newtype = types.get(i);
+
+         if (redo && !this.params.get(i).isTyped()) {
+            this.params.set(i, newtype);
+         } else if (!redo) {
+            this.params.add(newtype);
+         }
+
+         if (!this.params.get(i).isTyped()) {
+            this.paramstyped = false;
+         }
+      }
+   }
+
+   /** Ensure params list matches paramsize using placeholder types. */
+   public void ensureParamPlaceholders() {
+      while (this.params.size() < this.paramsize) {
+         this.params.add(new Type(Type.VT_INTEGER));
+      }
+      while (this.params.size() > this.paramsize) {
+         this.params.remove(this.params.size() - 1);
       }
    }
 
@@ -362,4 +375,3 @@ public class SubroutineState {
       }
    }
 }
-

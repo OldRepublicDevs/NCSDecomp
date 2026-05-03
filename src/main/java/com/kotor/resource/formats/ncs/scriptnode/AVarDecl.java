@@ -1,7 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// Visit https://bolabaden.org for more information and other ventures
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs.scriptnode;
 
@@ -59,7 +57,7 @@ public class AVarDecl extends ScriptNode {
    public String toString() {
       return this.exp == null
          ? this.tabs + this.var.toDeclString() + ";" + this.newline
-         : this.tabs + this.var.toDeclString() + " = " + this.exp.toString() + ";" + this.newline;
+         : this.tabs + this.var.toDeclString() + " = " + ExpressionFormatter.formatValue(this.exp) + ";" + this.newline;
    }
 
    @Override

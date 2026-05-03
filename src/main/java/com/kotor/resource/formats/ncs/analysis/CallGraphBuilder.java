@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs.analysis;
 
@@ -32,6 +31,14 @@ public class CallGraphBuilder extends PrunedDepthFirstAdapter {
    }
 
    public CallGraph build() {
+      // Include main + globals so reachability/prototyping sees calls from entrypoints.
+      // getSubroutines() intentionally excludes main/globals.
+      if (this.subdata.getGlobalsSub() != null) {
+         this.subdata.getGlobalsSub().apply(this);
+      }
+      if (this.subdata.getMainSub() != null) {
+         this.subdata.getMainSub().apply(this);
+      }
       this.subdata.getSubroutines().forEachRemaining(sub -> sub.apply(this));
       return new CallGraph(this.edges);
    }

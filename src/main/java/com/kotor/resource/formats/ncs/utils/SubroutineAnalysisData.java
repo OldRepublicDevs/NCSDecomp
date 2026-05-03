@@ -1,7 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// Visit https://bolabaden.org for more information and other ventures
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs.utils;
 
@@ -275,7 +273,12 @@ public class SubroutineAnalysisData {
    private void addMain(ASubroutine sub, boolean conditional) {
       this.mainsub = sub;
       if (conditional) {
-         this.addSubState(this.mainsub, (byte)0, new Type((byte)3));
+         // Conditional programs use StartingConditional() which returns int.
+         // Use return-depth 0 here so later typing/stack setup can infer the
+         // correct calling convention without being skewed by a pre-filled depth.
+         SubroutineState state = new SubroutineState(this.nodedata, this.mainsub, (byte)0);
+         state.setReturnType(new Type((byte)3), 0);
+         this.substates.put(this.mainsub, state);
       } else {
          this.addSubState(this.mainsub, (byte)0);
       }

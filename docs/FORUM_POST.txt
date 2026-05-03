@@ -1,0 +1,128 @@
+[b]DeNCS - Turn Your Compiled KOTOR Scripts Back Into Readable Code![/b]
+
+Ever wanted to see what's inside those compiled .ncs script files from KOTOR? Or maybe you found a mod with scripts you want to understand or modify? DeNCS can take those compiled script files and turn them back into readable source code that you can actually understand and edit!
+
+[b]What does it do?[/b]
+
+Simply put, DeNCS converts compiled KOTOR scripts (.ncs files) back into source code (.nss files). It's like having a translator that converts the game's internal script format back into human-readable code. Works with both KOTOR 1 and KOTOR 2!
+
+[b]How to use:[/b]
+
+There are two ways to use DeNCS - a simple graphical program (GUI) or command-line tools. Most users will want the GUI version!
+
+[b]Option 1: The Easy Way (GUI - Recommended!)[/b]
+
+1. Download the DeNCS folder
+2. Double-click DeNCS.exe (Windows) or DeNCS.app (Mac)
+3. That's it! No Java installation needed - everything is included!
+
+Once it opens:
+[list]
+[*]Drag and drop any .ncs file onto the window to decompile it
+[*]Or use File -> Open to browse for files
+[*]The decompiled code will appear with syntax highlighting (color-coded keywords, functions, etc.)
+[*]You can edit the code right there if you want
+[*]Press Ctrl+S (or Cmd+S on Mac) to save your changes
+[*]Open multiple files at once - each gets its own tab
+[/list]
+
+The program automatically detects whether you're working with KOTOR 1 or KOTOR 2 scripts, so you don't need to worry about that!
+
+[b]Option 2: Command Line (For Advanced Users)[/b]
+
+If you prefer using the command line or want to automate tasks:
+
+Windows:
+[code].\DeNCSCLI.exe -i "script.ncs" -o "script.nss" --k2[/code]
+
+Mac/Linux:
+[code]./DeNCSCLI -i "script.ncs" -o "script.nss" --k2[/code]
+
+This reads script.ncs and creates script.nss with the decompiled code. Use --k1 for KOTOR 1 scripts, or --k2 for KOTOR 2 scripts.
+
+Decompile an entire folder:
+[code].\DeNCSCLI.exe -i "scripts_folder" -r --k2 -O "output_folder"[/code]
+
+This processes all .ncs files in the folder (including subfolders) and saves the results to your output folder.
+
+[b]Features:[/b]
+
+[list]
+[*]Works with both KOTOR 1 and KOTOR 2/TSL scripts
+[*]Beautiful graphical interface with syntax highlighting
+[*]Edit decompiled scripts and compile them back
+[*]Round-trip verification - see if your edited code compiles correctly
+[*]Batch process entire folders of scripts at once
+[*]View bytecode if you're curious about the low-level details
+[*]Self-contained - no Java installation needed!
+[*]Cross-platform - works on Windows, Mac, and Linux
+[/list]
+
+[b]What can you do with it?[/b]
+
+[list]
+[*]Decompile .ncs files to see the original source code
+[*]Understand how game scripts work
+[*]Edit scripts and recompile them for mods
+[*]Analyze scripts from your favorite mods
+[*]Batch process entire script folders quickly
+[/list]
+
+[b]Troubleshooting:[/b]
+
+[i]"Error: nwscript file not found"[/i]
+[list]
+[*]Make sure you haven't deleted or moved the tools folder that came with the download
+[*]The program should find everything automatically, but if you get this error, check that the tools folder is in the same directory as the executable
+[/list]
+
+[i]"Program won't start" (Windows)[/i]
+[list]
+[*]Windows might be blocking it. Right-click DeNCS.exe -> Properties -> Check "Unblock" -> Apply
+[*]Try running as Administrator if you get permission errors
+[/list]
+
+[i]"Program won't start" (Mac)[/i]
+[list]
+[*]You may need to allow the app in System Preferences -> Security & Privacy
+[*]Right-click the app and select "Open" the first time
+[/list]
+
+[i]"Program won't start" (Linux)[/i]
+[list]
+[*]Make sure the executable has permission to run: chmod +x DeNCSCLI/DeNCSCLI
+[/list]
+
+For more help:
+[list]
+[*]Run .\DeNCSCLI.exe --help (Windows) or ./DeNCSCLI --help (Mac/Linux) to see all available options
+[*]Check the included README files for detailed documentation
+[/list]
+
+[b]Source code and more info:[/b]
+
+[url=https://github.com/bolabaden]https://github.com/bolabaden[/url]
+[url=https://bolabaden.org]https://bolabaden.org[/url]
+
+[b]Credits:[/b]
+
+[b]Original Developers (The Foundation):[/b]
+[list]
+[*]JdNoa - Created the original script decompiler engine
+[*]Dashus - Created the original GUI
+[/list]
+
+These developers did the hard foundational work that made this tool possible. The original DeNCS was an internal tool used by TSLRP (The Sith Lords Restoration Project) and was released to the public "as is" with no warranty.
+
+[b]Current Maintainer:[/b]
+[list]
+[*]th3w1zard1 - Complete rewrite and modernization
+[/list]
+
+This version represents a near-complete rewrite and modernization of the original DeNCS tool. While based on the original developers' foundational work, the current version has been extensively revamped with a new GUI, modernized codebase, cross-platform support, and many new features. The core decompilation concepts from the original work remain, but the implementation has been significantly rewritten for modern development practices.
+
+[b]License:[/b]
+
+This software is provided under the MIT License (see LICENSE). See LICENSE in the download for full license information.
+
+Enjoy decompiling! 🎮✨

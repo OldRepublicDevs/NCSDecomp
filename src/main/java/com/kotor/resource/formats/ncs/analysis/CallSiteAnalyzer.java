@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 package com.kotor.resource.formats.ncs.analysis;
 
 import com.kotor.resource.formats.ncs.ActionsData;
@@ -26,6 +25,7 @@ import com.kotor.resource.formats.ncs.utils.Type;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+
 
 /**
  * Lightweight stack simulator that estimates parameter counts for JSR targets
@@ -54,8 +54,16 @@ public class CallSiteAnalyzer extends PrunedDepthFirstAdapter {
     * @return map of destination bytecode offsets to inferred parameter counts
     */
    public Map<Integer, Integer> analyze() {
-      Iterator<ASubroutine> subs = this.subdata.getSubroutines();
+      // Include globals + main so we see call-sites from entrypoints.
+      // getSubroutines() intentionally excludes main/globals.
+      if (this.subdata.getGlobalsSub() != null) {
+         this.analyzeSubroutine(this.subdata.getGlobalsSub());
+      }
+      if (this.subdata.getMainSub() != null) {
+         this.analyzeSubroutine(this.subdata.getMainSub());
+      }
 
+      Iterator<ASubroutine> subs = this.subdata.getSubroutines();
       while (subs.hasNext()) {
          this.analyzeSubroutine(subs.next());
       }
@@ -191,12 +199,16 @@ public class CallSiteAnalyzer extends PrunedDepthFirstAdapter {
    public void outAJumpToSubroutine(AJumpToSubroutine node) {
       if (!this.skipdeadcode) {
          int dest = NodeUtils.getJumpDestinationPos(node);
+         // Growth tracks pushes since the last statement boundary/reset. For JSR call-sites,
+         // that growth includes the reserved return slot (RSADD) plus the actual arguments.
+         // We want argument count, so subtract the return slot when present.
          int inferred = Math.max(0, this.growth);
-         if (inferred == 0) {
-            inferred = Math.max(0, this.height);
+         if (inferred > 0) {
+            inferred = Math.max(0, inferred - 1);
          }
 
          this.inferredParams.merge(dest, inferred, Math::max);
+         // Pop only the arguments; the return slot remains on the stack.
          this.pop(inferred);
          this.resetGrowth();
       }

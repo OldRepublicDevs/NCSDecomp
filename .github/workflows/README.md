@@ -1,6 +1,6 @@
 # GitHub Actions Workflows Documentation
 
-This directory contains GitHub Actions workflows for automated CI/CD, security analysis, and release management for the NCSDecomp project.
+This directory contains GitHub Actions workflows for automated CI/CD, security analysis, and release management for the DeNCS project.
 
 ## Overview
 
@@ -235,8 +235,8 @@ This workflow requires `contents: write` permission to create releases. This is 
 You can add status badges to your README.md to show workflow status:
 
 ```markdown
-![CI](https://github.com/bolabaden/NCSDecomp/workflows/CI/badge.svg)
-![CodeQL](https://github.com/bolabaden/NCSDecomp/workflows/CodeQL%20Security%20Analysis/badge.svg)
+![CI](https://github.com/bolabaden/DeNCS/workflows/CI/badge.svg)
+![CodeQL](https://github.com/bolabaden/DeNCS/workflows/CodeQL%20Security%20Analysis/badge.svg)
 ```
 
 ---

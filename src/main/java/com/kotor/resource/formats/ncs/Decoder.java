@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -309,7 +308,19 @@ public class Decoder {
       } else {
          this.pos += 4;
          BigInteger i = new BigInteger(buffer);
-         return Float.toString(Float.intBitsToFloat(i.intValue()));
+         float floatValue = Float.intBitsToFloat(i.intValue());
+         // Format float to avoid scientific notation (E- or E+) which the lexer doesn't support
+         // Use DecimalFormat to ensure we get decimal notation, not scientific
+         java.text.DecimalFormat df = new java.text.DecimalFormat("0.0##############");
+         df.setMaximumFractionDigits(15); // Float has ~7 decimal digits of precision
+         df.setMinimumFractionDigits(0);
+         df.setGroupingUsed(false);
+         String result = df.format(floatValue);
+         // Ensure we have at least one digit after the decimal point for very small numbers
+         if (result.indexOf('.') == -1 && Math.abs(floatValue) < 1.0 && floatValue != 0.0) {
+            result = "0." + result;
+         }
+         return result;
       }
    }
 

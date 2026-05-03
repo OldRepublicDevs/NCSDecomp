@@ -1,7 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// Visit https://bolabaden.org for more information and other ventures
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs.scriptnode;
 
@@ -91,7 +89,7 @@ public class ASwitch extends ScriptNode {
    @Override
    public String toString() {
       StringBuffer buff = new StringBuffer();
-      buff.append(this.tabs + "switch (" + this.switchexp + ") {" + this.newline);
+      buff.append(this.tabs + "switch(" + this.switchexp + ") {" + this.newline);
 
       for (int i = 0; i < this.cases.size(); i++) {
          buff.append(this.cases.get(i).toString());

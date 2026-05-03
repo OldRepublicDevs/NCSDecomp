@@ -1,7 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// Visit https://bolabaden.org for more information and other ventures
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs.utils;
 
@@ -338,7 +336,17 @@ public final class NodeUtils {
       if (type.byteValue() != 4) {
          throw new RuntimeException("Expected float const type (4), got " + type);
       }
-      return Float.parseFloat(((AFloatConstant)pconst).getFloatConstant().getText());
+      // Handle case where parser created AIntConstant instead of AFloatConstant
+      // This can happen when the float value is a whole number or due to parser quirks
+      if (AIntConstant.class.isInstance(pconst)) {
+         // Parse as integer first, then convert to float
+         long intValue = Long.parseLong(((AIntConstant)pconst).getIntegerConstant().getText());
+         return (float)intValue;
+      } else if (AFloatConstant.class.isInstance(pconst)) {
+         return Float.parseFloat(((AFloatConstant)pconst).getFloatConstant().getText());
+      } else {
+         throw new RuntimeException("Expected AFloatConstant or AIntConstant, got " + pconst.getClass().getSimpleName());
+      }
    }
 
    public static String getStringConstValue(AConstCommand node) {
@@ -384,15 +392,22 @@ public final class NodeUtils {
    }
 
    public static int actionRemoveElementCount(AActionCommand node, ActionsData actions) {
-      List<Type> types = getActionParamTypes(node, actions);
-      int count = getActionParamCount(node);
-      int remove = 0;
+      try {
+         List<Type> types = getActionParamTypes(node, actions);
+         int count = Math.min(getActionParamCount(node), types.size());
+         int remove = 0;
 
-      for (int i = 0; i < count; i++) {
-         remove += types.get(i).typeSize();
+         for (int i = 0; i < count; i++) {
+            remove += types.get(i).typeSize();
+         }
+
+         return stackSizeToPos(remove);
+      } catch (RuntimeException e) {
+         // Action metadata missing or invalid - fall back to raw arg bytes.
+         // ArgCount is stored in bytes; convert to stack slots for consistency.
+         int argBytes = getActionParamCount(node);
+         return stackSizeToPos(argBytes);
       }
-
-      return stackSizeToPos(remove);
    }
 
    public static int stackOffsetToPos(TIntegerConstant offset) {

@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -219,7 +218,13 @@ public class MainPass extends PrunedDepthFirstAdapter {
                i += entry.size();
             }
 
-            Type type = NodeUtils.getReturnType(node, this.actions);
+            Type type;
+            try {
+               type = NodeUtils.getReturnType(node, this.actions);
+            } catch (RuntimeException e) {
+               // Action metadata missing or invalid - assume void return
+               type = new Type((byte)0);
+            }
             if (!type.equals((byte)-16)) {
                if (!type.equals((byte)0)) {
                   Variable var = new Variable(type);

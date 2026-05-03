@@ -1,7 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// Visit https://bolabaden.org for more information and other ventures
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs.scriptnode;
 
@@ -26,7 +24,9 @@ public class AReturnStatement extends ScriptNode {
 
    @Override
    public String toString() {
-      return this.returnexp == null ? this.tabs + "return;" + this.newline : this.tabs + "return " + this.returnexp.toString() + ";" + this.newline;
+      return this.returnexp == null
+         ? this.tabs + "return;" + this.newline
+         : this.tabs + "return " + ExpressionFormatter.formatValue(this.returnexp) + ";" + this.newline;
    }
 
    @Override

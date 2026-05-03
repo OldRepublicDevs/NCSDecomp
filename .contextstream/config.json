@@ -1,0 +1,19 @@
+{
+  "workspace_id": "99619ee8-05d8-44ab-a96c-e62d06b6184e",
+  "workspace_name": "Personal Workspace",
+  "associated_at": "2026-01-28T23:55:27.449Z",
+  "version": "0.4.44",
+  "configured_editors": [
+    "codex",
+    "claude",
+    "cursor",
+    "cline",
+    "kilo",
+    "roo",
+    "aider",
+    "antigravity"
+  ],
+  "context_pack": true,
+  "api_url": "https://api.contextstream.io",
+  "updated_at": "2026-01-28T23:55:27.449Z"
+}

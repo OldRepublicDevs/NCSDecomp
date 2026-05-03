@@ -1,7 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// Visit https://bolabaden.org for more information and other ventures
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs.stack;
 
@@ -64,7 +62,6 @@ public class LocalTypeStack extends LocalStack<Type> {
    }
 
    public void remove(int count) {
-      // Only remove as many elements as are available to avoid NoSuchElementException
       int actualCount = Math.min(count, this.stack.size());
       for (int i = 0; i < actualCount; i++) {
          this.stack.removeFirst();
@@ -74,10 +71,8 @@ public class LocalTypeStack extends LocalStack<Type> {
    public void removeParams(int count, SubroutineState state) {
       LinkedList<Type> params = new LinkedList<>();
 
-      // Only remove as many elements as are available to avoid NoSuchElementException
-      int actualCount = Math.min(count, this.stack.size());
-      for (int i = 0; i < actualCount; i++) {
-         Type type = this.stack.removeFirst();
+      for (int i = 0; i < count; i++) {
+         Type type = this.stack.isEmpty() ? new Type((byte)-1) : this.stack.removeFirst();
          params.addFirst(type);
       }
 

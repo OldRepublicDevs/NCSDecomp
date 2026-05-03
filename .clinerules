@@ -1,0 +1,37 @@
+<!-- BEGIN ContextStream -->
+# Workspace: Personal Workspace
+# Project: NCSDecomp
+# Workspace ID: 99619ee8-05d8-44ab-a96c-e62d06b6184e
+
+# Cline Rules
+## ContextStream Dynamic Rules (Powered by our SmartRouter)
+
+All rules are served dynamically via `context_smart`. This file is minimal by design.
+
+### Every Message Protocol
+
+| Message | What to Call |
+|---------|--------------|
+| **1st message** | `session_init(folder_path="<cwd>", context_hint="<msg>")` then `context_smart(user_message="<msg>")` |
+| **2nd+ messages** | `context_smart(user_message="<msg>")` |
+
+### Follow the Instructions Field
+
+The `context_smart` response includes an `instructions` field with context-aware guidance.
+**Follow these instructions.** They are dynamically matched to your query and include:
+- Search guidance (when/how to search)
+- Git workflow rules (commit, PR, safety)
+- Planning rules (use ContextStream plans, not file-based)
+- Media/code analysis guidance
+- Lessons from past mistakes
+- And more...
+
+### Notices
+
+Handle notices from `context_smart` response:
+- **[VERSION_NOTICE]**: Tell user to update MCP
+- **[RULES_NOTICE]**: Run `generate_rules()`
+- **[LESSONS_WARNING]**: Apply lessons immediately
+
+Rules Version: 0.4.44
+<!-- END ContextStream -->

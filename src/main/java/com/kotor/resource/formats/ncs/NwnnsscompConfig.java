@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -44,9 +43,11 @@ public class NwnnsscompConfig {
    public NwnnsscompConfig(File compilerPath, File sourceFile, File outputFile, boolean isK2)
          throws IOException {
       this.sourceFile = sourceFile;
-      this.outputFile = outputFile;
-      this.outputDir = outputFile.getParentFile();
-      this.outputName = outputFile.getName();
+      // Convert to absolute path to ensure parent directory is always available
+      File absoluteOutputFile = outputFile.getAbsoluteFile();
+      this.outputFile = absoluteOutputFile;
+      this.outputDir = absoluteOutputFile.getParentFile();
+      this.outputName = absoluteOutputFile.getName();
       this.isK2 = isK2;
 
       // Calculate hash of the compiler executable
@@ -79,30 +80,53 @@ public class NwnnsscompConfig {
     * @return Array of command-line arguments
     */
    public String[] getCompileArgs(String executable, java.util.List<File> includeDirs) {
-      String[] base = getCompileArgs(executable);
-      if (includeDirs == null || includeDirs.isEmpty()) {
-         return base;
+      // Build include arguments array for {includes} placeholder
+      // Note: KOTOR Tool and KOTOR Scripting Tool don't support -i flag - they expect includes in same directory as source
+      java.util.List<String> includeArgs = new java.util.ArrayList<>();
+      if (includeDirs != null && !includeDirs.isEmpty()) {
+         // Only add -i flags if compiler supports them (not KOTOR Tool or KOTOR Scripting Tool)
+         boolean supportsIncludeFlag = (chosenCompiler != KnownExternalCompilers.KOTOR_TOOL
+               && chosenCompiler != KnownExternalCompilers.KOTOR_SCRIPTING_TOOL);
+         if (supportsIncludeFlag) {
+            for (File dir : includeDirs) {
+               if (dir != null && dir.exists()) {
+                  includeArgs.add("-i");
+                  includeArgs.add(dir.getAbsolutePath());
+               }
+            }
+         }
+         // For KOTOR Tool and KOTOR Scripting Tool, include files must be in the same directory as the source file
+         // The caller should copy include files to the source directory if needed
       }
 
+      // Get base template args
+      String[] template = chosenCompiler.getCompileArgs();
       java.util.List<String> args = new java.util.ArrayList<>();
-      for (String s : base) {
-         args.add(s);
-      }
 
-      for (File dir : includeDirs) {
-         if (dir != null && dir.exists()) {
-            args.add("-i");
-            args.add(dir.getAbsolutePath());
+      // Process template and expand {includes} placeholder
+      for (String arg : template) {
+         if (arg.equals("{includes}")) {
+            // Insert include arguments at this position
+            args.addAll(includeArgs);
+         } else {
+            // Format the argument (replacing other placeholders)
+            String formatted = arg
+               .replace("{source}", sourceFile.getAbsolutePath())
+               .replace("{output}", outputFile.getAbsolutePath())
+               .replace("{output_dir}", outputDir != null ? outputDir.getAbsolutePath() : "")
+               .replace("{output_name}", outputName)
+               .replace("{game_value}", isK2 ? "2" : "1");
+            args.add(formatted);
          }
       }
 
-      return args.toArray(new String[0]);
+      return buildCommand(executable, args);
    }
 
    /**
     * Gets the formatted decompile command-line arguments.
     *
-    * @param executable Path to the nwnnsscomp executable
+    * @param executable Path to the nwnnsscomp executable (or ncsdis.exe)
     * @return Array of command-line arguments
     * @throws UnsupportedOperationException If decompilation is not supported
     */
@@ -111,6 +135,17 @@ public class NwnnsscompConfig {
          throw new UnsupportedOperationException(
             "Compiler '" + chosenCompiler.getName() + "' does not support decompilation");
       }
+
+      // Special handling for ncsdis.exe which uses a simpler command line: ncsdis.exe <input.ncs> <output.pcode>
+      // No -d, -o, or -g flags
+      if (chosenCompiler == KnownExternalCompilers.NCSDIS) {
+         // ncsdis command: ncsdis.exe <input.ncs> <output.pcode>
+         java.util.List<String> args = new java.util.ArrayList<>();
+         args.add(sourceFile.getAbsolutePath());
+         args.add(outputFile.getAbsolutePath());
+         return buildCommand(executable, args);
+      }
+
       return formatArgs(chosenCompiler.getDecompileArgs(), executable);
    }
 
@@ -120,36 +155,55 @@ public class NwnnsscompConfig {
     * @param argsList The argument template array
     * @param executable The executable path
    * @return Formatted argument array where placeholders ({@code {source}}, {@code {output}},
-   * {@code {output_dir}}, {@code {output_name}}, {@code {game_value}}) are replaced
+   * {@code {output_dir}}, {@code {output_name}}, {@code {game_value}}, {@code {includes}}) are replaced
     */
    private String[] formatArgs(String[] argsList, String executable) {
-      String[] formatted = new String[argsList.length];
-      for (int i = 0; i < argsList.length; i++) {
-         String arg = argsList[i];
-         formatted[i] = arg
+      java.util.List<String> formatted = new java.util.ArrayList<>();
+      for (String arg : argsList) {
+         String replaced = arg
             .replace("{source}", sourceFile.getAbsolutePath())
             .replace("{output}", outputFile.getAbsolutePath())
             .replace("{output_dir}", outputDir != null ? outputDir.getAbsolutePath() : "")
             .replace("{output_name}", outputName)
-            .replace("{game_value}", isK2 ? "2" : "1");
+            .replace("{game_value}", isK2 ? "2" : "1")
+            .replace("{includes}", ""); // Remove {includes} placeholder when no includes provided
+         // Only add non-empty arguments
+         if (!replaced.isEmpty()) {
+            formatted.add(replaced);
+         }
       }
 
-      // Check if we're running on a non-Windows platform
+      return buildCommand(executable, formatted);
+   }
+
+   /**
+    * Builds a command array from executable and arguments, prepending {@code wine} on
+    * non-Windows systems when the executable is a {@code .exe} file.
+    *
+    * @param executable The executable path
+    * @param args The list of arguments (excluding the executable itself)
+    * @return Full command array ready for {@link ProcessBuilder}
+    */
+   private String[] buildCommand(String executable, java.util.List<String> args) {
       String osName = System.getProperty("os.name").toLowerCase();
       boolean isWindows = osName.startsWith("windows");
-      
+
       if (!isWindows && executable.toLowerCase().endsWith(".exe")) {
          // Use Wine to run .exe on non-Windows platforms
-         String[] result = new String[formatted.length + 2];
+         String[] result = new String[args.size() + 2];
          result[0] = "wine";
          result[1] = executable;
-         System.arraycopy(formatted, 0, result, 2, formatted.length);
+         for (int i = 0; i < args.size(); i++) {
+            result[i + 2] = args.get(i);
+         }
          return result;
       } else {
          // Prepend the executable path (Windows or non-.exe executable)
-         String[] result = new String[formatted.length + 1];
+         String[] result = new String[args.size() + 1];
          result[0] = executable;
-         System.arraycopy(formatted, 0, result, 1, formatted.length);
+         for (int i = 0; i < args.size(); i++) {
+            result[i + 1] = args.get(i);
+         }
          return result;
       }
    }

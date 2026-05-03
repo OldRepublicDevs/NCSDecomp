@@ -1,6 +1,5 @@
-// Copyright 2021-2025 NCSDecomp
-// Licensed under the Business Source License 1.1 (BSL 1.1).
-// See LICENSE.txt file in the project root for full license information.
+// Copyright 2021-2025 DeNCS
+// Licensed under the MIT License. See LICENSE in the project root for full license text.
 
 package com.kotor.resource.formats.ncs;
 
@@ -18,6 +17,16 @@ public class DecompilerException extends Exception {
     */
    public DecompilerException(String msg) {
       super(msg);
+   }
+
+   /**
+    * Creates a new decompiler exception with a message and underlying cause.
+    *
+    * @param msg description of the failure
+    * @param cause root cause for debugging
+    */
+   public DecompilerException(String msg, Throwable cause) {
+      super(msg, cause);
    }
 }
 
