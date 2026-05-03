@@ -1,3 +1,0 @@
-void main() {
-	IsStealthed(GetPartyLeader());
-}

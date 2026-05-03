@@ -1,3 +1,0 @@
-int StartingConditional() {
-	return GetIsXBox();
-}
